@@ -1,0 +1,62 @@
+[package]
+name = "typus_dov"
+published-at = "0xb8290daeb5204b3527cbc57637df55b12cc28d17ce08eadc910ae4cd8f9a695a"
+edition = "2024.beta"
+
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "mainnet"
+override = true
+
+[dependencies.MoveStdlib]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/move-stdlib"
+rev = "mainnet"
+override = true
+
+[dependencies.SuiSystem]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-system"
+rev = "mainnet"
+override = true
+
+[dependencies.Pyth]
+git = "https://github.com/pyth-network/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "sui-contract-mainnet"
+override = true
+
+[dependencies.SupraOracle]
+git = "https://github.com/Entropy-Foundation/dora-interface.git"
+subdir = "sui/mainnet/supra_holder"
+rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+override = true
+
+[dependencies.supra_utils]
+git = "https://github.com/Entropy-Foundation/dora-interface.git"
+subdir = "sui/mainnet/supra_utils"
+rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+override = true
+
+[dependencies.supra_validator]
+git = "https://github.com/Entropy-Foundation/dora-interface.git"
+subdir = "sui/mainnet/supra_validator"
+rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+override = true
+
+[dependencies.typus_nft]
+local = "../typus_nft"
+
+[dependencies.typus_oracle]
+local = "../typus_oracle"
+
+[dependencies.typus]
+local = "../typus"
+
+[dependencies.typus_framework]
+local = "../typus_framework"
+
+[addresses]
+typus_dov = "0x321848bf1ae327a9e022ccb3701940191e02fa193ab160d9c0e49cd3c003de3a"
+dov_fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
