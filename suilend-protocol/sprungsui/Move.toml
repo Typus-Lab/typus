@@ -1,0 +1,11 @@
+[package]
+name = "sprungsui"
+published-at = "0xb87cea7e4220461e35dff856185814d6a37ef479ce895ffbe4efa1d1af5aacbc"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
+
+[addresses]
+sprungsui = "0xb87cea7e4220461e35dff856185814d6a37ef479ce895ffbe4efa1d1af5aacbc"
+
