@@ -1,0 +1,56 @@
+[package]
+name = "typus_framework"
+version = "2.28.12"
+published-at = "0x708bf175f5a6f365dae45ff7684eb27e0597dcd0f142ba1999587825091c134f"
+edition = "2024.beta"
+
+[dependencies.Sui]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-framework"
+rev = "mainnet"
+override = true
+
+[dependencies.SuiSystem]
+git = "https://github.com/MystenLabs/sui.git"
+subdir = "crates/sui-framework/packages/sui-system"
+rev = "mainnet"
+override = true
+
+[dependencies.Pyth]
+git = "https://github.com/pyth-network/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "sui-contract-mainnet"
+override = true
+
+[dependencies.spool]
+git = "https://github.com/scallop-io/spool-contract-interface.git"
+subdir = "spool"
+rev = "2532555052d9b56505455a6263c89ca129ee201b"
+
+[dependencies.ScallopProtocol]
+git = "https://github.com/scallop-io/sui-lending-protocol.git"
+subdir = "contracts/protocol"
+rev = "ec2332705c2520ffb98f3a69e7e591d4cc2b3677"
+
+[dependencies.Math]
+git = "https://github.com/scallop-io/sui-lending-protocol.git"
+subdir = "contracts/libs/math"
+rev = "ec2332705c2520ffb98f3a69e7e591d4cc2b3677"
+override = true
+
+[dependencies.suilend]
+local = "../suilend-protocol/suilend"
+
+[dependencies.lending_core]
+local = "../navi-protocol/lending_core"
+
+[dependencies.oracle]
+local = "../navi-protocol/oracle"
+
+[addresses]
+typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"
+# upgrade_cap = "0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642"
+
+# sui client upgrade --upgrade-capability 0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --skip-dependency-verification --serialize-unsigned-transaction > data.txt
+
+# sui keytool multi-sig-combine-partial-sig --pks AMRpzJbrI1fbe/m5w9i4Y5oBUdt5PlmYd8vrVz8VdRcw ABhvd0+woaAG33pe/CTyYlS6/UkP9H2BFy35+Ch3iyQ+ AH0U2vAxvY4vagbmsUC9bsFHhsnk9bFUOdmMposcGe77 ALn8kQubZ0N1sMfcsyRZ+f4rb3WBZkl48eDvPkXs7Ly8 AFVAc5wUOvdH2GzqavT9JmjT2R82vvcWuFSE0EK8ENBG --weights 3 2 1 1 1 --threshold 3 --sigs
