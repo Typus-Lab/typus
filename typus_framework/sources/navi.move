@@ -8,13 +8,16 @@ module typus_framework::navi {
     use typus_framework::vault::{Self, DepositVault};
     use typus_framework::balance_pool::BalancePool;
 
+    /// Creates a new `AccountCap` for the Navi protocol.
     public fun new_navi_account_cap(
         ctx: &mut TxContext,
     ): AccountCap {
         lending_core::lending::create_account(ctx)
     }
 
-    // after activate
+    /// Deposits assets into a Navi lending pool.
+    /// This function is called after the vault is activated.
+    /// WARNING: mut inputs without authority check inside
     public fun deposit<TOKEN>(
         deposit_vault: &mut DepositVault,
         navi_account_cap: &AccountCap,
@@ -46,7 +49,9 @@ module typus_framework::navi {
         log
     }
 
-    // withdraw before recoup or settle
+    /// Withdraws assets from a Navi lending pool.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -96,7 +101,9 @@ module typus_framework::navi {
         vault::deposit_from_lending(fee_pool, deposit_vault, incentive, balance, balance::zero<TOKEN>(), distribute)
     }
 
-    // withdraw before recoup or settle
+    /// Claims rewards from a Navi lending pool.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun reward<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,

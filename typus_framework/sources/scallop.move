@@ -17,6 +17,8 @@ module typus_framework::scallop {
     use typus_framework::vault::{Self, DepositVault, deprecated};
     use typus_framework::balance_pool::BalancePool;
 
+    /// Creates a new `SpoolAccount` for Scallop.
+    /// WARNING: mut inputs without authority check inside
     public fun new_spool_account<TOKEN>(
         spool: &mut Spool,
         clock: &Clock,
@@ -25,7 +27,9 @@ module typus_framework::scallop {
         user::new_spool_account<MarketCoin<TOKEN>>(spool, clock, ctx)
     }
 
-    // after activate
+    /// Deposits assets into a Scallop spool.
+    /// This function is called after the vault is activated.
+    /// WARNING: mut inputs without authority check inside
     public fun deposit<TOKEN>(
         deposit_vault: &mut DepositVault,
         version: &Version,
@@ -59,7 +63,9 @@ module typus_framework::scallop {
         log
     }
 
-    // withdraw before recoup or settle
+    /// Withdraws assets and claims rewards from a Scallop spool.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw<D_TOKEN, R_TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -106,6 +112,7 @@ module typus_framework::scallop {
         vault::deposit_from_lending(fee_pool, deposit_vault, incentive, balance, reward, distribute)
     }
 
+    /// Deprecated function.
     public fun withdraw_xxx<TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -119,6 +126,7 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): vector<u64> { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun withdraw_xyy<D_TOKEN, B_TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -132,6 +140,7 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): vector<u64> { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun withdraw_xyx<TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -145,6 +154,7 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): vector<u64> { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun withdraw_xyz<D_TOKEN, I_TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -158,6 +168,7 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): vector<u64> { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun withdraw_additional_lending<D_TOKEN, I_TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -172,7 +183,10 @@ module typus_framework::scallop {
     ): vector<u64> { deprecated(); abort 0 }
 
     // ======= basic lending =======
-    // after activate
+
+    /// Deposits assets for basic lending (without staking).
+    /// This function is called after the vault is activated.
+    /// WARNING: mut inputs without authority check inside
     public fun deposit_basic_lending<TOKEN>(
         deposit_vault: &mut DepositVault,
         version: &Version,
@@ -200,9 +214,11 @@ module typus_framework::scallop {
         )
     }
 
-    // withdraw before recoup or settle
-    // put principal into active & deactivating, and put reward into premium
-    // for D_TOKEN = B_TOKEN only
+    /// Withdraws assets from basic lending.
+    /// This function is called before recouping or settling the vault.
+    /// It puts the principal into the active & deactivating pools, and the reward into the premium pool.
+    /// This function is for when the deposit token is the same as the reward token.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw_basic_lending_v2<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -232,6 +248,7 @@ module typus_framework::scallop {
         vault::deposit_from_lending(fee_pool, deposit_vault, incentive, balance, balance::zero<TOKEN>(), distribute)
     }
 
+    /// Deprecated function.
     public fun withdraw_basic_lending<TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -243,6 +260,7 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): vector<u64> { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun withdraw_basic_lending_xy<TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,

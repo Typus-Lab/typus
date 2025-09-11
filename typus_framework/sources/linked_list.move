@@ -10,22 +10,33 @@ module typus_framework::linked_list {
 
     // ======== Structs ========
 
+    /// A doubly linked list implementation using dynamic fields.
     public struct LinkedList<K: copy + drop + store, phantom V: store> has drop, store {
+        /// The `ID` of the object that holds the nodes as dynamic fields.
         id: ID,
+        /// The key of the first element in the list.
         first: Option<K>,
+        /// The key of the last element in the list.
         last: Option<K>,
+        /// The number of elements in the list.
         length: u64,
     }
 
+    /// Represents a node in the linked list.
     public struct Node<K: copy + drop + store, V: store> has copy, drop, store {
+        /// The value stored in the node.
         value: V,
+        /// The key of the previous element in the list.
         prev: Option<K>,
+        /// The key of the next element in the list.
         next: Option<K>,
+        /// A boolean to indicate if the node is currently part of the list (for lazy deletion).
         exists: bool,
     }
 
     // ======== Public Functions ========
 
+    /// Creates a new, empty `LinkedList`.
     public fun new<K: copy + drop + store, V: store>(id: ID): LinkedList<K, V> {
         LinkedList<K, V> {
             id,
@@ -35,6 +46,7 @@ module typus_framework::linked_list {
         }
     }
 
+    /// Creates a new `Node`.
     public fun new_node<K: copy + drop + store, V: store>(
         value: V,
         prev: Option<K>,
@@ -48,30 +60,38 @@ module typus_framework::linked_list {
         }
     }
 
+    /// Checks if a node exists.
     public fun node_exists<K: copy + drop + store, V: store>(node: &Node<K, V>): bool {
         node.exists
     }
 
+    /// Returns a reference to the value of a node.
     public fun node_value<K: copy + drop + store, V: store>(node: &Node<K, V>): &V {
         &node.value
     }
 
+    /// Returns the key of the first element in the list.
     public fun first<K: copy + drop + store, V: store>(linked_list: &LinkedList<K, V>): Option<K> {
         linked_list.first
     }
 
+    /// Returns the key of the last element in the list.
     public fun last<K: copy + drop + store, V: store>(linked_list: &LinkedList<K, V>): Option<K> {
         linked_list.last
     }
 
+    /// Returns the number of elements in the list.
     public fun length<K: copy + drop + store, V: store>(linked_list: &LinkedList<K, V>): u64 {
         linked_list.length
     }
 
+    /// Checks if the list is empty.
     public fun is_empty<K: copy + drop + store, V: store>(linked_list: &LinkedList<K, V>): bool {
         linked_list.length == 0
     }
 
+    /// Adds an element to the front of the list.
+    /// WARNING: mut inputs without authority check inside
     public fun push_front<K: copy + drop + store, V: drop + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -105,6 +125,8 @@ module typus_framework::linked_list {
         linked_list.first = option::some(key);
     }
 
+    /// Adds an element to the back of the list.
+    /// WARNING: mut inputs without authority check inside
     public fun push_back<K: copy + drop + store, V: drop + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -138,6 +160,8 @@ module typus_framework::linked_list {
         linked_list.last = option::some(key);
     }
 
+    /// Adds an element to the front of the list, returning the previous value if the key already existed.
+    /// WARNING: mut inputs without authority check inside
     public fun put_front<K: copy + drop + store, V: store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -173,6 +197,8 @@ module typus_framework::linked_list {
         previous_value
     }
 
+    /// Adds an element to the back of the list, returning the previous value if the key already existed.
+    /// WARNING: mut inputs without authority check inside
     public fun put_back<K: copy + drop + store, V: store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -208,6 +234,8 @@ module typus_framework::linked_list {
         previous_value
     }
 
+    /// Removes and returns the element from the front of the list.
+    /// WARNING: mut inputs without authority check inside
     public fun pop_front<K: copy + drop + store, V: copy + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -229,6 +257,8 @@ module typus_framework::linked_list {
         (key, pop_node(uid, key))
     }
 
+    /// Removes and returns the element from the back of the list.
+    /// WARNING: mut inputs without authority check inside
     public fun pop_back<K: copy + drop + store, V: copy + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -250,6 +280,8 @@ module typus_framework::linked_list {
         (key, pop_node(uid, key))
     }
 
+    /// Removes and returns an element from the list by its key.
+    /// WARNING: mut inputs without authority check inside
     public fun remove<K: copy + drop + store, V: copy + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -278,6 +310,8 @@ module typus_framework::linked_list {
         pop_node(uid, key)
     }
 
+    /// Removes and returns the element from the front of the list, consuming the node.
+    /// WARNING: mut inputs without authority check inside
     public fun take_front<K: copy + drop + store, V: store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -299,6 +333,8 @@ module typus_framework::linked_list {
         (key, take_node(uid, key))
     }
 
+    /// Removes and returns the element from the back of the list, consuming the node.
+    /// WARNING: mut inputs without authority check inside
     public fun take_back<K: copy + drop + store, V: store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -320,6 +356,8 @@ module typus_framework::linked_list {
         (key, take_node(uid, key))
     }
 
+    /// Removes and returns an element from the list by its key, consuming the node.
+    /// WARNING: mut inputs without authority check inside
     public fun delete<K: copy + drop + store, V: copy + store>(
         uid: &mut UID,
         linked_list: &mut LinkedList<K, V>,
@@ -348,6 +386,8 @@ module typus_framework::linked_list {
         take_node(uid, key)
     }
 
+    /// Appends the elements of list `b` to the end of list `a`.
+    /// WARNING: mut inputs without authority check inside
     public fun chain<K: copy + drop + store, V: store>(
         a: &mut LinkedList<K, V>,
         b: &mut LinkedList<K, V>,
@@ -370,12 +410,14 @@ module typus_framework::linked_list {
         }
     }
 
+    /// Checks if the list contains a given key.
     public fun contains<K: copy + drop + store, V: store>(uid: &UID, linked_list: &LinkedList<K, V>, key: K): bool {
         assert!(object::uid_to_inner(uid) == linked_list.id, E_ID_MISMATCH);
 
         field::exists_(uid, key) && field::borrow<K, Node<K, V>>(uid, key).exists
     }
 
+    /// Borrows a reference to the value of an element in the list by its key.
     public fun borrow<K: copy + drop + store, V: store>(
         uid: &UID,
         linked_list: &LinkedList<K, V>,
@@ -396,6 +438,8 @@ module typus_framework::linked_list {
         value
     }
 
+    /// Borrows a mutable reference to the value of an element in the list by its key.
+    /// WARNING: mut inputs without authority check inside
     public fun borrow_mut<K: copy + drop + store, V: store>(
         uid: &mut UID,
         linked_list: &LinkedList<K, V>,
@@ -416,6 +460,7 @@ module typus_framework::linked_list {
         value
     }
 
+    /// Returns the key of the previous element in the list.
     public fun prev<K: copy + drop + store, V: store>(
         uid: &UID,
         linked_list: &LinkedList<K, V>,
@@ -436,6 +481,7 @@ module typus_framework::linked_list {
         *prev
     }
 
+    /// Returns the key of the next element in the list.
     public fun next<K: copy + drop + store, V: store>(
         uid: &UID,
         linked_list: &LinkedList<K, V>,
@@ -456,6 +502,8 @@ module typus_framework::linked_list {
         *next
     }
 
+    /// Pushes a new node into the list. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun push_node<K: copy + drop + store, V: drop + store>(
         uid: &mut UID,
         key: K,
@@ -482,6 +530,8 @@ module typus_framework::linked_list {
         };
     }
 
+    /// Puts a new node into the list, returning the previous value if the key already existed. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun put_node<K: copy + drop + store, V: store>(
         uid: &mut UID,
         key: K,
@@ -507,6 +557,8 @@ module typus_framework::linked_list {
         previous_value
     }
 
+    /// Pops a node from the list. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun pop_node<K: copy + drop + store, V: copy + store>(
         uid: &mut UID,
         key: K,
@@ -527,6 +579,8 @@ module typus_framework::linked_list {
         *value
     }
 
+    /// Takes a node from the list, consuming it. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun take_node<K: copy + drop + store, V: store>(
         uid: &mut UID,
         key: K
@@ -544,6 +598,8 @@ module typus_framework::linked_list {
         value
     }
 
+    /// Prepares a node for use in the linked list. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun prepare_node<K: copy + drop + store, V: drop + store>(
         uid: &mut UID,
         key: K,
@@ -563,6 +619,8 @@ module typus_framework::linked_list {
         }
     }
 
+    /// Removes a node from the dynamic fields. This is a helper function.
+    /// WARNING: mut inputs without authority check inside
     public fun remove_node<K: copy + drop + store, V: drop + store>(
         uid: &mut UID,
         key: K,

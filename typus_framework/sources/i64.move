@@ -9,30 +9,32 @@ module typus_framework::i64 {
     /// @dev u64 with the first bit set. An `I64` is negative if this bit is set.
     const U64_WITH_FIRST_BIT_SET: u64 = 1 << 63;
 
-    /// When both `U256` equal.
+    /// @dev Represents the result of a comparison where two `I64` values are equal.
     const EQUAL: u8 = 0;
 
-    /// When `a` is less than `b`.
+    /// @dev Represents the result of a comparison where `a` is less than `b`.
     const LESS_THAN: u8 = 1;
 
-    /// When `a` is greater than `b`.
+    /// @dev Represents the result of a comparison where `a` is greater than `b`.
     const GREATER_THAN: u8 = 2;
 
-    /// @dev When trying to convert from a u64 > MAX_I64_AS_U64 to an I64.
+    /// @dev Error code for when trying to convert from a u64 > MAX_I64_AS_U64 to an I64.
     const E_CONVERSION_FROM_U64_OVERFLOW: u64 = 0;
 
-    /// @dev When trying to convert from an negative I64 to a u64.
+    /// @dev Error code for when trying to convert from a negative I64 to a u64.
     const E_CONVERSION_TO_U64_UNDERFLOW: u64 = 1;
 
-    /// @dev When trying to convert from a u64 > MAX_I64_AS_U64 to an I64.
+    /// @dev Error code for when an arithmetic operation results in an overflow.
     const E_ARITHMETIC_OVERFLOW: u64 = 2;
 
     /// @notice Struct representing a signed 64-bit integer.
+    /// @dev The most significant bit is used to represent the sign (1 for negative, 0 for positive).
     public struct I64 has copy, drop, store {
         bits: u64
     }
 
     /// @notice Casts a `u64` to an `I64`.
+    /// @dev Aborts if the u64 value is too large to be represented as a positive I64.
     public fun from(x: u64): I64 {
         assert!(x <= MAX_I64_AS_U64, E_CONVERSION_FROM_U64_OVERFLOW);
         I64 { bits: x }
@@ -44,17 +46,18 @@ module typus_framework::i64 {
     }
 
     /// @notice Casts an `I64` to a `u64`.
+    /// @dev Aborts if the I64 value is negative.
     public fun as_u64(x: &I64): u64 {
         assert!(x.bits < U64_WITH_FIRST_BIT_SET,E_CONVERSION_TO_U64_UNDERFLOW);
         x.bits
     }
 
-    /// @notice Whether or not `x` is equal to 0.
+    /// @notice Checks whether or not `x` is equal to 0.
     public fun is_zero(x: &I64): bool {
         x.bits == 0
     }
 
-    /// @notice Whether or not `x` is negative.
+    /// @notice Checks whether or not `x` is negative.
     public fun is_neg(x: &I64): bool {
         x.bits > U64_WITH_FIRST_BIT_SET
     }
@@ -65,19 +68,20 @@ module typus_framework::i64 {
         I64 { bits: if (x.bits < U64_WITH_FIRST_BIT_SET) x.bits | (1 << 63) else x.bits - (1 << 63) }
     }
 
-    /// @notice Flips the sign of `x`.
+    /// @notice Creates a negative `I64` from a `u64` value.
     public fun neg_from(x: u64): I64 {
         let mut ret = from(x);
         if (ret.bits > 0) *&mut ret.bits = ret.bits | (1 << 63);
         ret
     }
 
-    /// @notice Absolute value of `x`.
+    /// @notice Returns the absolute value of `x`.
     public fun abs(x: &I64): I64 {
         if (x.bits < U64_WITH_FIRST_BIT_SET) *x else I64 { bits: x.bits - (1 << 63) }
     }
 
-    /// @notice Compare `a` and `b`.
+    /// @notice Compares `a` and `b`.
+    /// @return `EQUAL` if a == b, `LESS_THAN` if a < b, `GREATER_THAN` if a > b.
     public fun compare(a: &I64, b: &I64): u8 {
         if (a.bits == b.bits) return EQUAL;
         if (a.bits < U64_WITH_FIRST_BIT_SET) {
