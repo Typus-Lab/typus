@@ -38,13 +38,13 @@ rev = "ec2332705c2520ffb98f3a69e7e591d4cc2b3677"
 override = true
 
 [dependencies.suilend]
-local = "../suilend-protocol/suilend"
+local = "../dependency/suilend-protocol/suilend"
 
 [dependencies.lending_core]
-local = "../navi-protocol/lending_core"
+local = "../dependency/navi-protocol/lending_core"
 
 [dependencies.oracle]
-local = "../navi-protocol/oracle"
+local = "../dependency/navi-protocol/oracle"
 
 [addresses]
 typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"

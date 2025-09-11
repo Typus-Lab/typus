@@ -3,7 +3,7 @@ name = "typus_nft"
 published-at = "0x153ead7b2ccad1483458d41f0daffa35965d89960d1024a4883ba52fb18332b3"
 
 [dependencies]
-Kiosk = { local = "../kiosk" }
+Kiosk = { local = "../dependency/kiosk" }
 
 
 [addresses]

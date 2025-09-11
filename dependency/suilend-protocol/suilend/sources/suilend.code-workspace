@@ -4,7 +4,7 @@
             "path": ".."
         },
         {
-            "path": "../../suilend-old"
+            "path": "../../dependency/suilend-old"
         },
         {
             "path": "../../../github/sui"
