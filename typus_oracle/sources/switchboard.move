@@ -1,3 +1,4 @@
+/// This module provides a function to parse Switchboard aggregator feeds.
 module typus_oracle::switchboard_feed_parser {
     use switchboard_std::aggregator::{Self, Aggregator}; // For reading aggregators
     use switchboard_std::math;
@@ -17,6 +18,7 @@ module typus_oracle::switchboard_feed_parser {
 
       where decimal = neg * value * 10^(-1 * dec)
     */
+    /// Information about a Switchboard aggregator.
     public struct AggregatorInfo has copy, drop {
         aggregator_addr: address,
         latest_result: u128,
@@ -29,6 +31,7 @@ module typus_oracle::switchboard_feed_parser {
 
     // add AggregatorInfo resource with latest value + aggregator address
     // @return (value, decimal)
+    /// Logs the information of a Switchboard aggregator and returns the latest value and scaling factor.
     public(package) fun log_aggregator_info(
         feed: &Aggregator
     ): (u128, u8) {

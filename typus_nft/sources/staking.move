@@ -1,3 +1,5 @@
+/// This module implements the staking functionality for Typus NFTs.
+/// Users can stake their NFTs to earn experience points and level up.
 module typus_nft::staking {
     use std::option;
 
@@ -20,25 +22,30 @@ module typus_nft::staking {
     const E_UPDATING_URL: u64 = 4;
 
     // Registry of typus_dov_single
+    /// The registry for the staking module.
     struct Registry has key {
         id: UID,
     }
 
+    /// A capability that allows the owner to manage the staking module.
     struct ManagerCap has key {
         id: UID,
     }
 
+    /// A staked Typus NFT.
     struct StakingTails has store {
         nft: Tails,
         snapshot_ms: u64,
         updating_url: bool,
     }
 
+    /// The NFT extension for the staking module.
     struct NftExtension has store {
         nft_table: Table<address, StakingTails>,
         nft_manager_cap: NftManagerCap,
     }
 
+    /// Initializes the staking module.
     fun init(ctx: &mut TxContext) {
         let registry = Registry { id: object::new(ctx) };
         let manager_cap = ManagerCap { id: object::new(ctx) };
@@ -47,6 +54,7 @@ module typus_nft::staking {
         transfer::transfer(manager_cap, tx_context::sender(ctx));
     }
 
+    /// Adds the NFT extension to the registry.
     public fun add_nft_extension(
         registry: &mut Registry,
         nft_manager_cap: NftManagerCap,
@@ -64,6 +72,7 @@ module typus_nft::staking {
         );
     }
 
+    /// Stakes an NFT.
     public fun stake_nft(
         registry: &mut Registry,
         kiosk: &mut Kiosk,
@@ -88,6 +97,7 @@ module typus_nft::staking {
         // StakeEvent
     }
 
+    /// Unstakes an NFT.
     public fun unstake_nft(
         registry: &mut Registry,
         kiosk: &mut Kiosk,
@@ -109,6 +119,7 @@ module typus_nft::staking {
         // UnstakeEvent
     }
 
+    /// Takes a snapshot of the staked NFT to earn experience points.
     public fun snapshot(
         registry: &mut Registry,
         clock: &Clock,
@@ -131,6 +142,7 @@ module typus_nft::staking {
         typus_nft::nft_exp_up(&nft_extension.nft_manager_cap, &mut staking_nft.nft, 10);
     }
 
+    /// Marks the staked NFT as having made its first bid.
     public fun first_bid(
         registry: &mut Registry,
         ctx: &mut TxContext
@@ -150,6 +162,7 @@ module typus_nft::staking {
 
     }
 
+    /// Marks the staked NFT as having made its first deposit.
     public fun first_deposit(
         registry: &mut Registry,
         ctx: &mut TxContext
@@ -169,6 +182,7 @@ module typus_nft::staking {
 
     }
 
+    /// Event emitted when a staked NFT levels up.
     struct LevelUpEvent has copy, drop {
         nft_id: ID,
         sender: address,
@@ -176,6 +190,7 @@ module typus_nft::staking {
         level: u64
     }
 
+    /// Levels up a staked NFT.
     public fun level_up(
         registry: &mut Registry,
         ctx: &mut TxContext
@@ -202,6 +217,7 @@ module typus_nft::staking {
 
     // Admin Functions
 
+    /// Updates the image URL of a staked NFT.
     public fun update_image_url(
         registry: &mut Registry,
         _manager_cap: &ManagerCap,
@@ -220,6 +236,7 @@ module typus_nft::staking {
         staking_nft.updating_url = false;
     }
 
+    /// Adds experience points to a staked NFT.
     public fun add_exp(
         registry: &mut Registry,
         _manager_cap: &ManagerCap,

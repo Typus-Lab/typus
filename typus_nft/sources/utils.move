@@ -1,3 +1,4 @@
+/// This module provides utility functions for the Typus NFT collection.
 module typus_nft::utils {
 
     use std::vector;
@@ -16,6 +17,7 @@ module typus_nft::utils {
     const ETruncatedBytes: u64 = 1;
     const E_INVALID_LENGTH: u64 = 2;
 
+    /// Extracts a balance of a given amount from a vector of coins.
     #[lint_allow(self_transfer)]
     public(friend) fun extract_balance<Token>(coins: vector<Coin<Token>>, amount: u64, ctx: &TxContext): Balance<Token> {
         let balance = balance::zero();
@@ -47,6 +49,7 @@ module typus_nft::utils {
         balance
     }
 
+    /// Creates a map from a vector of keys and a vector of values.
     public(friend) fun from_vec_to_map<K: copy + drop, V: drop>(
         keys: vector<K>,
         values: vector<V>,
@@ -73,6 +76,7 @@ module typus_nft::utils {
         map
     }
 
+    /// Converts a vector of bytes to a u64.
     public(friend) fun u64_from_bytes(bytes: &vector<u8>): u64 {
         let m: u64 = 0;
 
@@ -92,6 +96,7 @@ module typus_nft::utils {
         m
     }
 
+    /// Generates a random u256 number.
     public(friend) fun rand(ctx: &mut TxContext): u256 {
         let uid = object::new(ctx);
         let object_nonce = object::uid_to_bytes(&uid);
@@ -108,6 +113,7 @@ module typus_nft::utils {
         u256_from_bytes(&rand)
     }
 
+    /// Converts a vector of bytes to a u256.
     public(friend) fun u256_from_bytes(bytes: &vector<u8>): u256 {
         let m: u256 = 0;
 

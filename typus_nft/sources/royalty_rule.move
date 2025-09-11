@@ -1,6 +1,9 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+/// This module is part of the Typus NFT collection.
+/// It defines a royalty rule for the transfer policy.
+///
 /// Description:
 /// This module defines a Rule which requires a payment on a purchase.
 /// The payment amount can be either a fixed amount (min_amount) or a
