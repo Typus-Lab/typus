@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `Auction` be exposed.
 module typus_framework::dutch {
     use std::type_name::{Self, TypeName};
 
@@ -340,6 +341,7 @@ module typus_framework::dutch {
     }
 
     /// This function is called after the auction ends to distribute the assets and funds.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery<TOKEN>(
         fee_pool: &mut BalancePool,
         refund_vault: &mut RefundVault,
@@ -482,6 +484,7 @@ module typus_framework::dutch {
     }
 
     /// An older version of the delivery function.
+    /// WARNING: mut inputs without authority check inside
     public fun old_delivery<TOKEN>(
         fee_pool: &mut BalancePool,
         refund_vault: &mut RefundVault,
@@ -684,6 +687,7 @@ module typus_framework::dutch {
     }
 
     /// Terminates an auction and refunds all bidders.
+    /// WARNING: mut inputs without authority check inside
     public fun terminate<TOKEN>(
         auction: Auction,
         refund_vault: &mut RefundVault,

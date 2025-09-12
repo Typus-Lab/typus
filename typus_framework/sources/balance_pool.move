@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `BalancePool` be exposed.
 module typus_framework::balance_pool {
     use std::type_name::{Self, TypeName};
 
@@ -70,7 +71,7 @@ module typus_framework::balance_pool {
     }
 
     /// Creates a `SharedBalancePool` as a dynamic field within the `BalancePool`.
-    /// This is an authorized function.
+    /// Safe with authority check
     public fun new_shared_balance_pool(
         balance_pool: &mut BalancePool,
         key: vector<u8>,
@@ -141,7 +142,7 @@ module typus_framework::balance_pool {
 
     /// Withdraws a specified `amount` of a `TOKEN` from the `BalancePool` and sends it to the sender.
     /// If `amount` is `None`, the entire balance of the token is withdrawn.
-    /// This is an authorized function.
+    /// Safe with authority check
     #[lint_allow(self_transfer)]
     public fun take<TOKEN>(
         balance_pool: &mut BalancePool,
@@ -182,7 +183,7 @@ module typus_framework::balance_pool {
 
     /// Withdraws a specified `amount` of a `TOKEN` from the `BalancePool` and sends it to a `recipient`.
     /// If `amount` is `None`, the entire balance of the token is withdrawn.
-    /// This is an authorized function.
+    /// Safe with authority check
     public fun send<TOKEN>(
         balance_pool: &mut BalancePool,
         amount: Option<u64>,
@@ -254,7 +255,7 @@ module typus_framework::balance_pool {
 
     /// Withdraws a specified `amount` of a `TOKEN` from a `SharedBalancePool` and sends it to the sender.
     /// If `amount` is `None`, the entire balance of the token is withdrawn.
-    /// This is an authorized function.
+    /// Safe with authority check
     #[lint_allow(self_transfer)]
     public fun take_shared<TOKEN>(
         balance_pool: &mut BalancePool,
@@ -297,7 +298,7 @@ module typus_framework::balance_pool {
 
     /// Withdraws a specified `amount` of a `TOKEN` from a `SharedBalancePool` and sends it to a `recipient`.
     /// If `amount` is `None`, the entire balance of the token is withdrawn.
-    /// This is an authorized function.
+    /// Safe with authority check
     public fun send_shared<TOKEN>(
         balance_pool: &mut BalancePool,
         key: vector<u8>,

@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `DepositVault` and `AccountCap` be exposed.
 module typus_framework::navi {
     use sui::coin;
     use sui::balance::{Self, Balance};

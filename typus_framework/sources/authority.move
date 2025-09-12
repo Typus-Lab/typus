@@ -11,7 +11,6 @@ module typus_framework::authority {
     }
 
     /// Verifies if the transaction sender is in the authority's whitelist.
-    /// This is an authorized function.
     public fun verify(authority: &Authority, ctx: &TxContext) {
         assert!(
             linked_table::contains(&authority.whitelist, tx_context::sender(ctx)),
@@ -19,7 +18,6 @@ module typus_framework::authority {
         );
     }
     /// Verifies if the transaction sender is in either of the two authorities' whitelists.
-    /// This is an authorized function.
     public fun double_verify(primary_authority: &Authority, secondary_authority: &Authority, ctx: &TxContext) {
         assert!(
             linked_table::contains(&primary_authority.whitelist, tx_context::sender(ctx))

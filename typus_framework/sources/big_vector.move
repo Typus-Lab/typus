@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `BigVector` be exposed.
 module typus_framework::big_vector {
     use sui::dynamic_field;
 

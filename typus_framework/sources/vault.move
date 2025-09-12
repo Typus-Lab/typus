@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `DepositVault` `BidVault` and `RefundVault` be exposed.
 module typus_framework::vault {
     use std::string::{Self, String};
     use std::type_name::{Self, TypeName};

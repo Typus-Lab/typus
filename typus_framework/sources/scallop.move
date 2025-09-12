@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `DepositVault` and `SpoolAccount` be exposed.
 module typus_framework::scallop {
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};

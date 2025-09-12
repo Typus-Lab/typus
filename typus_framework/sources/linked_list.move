@@ -1,3 +1,5 @@
+/// No authority chech in these public functions, do not let `LinkedList` be exposed.
+/// Deprecated use `BigVector` instead
 module typus_framework::linked_list {
     use sui::dynamic_field as field;
 
