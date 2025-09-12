@@ -127,6 +127,7 @@ module typus_nft::typus_nft {
     }
 
     /// Withdraws the royalty from the transfer policy.
+    /// Safe with `ManagerCap` check
     entry fun withdraw_royalty(
         _manager_cap: &ManagerCap,
         royalty: &Royalty,
@@ -158,6 +159,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates the royalty recipients and shares.
+    /// Safe with `ManagerCap` check
     entry fun update_royalty(
         _manager_cap: &ManagerCap,
         royalty: &mut Royalty,
@@ -185,6 +187,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates the policy rules for the NFT collection.
+    /// Safe with `ManagerCap` check
     entry fun update_policy_rules(
         _manager_cap: &ManagerCap,
         policy: &mut TransferPolicy<Tails>,
@@ -214,6 +217,7 @@ module typus_nft::typus_nft {
     }
 
     /// Creates a new NFT pool.
+    /// Safe with `ManagerCap` check
     entry fun new_pool(
         _manager_cap: &ManagerCap,
         start_ms: u64,
@@ -230,6 +234,7 @@ module typus_nft::typus_nft {
     }
 
     /// Closes an NFT pool.
+    /// Safe with `ManagerCap` check
     entry fun close_pool(
         _manager_cap: &ManagerCap,
         pool: Pool,
@@ -253,6 +258,7 @@ module typus_nft::typus_nft {
     }
 
     /// Creates a new manager capability.
+    /// Safe with `ManagerCap` check
     #[lint_allow(self_transfer)]
     entry fun new_manager_cap (
         _manager_cap: &ManagerCap,
@@ -271,6 +277,7 @@ module typus_nft::typus_nft {
     }
 
     /// Deposits an NFT into the pool.
+    /// Safe with `ManagerCap` check
     entry fun deposit_nft(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -329,6 +336,7 @@ module typus_nft::typus_nft {
     }
 
     /// Issues whitelist tokens to the given recipients.
+    /// Safe with `ManagerCap` check
     entry fun issue_whitelist(
         _manager_cap: &ManagerCap,
         pool: &Pool,
@@ -353,6 +361,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates the start time of the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_start_ms(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -363,6 +372,7 @@ module typus_nft::typus_nft {
 
     /// Sends NFTs from the pool to the given recipient.
     #[lint_allow(share_owned)]
+    /// Safe with `ManagerCap` check
     entry fun send_nfts(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -411,6 +421,7 @@ module typus_nft::typus_nft {
     }
 
     /// Resends the mint event for the given NFT.
+    /// Safe with `ManagerCap` check
     entry fun resend_nfts_event(
         _manager_cap: &ManagerCap,
         id: address,
@@ -456,6 +467,7 @@ module typus_nft::typus_nft {
     }
 
     /// Sets the level of the first n NFTs in the pool.
+    /// Safe with `ManagerCap` check
     entry fun pool_set_n_level(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -480,6 +492,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates an NFT in the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_pool_nft(
         manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -509,6 +522,7 @@ module typus_nft::typus_nft {
 
     // Staking Related
     /// Updates the image URL of the NFT.
+    /// Safe with `ManagerCap` check
     public fun update_image_url(
         _manager_cap: &ManagerCap,
         tails: &mut Tails,
@@ -525,6 +539,7 @@ module typus_nft::typus_nft {
     }
 
     /// Increases the experience points of an NFT.
+    /// Safe with `ManagerCap` check
     public fun nft_exp_up(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -548,6 +563,7 @@ module typus_nft::typus_nft {
     }
 
     /// Decreases the experience points of an NFT.
+    /// Safe with `ManagerCap` check
     public fun nft_exp_down(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -571,6 +587,7 @@ module typus_nft::typus_nft {
     }
 
     /// Marks an NFT as having made its first bid and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_bid(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -595,6 +612,7 @@ module typus_nft::typus_nft {
     }
 
     /// Marks an NFT as having made its first deposit and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_deposit(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -612,6 +630,7 @@ module typus_nft::typus_nft {
     }
 
     /// Marks an NFT as having made its first NFT deposit and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_deposit_nft(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -629,6 +648,7 @@ module typus_nft::typus_nft {
     }
 
     /// Levels up an NFT if it has enough experience points.
+    /// Safe with `ManagerCap` check
     public fun level_up(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -661,6 +681,7 @@ module typus_nft::typus_nft {
 
     // Extension
     /// Inserts a key-value pair into the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun insert_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -671,6 +692,7 @@ module typus_nft::typus_nft {
     }
 
     /// Checks if the u64 padding of the NFT contains the given key.
+    /// Safe with `ManagerCap` check
     public fun contains_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &Tails,
@@ -680,6 +702,7 @@ module typus_nft::typus_nft {
     }
 
     /// Returns the value associated with the given key in the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun get_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &Tails,
@@ -689,6 +712,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates the value associated with the given key in the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun update_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -700,6 +724,7 @@ module typus_nft::typus_nft {
     }
 
     /// Removes the key-value pair with the given key from the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun remove_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,

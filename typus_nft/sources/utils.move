@@ -1,4 +1,5 @@
 /// This module provides utility functions for the Typus NFT collection.
+/// Only contains public(friend) functions
 module typus_nft::utils {
 
     use std::vector;

@@ -62,6 +62,7 @@ module typus_nft::discount_mint {
     }
 
     /// Creates a new discount minting pool.
+    /// Safe with `ManagerCap` check
     entry fun new_pool(
         _manager_cap: &typus_nft::ManagerCap,
         price: u64,
@@ -97,6 +98,7 @@ module typus_nft::discount_mint {
     }
 
     /// Migrates NFTs from an old pool to a new pool.
+    /// Safe with `ManagerCap` check
     entry fun migrate_nfts(
         manager_cap: &typus_nft::ManagerCap,
         pool: &mut typus_nft::Pool,
@@ -114,6 +116,7 @@ module typus_nft::discount_mint {
     }
 
     /// Migrates NFTs from one pool to another based on level.
+    /// Safe with `authority` check
     entry fun migrate_pool(
         pool: &mut Pool,
         new_pool: &mut Pool,
@@ -142,6 +145,7 @@ module typus_nft::discount_mint {
     }
 
     /// Updates an NFT in the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_pool_nft(
         manager_cap: &typus_nft::ManagerCap,
         pool: &mut Pool,
@@ -226,6 +230,7 @@ module typus_nft::discount_mint {
     }
 
     /// Executes a mint request.
+    /// Safe with `authority` check
     #[lint_allow(share_owned)]
     entry fun execute_mint(
         pool: &mut Pool,
@@ -300,6 +305,7 @@ module typus_nft::discount_mint {
     }
 
     /// Refunds a mint request.
+    /// Safe with `authority` check
     entry fun refund(
         pool: &mut Pool,
         ctx: & TxContext
@@ -316,6 +322,7 @@ module typus_nft::discount_mint {
     }
 
     /// Closes the pool.
+    /// Safe with `authority` check
     entry fun close(
         pool: &mut Pool,
         ctx: & TxContext
@@ -325,6 +332,7 @@ module typus_nft::discount_mint {
     }
 
     /// Starts a new round.
+    /// Safe with `authority` check
     entry fun new_round(
         pool: &mut Pool,
         num: u64,
@@ -347,6 +355,7 @@ module typus_nft::discount_mint {
     }
 
     /// Updates the discount percentages.
+    /// Safe with `authority` check
     entry fun update_discount_pcts(
         pool: &mut Pool,
         discount_pcts: vector<u64>,
@@ -357,6 +366,7 @@ module typus_nft::discount_mint {
     }
 
     /// Updates the end time of the mint.
+    /// Safe with `authority` check
     entry fun update_end_ms(
         pool: &mut Pool,
         end_ms: u64,
@@ -367,6 +377,7 @@ module typus_nft::discount_mint {
     }
 
     /// Adds users to the whitelist.
+    /// Safe with `authority` check
     entry fun add_whitelist(
         pool: &mut Pool,
         users: vector<address>,
@@ -391,6 +402,7 @@ module typus_nft::discount_mint {
     }
 
     /// Sends an NFT from the pool to the given recipient.
+    /// Safe with `authority` check
     #[lint_allow(share_owned)]
     entry fun send_nft(
         _manager_cap: &typus_nft::ManagerCap,
@@ -428,6 +440,7 @@ module typus_nft::discount_mint {
     }
 
     /// Withdraws the balance from the pool.
+    /// Safe with `authority` check
     entry fun withdraw_balance(
         pool: &mut Pool,
         ctx: &mut TxContext

@@ -1,5 +1,6 @@
 /// This module implements the staking functionality for Typus NFTs.
 /// Users can stake their NFTs to earn experience points and level up.
+/// Deprecated: use `typus/sources/tails_staking.move` instead.
 module typus_nft::staking {
     use std::option;
 

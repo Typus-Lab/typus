@@ -5,6 +5,7 @@
 /// It implements a scalable vector using a table.
 ///
 /// A basic scalable vector library implemented using `Table`.
+/// Copy from sui-framwork to implement `swap` function at that time.
 module typus_nft::table_vec {
     use sui::table::{Self, Table};
     use sui::tx_context::TxContext;
