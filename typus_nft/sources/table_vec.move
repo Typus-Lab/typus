@@ -1,7 +1,11 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+/// This module is part of the Typus NFT collection.
+/// It implements a scalable vector using a table.
+///
 /// A basic scalable vector library implemented using `Table`.
+/// Copy from sui-framwork to implement `swap` function at that time.
 module typus_nft::table_vec {
     use sui::table::{Self, Table};
     use sui::tx_context::TxContext;

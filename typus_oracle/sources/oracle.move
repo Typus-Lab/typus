@@ -1,3 +1,6 @@
+/// This module implements a generic oracle that can be updated from different sources.
+/// It supports Switchboard, Pyth, and Supra oracles.
+/// The oracle can be used to get the price of a token pair.
 module typus_oracle::oracle {
     use sui::event::emit;
     use sui::clock::{Self, Clock};
@@ -9,28 +12,43 @@ module typus_oracle::oracle {
 
     // ======== Structs =========
 
+    /// A capability that allows the owner to manage the oracle.
     public struct ManagerCap has key {
         id: UID,
     }
 
+    /// The oracle object.
     public struct Oracle has key {
         id: UID,
+        /// The base token of the token pair.
         base_token: String,
+        /// The quote token of the token pair.
         quote_token: String,
+        /// The type name of the base token.
         base_token_type: TypeName,
+        /// The type name of the quote token.
         quote_token_type: TypeName,
+        /// The number of decimals of the price.
         decimal: u64,
+        /// The latest price.
         price: u64,
+        /// The time-weighted average price.
         twap_price: u64,
+        /// The timestamp of the latest price update in milliseconds.
         ts_ms: u64,
+        /// The epoch of the latest price update.
         epoch: u64,
+        /// The time interval for which the oracle price is considered valid.
         time_interval: u64,
+        /// The ID of the Switchboard feed if it is used.
         switchboard: Option<ID>,
+        /// The ID of the Pyth feed if it is used.
         pyth: Option<ID>,
     }
 
     // ======== Functions =========
 
+    /// Initializes the oracle module.
     fun init(ctx: &mut TxContext) {
         transfer::transfer(
             ManagerCap {id: object::new(ctx)},
@@ -38,11 +56,14 @@ module typus_oracle::oracle {
         );
     }
 
+    /// Initializes the oracle module for testing.
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
         init(ctx);
     }
 
+    /// Creates a new oracle.
+    /// Safe with `ManagerCap` check
     public entry fun new_oracle<B_TOKEN, Q_TOKEN>(
         _manager_cap: &ManagerCap,
         base_token: String,
@@ -74,11 +95,14 @@ module typus_oracle::oracle {
         transfer::share_object(oracle);
     }
 
+    /// A capability that allows the owner to update the oracle.
     public struct UpdateAuthority has key {
         id: UID,
         authority: vector<address>,
     }
 
+    /// Creates a new update authority.
+    /// Safe with `ManagerCap` check
     entry fun new_update_authority(
         _manager_cap: &ManagerCap,
         ctx: &mut TxContext
@@ -87,6 +111,8 @@ module typus_oracle::oracle {
         transfer::share_object(update_authority);
     }
 
+    /// Adds new addresses to the update authority.
+    /// Safe with `ManagerCap` check
     entry fun add_update_authority(
         _manager_cap: &ManagerCap,
         update_authority: &mut UpdateAuthority,
@@ -98,6 +124,8 @@ module typus_oracle::oracle {
         }
     }
 
+    /// Removes addresses from the update authority.
+    /// Safe with `ManagerCap` check
     entry fun remove_update_authority(
         _manager_cap: &ManagerCap,
         update_authority: &mut UpdateAuthority,
@@ -114,6 +142,8 @@ module typus_oracle::oracle {
 
     const VERSION: u64 = 1;
 
+    /// Updates the version of the oracle.
+    /// Safe with `ManagerCap` check
     entry fun update_version(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -125,6 +155,7 @@ module typus_oracle::oracle {
         }
     }
 
+    /// Checks the version of the oracle.
     fun version_check(oracle: &Oracle,) {
         if (dynamic_field::exists_(&oracle.id, string::utf8(b"VERSION"))) {
             let v: u64 = *dynamic_field::borrow(&oracle.id, string::utf8(b"VERSION"));
@@ -134,6 +165,9 @@ module typus_oracle::oracle {
         }
     }
 
+    /// Updates the oracle price with the given price and TWAP price.
+    /// This function can only be called by the update authority.
+    /// Safe with `UpdateAuthority` check
     public entry fun update_v2(
         oracle: &mut Oracle,
         update_authority: & UpdateAuthority,
@@ -149,6 +183,9 @@ module typus_oracle::oracle {
         update_(oracle, price, twap_price, clock, ctx);
     }
 
+    /// Updates the oracle price with the given price and TWAP price.
+    /// This function can only be called by the manager.
+    /// Safe with `ManagerCap` check
     public entry fun update(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -161,6 +198,7 @@ module typus_oracle::oracle {
         update_(oracle, price, twap_price, clock, ctx);
     }
 
+    /// Internal function to update the oracle price.
     fun update_(
         oracle: &mut Oracle,
         price: u64,
@@ -184,6 +222,8 @@ module typus_oracle::oracle {
     use switchboard_std::aggregator::{Aggregator};
     use typus_oracle::switchboard_feed_parser;
 
+    /// Updates the Switchboard oracle feed ID.
+    /// Safe with `ManagerCap` check
     entry fun update_switchboard_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -194,6 +234,8 @@ module typus_oracle::oracle {
         oracle.switchboard = option::some(id);
     }
 
+    /// Updates the oracle price with the Switchboard feed.
+    /// Safe without authority check
     entry fun update_with_switchboard(
         oracle: &mut Oracle,
         feed: &Aggregator,
@@ -229,6 +271,8 @@ module typus_oracle::oracle {
     use pyth::state::{State as PythState};
     use pyth::price_info::{PriceInfoObject};
 
+    /// Updates the Pyth oracle feed ID.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -243,6 +287,8 @@ module typus_oracle::oracle {
         dynamic_field::add(&mut oracle.id, string::utf8(b"quote_price_info_object"), id);
     }
 
+    /// Updates the oracle price with the Pyth feed.
+    /// Safe without authority check
     public fun update_with_pyth(
         oracle: &mut Oracle,
         state: &PythState,
@@ -293,6 +339,8 @@ module typus_oracle::oracle {
         emit(PriceEvent {id: object::id(oracle), price, ts_ms});
     }
 
+    /// Updates the Pyth oracle feed ID for USD pairs.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle_usd(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -305,6 +353,8 @@ module typus_oracle::oracle {
         oracle.pyth = option::some(id);
     }
 
+    /// Updates the Pyth oracle feed ID for reciprocal USD pairs.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle_usd_reciprocal(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -318,6 +368,8 @@ module typus_oracle::oracle {
         dynamic_field::add(&mut oracle.id, string::utf8(b"reciprocal_pyth"), id);
     }
 
+    /// Updates the oracle price with the Pyth feed for USD pairs.
+    /// Safe without authority check
     public fun update_with_pyth_usd(
         oracle: &mut Oracle,
         state: &PythState,
@@ -382,6 +434,8 @@ module typus_oracle::oracle {
     use typus_oracle::supra;
     use SupraOracle::SupraSValueFeed::OracleHolder;
 
+    /// Updates the Supra oracle pair ID.
+    /// Safe with `ManagerCap` check
     entry fun update_supra_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -396,6 +450,8 @@ module typus_oracle::oracle {
         };
     }
 
+    /// Updates the oracle price with the Supra feed.
+    /// Safe with `ManagerCap` check
     entry fun update_with_supra(
         oracle: &mut Oracle,
         oracle_holder: &OracleHolder,
@@ -429,6 +485,8 @@ module typus_oracle::oracle {
         emit(PriceEvent {id: object::id(oracle), price: price_u64, ts_ms});
     }
 
+    /// Copies the manager capability.
+    /// Safe with `ManagerCap` check
     public entry fun copy_manager_cap(
         _manager_cap: &ManagerCap,
         recipient: address,
@@ -437,6 +495,7 @@ module typus_oracle::oracle {
         transfer::transfer(ManagerCap {id: object::new(ctx)}, recipient);
     }
 
+    /// Burns the manager capability.
     public entry fun burn_manager_cap(
         manager_cap: ManagerCap,
     ) {
@@ -446,18 +505,21 @@ module typus_oracle::oracle {
         id.delete();
     }
 
+    /// getter function Returns the oracle data.
     public fun get_oracle(
         oracle: &Oracle
     ): (u64, u64, u64, u64) {
         (oracle.price, oracle.decimal, oracle.ts_ms, oracle.epoch)
     }
 
+    /// getter function Returns the token data.
     public fun get_token(
         oracle: &Oracle
     ): (String, String, TypeName, TypeName) {
         (oracle.base_token, oracle.quote_token, oracle.base_token_type, oracle.quote_token_type)
     }
 
+    /// getter function Returns the price and decimals of the oracle.
     public fun get_price(
         oracle: &Oracle,
         clock: &Clock,
@@ -467,6 +529,7 @@ module typus_oracle::oracle {
         (oracle.price, oracle.decimal)
     }
 
+    /// getter function Returns the TWAP price and decimals of the oracle.
     public fun get_twap_price(
         oracle: &Oracle,
         clock: &Clock,
@@ -476,6 +539,7 @@ module typus_oracle::oracle {
         (oracle.twap_price, oracle.decimal)
     }
 
+    /// getter function Returns the price and decimals of the oracle with a custom time interval.
     public fun get_price_with_interval_ms(
         oracle: &Oracle,
         clock: &Clock,
@@ -486,6 +550,8 @@ module typus_oracle::oracle {
         (oracle.price, oracle.decimal)
     }
 
+    /// Updates the time interval of the oracle.
+    /// Safe with `ManagerCap` check
     public entry fun update_time_interval(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -495,6 +561,8 @@ module typus_oracle::oracle {
         oracle.time_interval = time_interval;
     }
 
+    /// Updates the token names of the oracle.
+    /// Safe with `ManagerCap` check
     public entry fun update_token(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -515,5 +583,6 @@ module typus_oracle::oracle {
     const E_INVALID_PYTH: u64 = 6;
     const E_INVALID_VERSION: u64 = 7;
 
+    /// Event emitted when the price is updated.
     public struct PriceEvent has copy, drop { id: ID, price: u64, ts_ms: u64 }
 }

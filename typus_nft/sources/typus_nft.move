@@ -1,3 +1,5 @@
+/// This module implements the Typus NFT collection.
+/// It includes functionality for minting, managing, and staking NFTs.
 module typus_nft::typus_nft {
 
     use std::string::{Self, String};
@@ -37,32 +39,49 @@ module typus_nft::typus_nft {
     /// One time witness is only instantiated in the init method
     struct TYPUS_NFT has drop {}
 
+    /// The Typus NFT object.
     struct Tails has key, store {
         id: UID,
+        /// The name of the NFT.
         name: String,
+        /// The description of the NFT.
         description: String,
+        /// The number of the NFT.
         number: u64,
+        /// The URL of the NFT image.
         url: Url,
+        /// The attributes of the NFT.
         attributes: VecMap<String, String>,
+        /// The level of the NFT.
         level: u64,
+        /// The experience points of the NFT.
         exp: u64,
+        /// Whether the NFT has made its first bid.
         first_bid: bool,
+        /// Whether the NFT has made its first deposit.
         first_deposit: bool,
+        /// Whether the NFT has made its first NFT deposit.
         first_deposit_nft: bool,
+        /// Padding for future use.
         u64_padding: VecMap<String, u64>,
     }
 
+    /// A capability that allows the owner to manage the NFT collection.
     struct ManagerCap has key, store { id: UID }
 
     const MAX_BPS: u64 = 10_000;
 
+    /// The royalty object.
     struct Royalty has key {
         id: UID,
+        /// The recipients of the royalty.
         recipients: VecMap<address, u64>,
+        /// The transfer policy capability for the royalty.
         policy_cap: TransferPolicyCap<Tails>
     }
 
 
+    /// Initializes the NFT module.
     #[lint_allow(self_transfer, share_owned)]
     fun init(otw: TYPUS_NFT, ctx: &mut TxContext) {
         let publisher = sui::package::claim(otw, ctx);
@@ -107,6 +126,8 @@ module typus_nft::typus_nft {
         event::emit(event);
     }
 
+    /// Withdraws the royalty from the transfer policy.
+    /// Safe with `ManagerCap` check
     entry fun withdraw_royalty(
         _manager_cap: &ManagerCap,
         royalty: &Royalty,
@@ -131,11 +152,14 @@ module typus_nft::typus_nft {
         coin::destroy_zero(total);
     }
 
+    /// Event emitted when the royalty is updated.
     struct RoyaltyUpdateEvent has copy, drop {
         sender: address,
         recipients: VecMap<address, u64>,
     }
 
+    /// Updates the royalty recipients and shares.
+    /// Safe with `ManagerCap` check
     entry fun update_royalty(
         _manager_cap: &ManagerCap,
         royalty: &mut Royalty,
@@ -162,6 +186,8 @@ module typus_nft::typus_nft {
         event::emit(event);
     }
 
+    /// Updates the policy rules for the NFT collection.
+    /// Safe with `ManagerCap` check
     entry fun update_policy_rules(
         _manager_cap: &ManagerCap,
         policy: &mut TransferPolicy<Tails>,
@@ -177,14 +203,21 @@ module typus_nft::typus_nft {
         kiosk_lock_rule::add(policy, &royalty.policy_cap);
     }
 
+    /// The NFT pool object.
     struct Pool has key {
         id: UID,
+        /// The NFTs in the pool.
         tails: TableVec<Tails>,
+        /// The number of NFTs in the pool.
         num: u64,
+        /// Whether the pool is live.
         is_live: bool,
+        /// The start time of the pool in milliseconds.
         start_ms: u64, // 18_446_744_073_709_551_615
     }
 
+    /// Creates a new NFT pool.
+    /// Safe with `ManagerCap` check
     entry fun new_pool(
         _manager_cap: &ManagerCap,
         start_ms: u64,
@@ -200,6 +233,8 @@ module typus_nft::typus_nft {
         transfer::share_object(pool);
     }
 
+    /// Closes an NFT pool.
+    /// Safe with `ManagerCap` check
     entry fun close_pool(
         _manager_cap: &ManagerCap,
         pool: Pool,
@@ -216,11 +251,14 @@ module typus_nft::typus_nft {
         object::delete(id);
     }
 
+    /// Event emitted when a new manager capability is created.
     struct NewManagerCapEvent has copy, drop {
         id: ID,
         sender: address
     }
 
+    /// Creates a new manager capability.
+    /// Safe with `ManagerCap` check
     #[lint_allow(self_transfer)]
     entry fun new_manager_cap (
         _manager_cap: &ManagerCap,
@@ -238,6 +276,8 @@ module typus_nft::typus_nft {
         transfer::public_transfer(manager_cap, sender);
     }
 
+    /// Deposits an NFT into the pool.
+    /// Safe with `ManagerCap` check
     entry fun deposit_nft(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -256,6 +296,7 @@ module typus_nft::typus_nft {
         pool.num = pool.num + 1;
     }
 
+    /// Creates a new NFT.
     fun new_nft(
         name: String,
         number: u64,
@@ -288,11 +329,14 @@ module typus_nft::typus_nft {
         nft
     }
 
+    /// The whitelist object.
     struct Whitelist has key {
         id: UID,
         for: ID
     }
 
+    /// Issues whitelist tokens to the given recipients.
+    /// Safe with `ManagerCap` check
     entry fun issue_whitelist(
         _manager_cap: &ManagerCap,
         pool: &Pool,
@@ -307,6 +351,7 @@ module typus_nft::typus_nft {
         }
     }
 
+    /// Updates the sale status of the pool.
     entry fun update_sale(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -315,6 +360,8 @@ module typus_nft::typus_nft {
         pool.is_live = is_live;
     }
 
+    /// Updates the start time of the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_start_ms(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -323,7 +370,9 @@ module typus_nft::typus_nft {
         pool.start_ms = start_ms;
     }
 
+    /// Sends NFTs from the pool to the given recipient.
     #[lint_allow(share_owned)]
+    /// Safe with `ManagerCap` check
     entry fun send_nfts(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -356,6 +405,7 @@ module typus_nft::typus_nft {
         transfer::public_transfer(kiosk_cap, recipient);
     }
 
+    /// Withdraws NFTs from the pool.
     public(friend) fun withdraw_nfts(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -370,6 +420,8 @@ module typus_nft::typus_nft {
         nfts
     }
 
+    /// Resends the mint event for the given NFT.
+    /// Safe with `ManagerCap` check
     entry fun resend_nfts_event(
         _manager_cap: &ManagerCap,
         id: address,
@@ -401,6 +453,7 @@ module typus_nft::typus_nft {
         event::emit(mint_event);
     }
 
+    /// Returns the experience points required for the given level.
     // 1_000, 50_000, 250_000, 1_000_000, 5_000_000, 20_000_000
     fun get_level_exp(level: u64): u64 {
         let exp = if (level == 2) { 1_000 }
@@ -413,6 +466,8 @@ module typus_nft::typus_nft {
         exp
     }
 
+    /// Sets the level of the first n NFTs in the pool.
+    /// Safe with `ManagerCap` check
     entry fun pool_set_n_level(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -436,6 +491,8 @@ module typus_nft::typus_nft {
         };
     }
 
+    /// Updates an NFT in the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_pool_nft(
         manager_cap: &ManagerCap,
         pool: &mut Pool,
@@ -448,6 +505,7 @@ module typus_nft::typus_nft {
         update_nft(manager_cap, nft, id, level, url);
     }
 
+    /// Updates an NFT.
     public(friend) fun update_nft(
         manager_cap: &ManagerCap,
         nft: &mut Tails,
@@ -463,6 +521,8 @@ module typus_nft::typus_nft {
     }
 
     // Staking Related
+    /// Updates the image URL of the NFT.
+    /// Safe with `ManagerCap` check
     public fun update_image_url(
         _manager_cap: &ManagerCap,
         tails: &mut Tails,
@@ -471,12 +531,15 @@ module typus_nft::typus_nft {
         tails.url = url::new_unsafe_from_bytes(url);
     }
 
+    /// Event emitted when an NFT gains experience points.
     struct ExpUpEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
     }
 
+    /// Increases the experience points of an NFT.
+    /// Safe with `ManagerCap` check
     public fun nft_exp_up(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -492,12 +555,15 @@ module typus_nft::typus_nft {
         event::emit(event);
     }
 
+    /// Event emitted when an NFT loses experience points.
     struct ExpDownEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_remove: u64
     }
 
+    /// Decreases the experience points of an NFT.
+    /// Safe with `ManagerCap` check
     public fun nft_exp_down(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -513,12 +579,15 @@ module typus_nft::typus_nft {
         event::emit(event);
     }
 
+    /// Event emitted when an NFT makes its first bid.
     struct FirstBidEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
     }
 
+    /// Marks an NFT as having made its first bid and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_bid(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -535,12 +604,15 @@ module typus_nft::typus_nft {
         }
     }
 
+    /// Event emitted when an NFT makes its first deposit.
     struct FirstDepositEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
     }
 
+    /// Marks an NFT as having made its first deposit and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_deposit(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -557,6 +629,8 @@ module typus_nft::typus_nft {
         }
     }
 
+    /// Marks an NFT as having made its first NFT deposit and increases its experience points.
+    /// Safe with `ManagerCap` check
     public fun first_deposit_nft(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -567,11 +641,14 @@ module typus_nft::typus_nft {
         }
     }
 
+    /// Event emitted when an NFT levels up.
     struct LevelUpEvent has copy, drop {
         nft_id: ID,
         level: u64
     }
 
+    /// Levels up an NFT if it has enough experience points.
+    /// Safe with `ManagerCap` check
     public fun level_up(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -603,6 +680,8 @@ module typus_nft::typus_nft {
 
 
     // Extension
+    /// Inserts a key-value pair into the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun insert_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -612,6 +691,8 @@ module typus_nft::typus_nft {
         vec_map::insert(&mut nft_mut.u64_padding, key, value);
     }
 
+    /// Checks if the u64 padding of the NFT contains the given key.
+    /// Safe with `ManagerCap` check
     public fun contains_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &Tails,
@@ -620,6 +701,8 @@ module typus_nft::typus_nft {
         vec_map::contains(& nft_mut.u64_padding, &key)
     }
 
+    /// Returns the value associated with the given key in the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun get_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &Tails,
@@ -628,6 +711,8 @@ module typus_nft::typus_nft {
         *vec_map::get(& nft_mut.u64_padding, &key)
     }
 
+    /// Updates the value associated with the given key in the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun update_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -638,6 +723,8 @@ module typus_nft::typus_nft {
         *mut_v = value;
     }
 
+    /// Removes the key-value pair with the given key from the u64 padding of the NFT.
+    /// Safe with `ManagerCap` check
     public fun remove_u64_padding(
         _manager_cap: &ManagerCap,
         nft_mut: &mut Tails,
@@ -647,6 +734,7 @@ module typus_nft::typus_nft {
     }
 
     // User Entry
+    /// Event emitted when an NFT is minted.
     struct MintEvent has copy, drop {
         id: ID,
         name: String,
@@ -657,6 +745,7 @@ module typus_nft::typus_nft {
         sender: address
     }
 
+    /// Emits a mint event.
     public(friend) fun emit_mint_event(nft: &Tails, sender: address) {
         let mint_event = MintEvent {
             id: object::id(nft),
@@ -670,6 +759,7 @@ module typus_nft::typus_nft {
         event::emit(mint_event);
     }
 
+    /// Mints an NFT from the pool.
     fun mint(
         pool: &mut Pool,
         whitelist_token: Whitelist,
@@ -710,6 +800,7 @@ module typus_nft::typus_nft {
         nft
     }
 
+    /// Mints an NFT for free.
     #[lint_allow(self_transfer, share_owned)]
     entry fun free_mint(
         pool: &mut Pool,
@@ -728,6 +819,7 @@ module typus_nft::typus_nft {
         transfer::public_transfer(kiosk_cap, sender);
     }
 
+    /// Mints an NFT for free into a kiosk.
     entry fun free_mint_into_kiosk(
         pool: &mut Pool,
         policy: &TransferPolicy<Tails>,
@@ -744,30 +836,35 @@ module typus_nft::typus_nft {
 
     // Public Functions
 
+    /// Returns the number of the NFT.
     public fun tails_number(
         nft: &Tails,
     ): u64 {
         nft.number
     }
 
+    /// Returns the level of the NFT.
     public fun tails_level(
         nft: &Tails,
     ): u64 {
         nft.level
     }
 
+    /// Returns the experience points of the NFT.
     public fun tails_exp(
         nft: &Tails,
     ): u64 {
         nft.exp
     }
 
+    /// Returns the attributes of the NFT.
     public fun tails_attributes(
         nft: &Tails,
     ): VecMap<String, String> {
         nft.attributes
     }
 
+    /// Initializes the NFT module for testing.
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
         init(TYPUS_NFT {}, ctx);

@@ -1,3 +1,5 @@
+/// This module implements a discount minting pool for Typus NFTs.
+/// Users can request to mint an NFT with a discount, and the final price is determined by a VRF.
 module typus_nft::discount_mint {
     use std::vector;
     use std::string;
@@ -31,22 +33,36 @@ module typus_nft::discount_mint {
 
     const DISCOUNT_PCT: u64 = 40;
 
+    /// The discount minting pool object.
     struct Pool has key {
         // constant
         id: UID,
+        /// The number of NFTs remaining in the pool.
         num: u64,   // remaining
+        /// The price of the NFT in SUI with 9 decimals.
         price: u64, // SUI decimal 9
+        /// The start time of the mint in milliseconds.
         start_ms: u64,
+        /// The end time of the mint in milliseconds.
         end_ms: u64,
+        /// The authority of the pool.
         authority: address,
+        /// The public key for the VRF.
         public_key: vector<u8>,
+        /// The discount percentages with 2 decimals.
         discount_pcts: vector<u64>, // decimal 2
+        /// Whether the pool is live.
         is_live: bool,
+        /// The balance of the pool.
         balance: Balance<SUI>,
+        /// The NFTs in the pool.
         tails: TableVec<Tails>,
+        /// The mint requests.
         requests: vector<MintRequest>,
     }
 
+    /// Creates a new discount minting pool.
+    /// Safe with `ManagerCap` check
     entry fun new_pool(
         _manager_cap: &typus_nft::ManagerCap,
         price: u64,
@@ -73,6 +89,7 @@ module typus_nft::discount_mint {
         transfer::share_object(pool);
     }
 
+    /// Deposits an NFT into the pool.
     entry fun deposit_nft(
         pool: &mut Pool,
         nft: Tails,
@@ -80,6 +97,8 @@ module typus_nft::discount_mint {
         table_vec::push_back(&mut pool.tails, nft);
     }
 
+    /// Migrates NFTs from an old pool to a new pool.
+    /// Safe with `ManagerCap` check
     entry fun migrate_nfts(
         manager_cap: &typus_nft::ManagerCap,
         pool: &mut typus_nft::Pool,
@@ -96,6 +115,8 @@ module typus_nft::discount_mint {
         vector::destroy_empty(nfts);
     }
 
+    /// Migrates NFTs from one pool to another based on level.
+    /// Safe with `authority` check
     entry fun migrate_pool(
         pool: &mut Pool,
         new_pool: &mut Pool,
@@ -123,6 +144,8 @@ module typus_nft::discount_mint {
         };
     }
 
+    /// Updates an NFT in the pool.
+    /// Safe with `ManagerCap` check
     entry fun update_pool_nft(
         manager_cap: &typus_nft::ManagerCap,
         pool: &mut Pool,
@@ -137,6 +160,7 @@ module typus_nft::discount_mint {
         typus_nft::update_nft(manager_cap, nft, id, level, url);
     }
 
+    /// A request to mint an NFT.
     #[lint_allow(coin_field)]
     struct MintRequest has store {
         user: address,
@@ -144,6 +168,7 @@ module typus_nft::discount_mint {
         vrf_input: vector<u8>
     }
 
+    /// Event emitted when a mint request is made.
     struct MintRequestEvent has copy, drop {
         user: address,
         vrf_input: vector<u8>,
@@ -151,6 +176,7 @@ module typus_nft::discount_mint {
         seed: u64,
     }
 
+    /// Requests to mint an NFT.
     entry fun request_mint(
         pool: &mut Pool,
         seed: u64, // 0, 1, 2
@@ -203,6 +229,8 @@ module typus_nft::discount_mint {
         event::emit(event);
     }
 
+    /// Executes a mint request.
+    /// Safe with `authority` check
     #[lint_allow(share_owned)]
     entry fun execute_mint(
         pool: &mut Pool,
@@ -265,6 +293,7 @@ module typus_nft::discount_mint {
         }
     }
 
+    /// Event emitted when a discount is applied.
     struct DiscountEventV3 has copy, drop {
         pool: ID,
         price: u64,
@@ -275,6 +304,8 @@ module typus_nft::discount_mint {
         level: u64,
     }
 
+    /// Refunds a mint request.
+    /// Safe with `authority` check
     entry fun refund(
         pool: &mut Pool,
         ctx: & TxContext
@@ -290,6 +321,8 @@ module typus_nft::discount_mint {
         transfer::public_transfer(coin, user);
     }
 
+    /// Closes the pool.
+    /// Safe with `authority` check
     entry fun close(
         pool: &mut Pool,
         ctx: & TxContext
@@ -298,6 +331,8 @@ module typus_nft::discount_mint {
         pool.is_live = false;
     }
 
+    /// Starts a new round.
+    /// Safe with `authority` check
     entry fun new_round(
         pool: &mut Pool,
         num: u64,
@@ -319,6 +354,8 @@ module typus_nft::discount_mint {
         }
     }
 
+    /// Updates the discount percentages.
+    /// Safe with `authority` check
     entry fun update_discount_pcts(
         pool: &mut Pool,
         discount_pcts: vector<u64>,
@@ -328,6 +365,8 @@ module typus_nft::discount_mint {
         pool.discount_pcts = discount_pcts;
     }
 
+    /// Updates the end time of the mint.
+    /// Safe with `authority` check
     entry fun update_end_ms(
         pool: &mut Pool,
         end_ms: u64,
@@ -337,6 +376,8 @@ module typus_nft::discount_mint {
         pool.end_ms = end_ms;
     }
 
+    /// Adds users to the whitelist.
+    /// Safe with `authority` check
     entry fun add_whitelist(
         pool: &mut Pool,
         users: vector<address>,
@@ -360,6 +401,8 @@ module typus_nft::discount_mint {
         }
     }
 
+    /// Sends an NFT from the pool to the given recipient.
+    /// Safe with `authority` check
     #[lint_allow(share_owned)]
     entry fun send_nft(
         _manager_cap: &typus_nft::ManagerCap,
@@ -382,6 +425,7 @@ module typus_nft::discount_mint {
         transfer::public_transfer(kiosk_cap, recipient);
     }
 
+    /// Checks if a user is whitelisted.
     public(friend) fun is_whitelist(
         pool: & Pool,
         user: address
@@ -395,6 +439,8 @@ module typus_nft::discount_mint {
         return false
     }
 
+    /// Withdraws the balance from the pool.
+    /// Safe with `authority` check
     entry fun withdraw_balance(
         pool: &mut Pool,
         ctx: &mut TxContext
@@ -405,6 +451,7 @@ module typus_nft::discount_mint {
         transfer::public_transfer(c, @TYPUS);
     }
 
+    /// Generates a random number from a given seed.
     fun generate_answer(n: u64, rnd: &vector<u8>): u64 {
         assert!(vector::length(rnd) >= 16, E_INVALID_RND_LENGTH);
         let m: u128 = 0;
