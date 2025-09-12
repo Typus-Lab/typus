@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `DepositVault` `BidVault` and `RefundVault` be exposed.
 module typus_framework::vault {
     use std::string::{Self, String};
     use std::type_name::{Self, TypeName};
@@ -39,105 +40,162 @@ module typus_framework::vault {
 
     // ======== Structs ========
 
+    /// One-time witness for the vault module.
     public struct VAULT has drop {}
 
-    /// DepositVault & BidVault lifecycle
-    /// user "deposit": transfer from user wallet to warmup_sub_vault
-    /// user "withraw": transfer from warmup_sub_vault to user wallet
-    /// manager "activate" the vault: transfer from warmup_sub_vault to active_sub_vault
-    /// user "unsubscribe": transfer from active_sub_vault to deactivating_sub_vault
-    /// manager "delivery" - unfilled deactivating users: transfer from deactivating_sub_vault to inactive_sub_vault
-    ///                    - unfilled active users: if has_next, transfer from active_sub_vault to warmup_sub_vault, otherwise to inactive_sub_vault
-    ///                    - premium: split balance to premium_sub_vault and performance_fee_sub_vault
-    ///                    - bidder share: add bidder shares to bidder_sub_vault
-    /// manager "settle" - transfer from deactivating_sub_vault to inactive_sub_vault
-    ///                       - if !has_next, transfer from active_sub_vault to inactive_sub_vault
-    ///                       - transfer from performance_fee_sub_vault to @fee_address & premium_sub_vault
-    /// user "claim": transfer from inactive_sub_vault to user wallet
-    /// user "harvest": transfer from premium_sub_vault to user wallet
+    /// The main vault for user deposits. It manages different sub-vaults (active, deactivating, inactive, warmup, premium, incentive)
+    /// as balances and tracks user shares in a `BigVector`.
+    ///
+    /// The lifecycle of funds in the vault is as follows:
+    /// 1. **Deposit**: User deposits funds, which go into the `warmup` sub-vault.
+    /// 2. **Activate**: A manager activates the vault, moving funds from `warmup` to `active`.
+    /// 3. **Unsubscribe**: A user unsubscribes, moving their share from `active` to `deactivating`.
+    /// 4. **Recoup/Settle/Delivery**: These are manager-only functions that handle the outcome of the strategy.
+    ///    - Unfilled portions are refunded.
+    ///    - Premiums are collected.
+    ///    - Funds are moved between sub-vaults based on the outcome and whether there is a next round.
+    /// 5. **Claim/Harvest**: Users claim their funds from the `inactive` sub-vault or harvest premiums.
     public struct DepositVault has key, store {
         id: UID,
+        /// The type of the token that is deposited into the vault.
         deposit_token: TypeName,
+        /// The type of the token that is used for bidding/premiums.
         bid_token: TypeName,
+        /// The type of the incentive token, if any.
         incentive_token: Option<TypeName>,
+        /// An index for the vault, often corresponding to an auction.
         index: u64,
+        /// The fee in basis points.
         fee_bp: u64,
+        /// The portion of the fee that is shared, in basis points.
         fee_share_bp: u64,
+        /// The key for the shared fee pool, if any.
         shared_fee_pool: Option<vector<u8>>,
+        /// The total supply of shares in the active sub-vault.
         active_share_supply: u64,
+        /// The total supply of shares in the deactivating sub-vault (for users who have unsubscribed).
         deactivating_share_supply: u64, // unsubscribe
+        /// The total supply of shares in the inactive sub-vault (for users to claim).
         inactive_share_supply: u64, // claim
+        /// The total supply of shares in the warmup sub-vault (for new deposits).
         warmup_share_supply: u64, // deposit / withdraw
+        /// The total supply of shares in the premium sub-vault (for harvesting).
         premium_share_supply: u64, // harvest
+        /// The total supply of shares in the incentive sub-vault (for redeeming).
         incentive_share_supply: u64, // redeem
+        /// A flag indicating if there is a next round for the vault.
         has_next: bool,
+        /// Metadata for display purposes.
         metadata: String,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
+        /// Padding for additional BCS-encoded fields.
         bcs_padding: vector<u8>,
     }
 
+    /// Holds the funds from bidders.
     public struct BidVault has key, store {
         id: UID,
+        /// The type of the token that is deposited into the vault.
         deposit_token: TypeName,
+        /// The type of the token that is used for bidding.
         bid_token: TypeName,
+        /// The type of the incentive token, if any.
         incentive_token: Option<TypeName>,
+        /// An index for the vault.
         index: u64,
+        /// The total supply of shares in the vault.
         share_supply: u64,
+        /// Metadata for display purposes.
         metadata: String,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
+        /// Padding for additional BCS-encoded fields.
         bcs_padding: vector<u8>,
     }
 
+    /// Holds funds to be refunded to users.
     public struct RefundVault has key, store {
         id: UID,
+        /// The type of the token being refunded.
         token: TypeName,
+        /// The total supply of shares in the vault.
         share_supply: u64,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
+        /// Padding for additional BCS-encoded fields.
         bcs_padding: vector<u8>,
     }
 
+    /// Represents a user's shares in the `DepositVault`.
     public struct DepositShare has copy, store {
+        /// The address of the user's receipt NFT.
         receipt: address,
+        /// The user's share in the active sub-vault.
         active_share: u64,
+        /// The user's share in the deactivating sub-vault.
         deactivating_share: u64,
+        /// The user's share in the inactive sub-vault.
         inactive_share: u64,
+        /// The user's share in the warmup sub-vault.
         warmup_share: u64,
+        /// The user's share in the premium sub-vault.
         premium_share: u64,
+        /// The user's share in the incentive sub-vault.
         incentive_share: u64,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
     }
 
+    /// An NFT that represents a user's deposit.
     public struct TypusDepositReceipt has key, store {
         id: UID,
+        /// The ID of the `DepositVault`.
         vid: ID,
+        /// The index of the vault.
         index: u64,
+        /// Metadata for display purposes.
         metadata: String,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
     }
 
+    /// Represents a bidder's shares in the `BidVault`.
     public struct BidShare has copy, store {
+        /// The address of the bidder's receipt NFT.
         receipt: address,
+        /// The bidder's share.
         share: u64,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
     }
 
+    /// An NFT that represents a bid.
     public struct TypusBidReceipt has key, store {
         id: UID,
+        /// The ID of the `BidVault`.
         vid: ID,
+        /// The index of the vault.
         index: u64,
+        /// Metadata for display purposes.
         metadata: String,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
     }
 
+    /// Represents a user's share in the `RefundVault`.
     public struct RefundShare has copy, store {
+        /// The address of the user.
         user: address,
+        /// The user's share.
         share: u64,
+        /// Padding for additional u64 fields.
         u64_padding: vector<u64>,
     }
 
     // ======== DepositVault Functions ========
 
-    /// create new DepositVault
+    /// Creates a new `DepositVault`.
     public fun new_deposit_vault<D_TOKEN, B_TOKEN>(
         index: u64,
         fee_bp: u64,
@@ -178,6 +236,7 @@ module typus_framework::vault {
         deposit_vault
     }
 
+    /// Creates a new `TypusDepositReceipt` NFT.
     public fun new_typus_deposit_receipt(
         deposit_vault: &DepositVault,
         ctx: &mut TxContext,
@@ -191,6 +250,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Updates the incentive token for a `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_deposit_vault_incentive_token<TOKEN>(
         deposit_vault: &mut DepositVault,
     ) {
@@ -207,6 +268,8 @@ module typus_framework::vault {
     //     dynamic_field::remove(&mut deposit_vault.id, K_INCENTIVE_BALANCE)
     // }
 
+    /// Updates the display metadata for a `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_deposit_receipt_display(
         deposit_vault: &mut DepositVault,
         metadata: String,
@@ -214,6 +277,7 @@ module typus_framework::vault {
         deposit_vault.metadata = metadata;
     }
 
+    /// Transfers a `TypusDepositReceipt` to a user.
     public fun transfer_deposit_receipt(receipt: Option<TypusDepositReceipt>, user: address) {
         if (option::is_some(&receipt)) {
             transfer::public_transfer(option::destroy_some(receipt), user);
@@ -222,6 +286,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Updates the incentive fee for a `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_incentive_fee(
         deposit_vault: &mut DepositVault,
         incentive_fee_bp: u64,
@@ -230,6 +296,8 @@ module typus_framework::vault {
         utils::set_u64_padding_value(&mut deposit_vault.u64_padding, I_INCENTIVE_FEE, incentive_fee_bp + (1 << 63));
     }
 
+    /// Updates the fee for a `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_fee(
         deposit_vault: &mut DepositVault,
         fee_bp: u64,
@@ -239,6 +307,8 @@ module typus_framework::vault {
         deposit_vault.fee_bp = fee_bp;
     }
 
+    /// Updates the fee sharing configuration for a `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_fee_share(
         deposit_vault: &mut DepositVault,
         fee_share_bp: u64,
@@ -250,7 +320,8 @@ module typus_framework::vault {
         deposit_vault.shared_fee_pool = shared_fee_pool;
     }
 
-    /// activate warmup_sub_vault to active_sub_vault
+    /// Activates the vault, moving funds from the warmup sub-vault to the active sub-vault.
+    /// WARNING: mut inputs without authority check inside
     public fun activate<TOKEN>(
         deposit_vault: &mut DepositVault,
         has_next: bool,
@@ -301,10 +372,12 @@ module typus_framework::vault {
         amount
     }
 
-    /// refund unfilled amount from deactivating_sub_vault to inactive_sub_vault
-    /// refund unfilled amount from active_sub_vault
-    ///     if has_next => transfer to warmup_sub_vault, and add share at front
-    ///     if not has_next => transfer to refund_sub_vault, add share
+    /// Recoups unfilled amounts after a round.
+    /// - Refunds unfilled amount from deactivating_sub_vault to inactive_sub_vault.
+    /// - Refunds unfilled amount from active_sub_vault.
+    ///   - If `has_next` is true, funds are moved to the warmup_sub_vault.
+    ///   - Otherwise, funds are moved to the inactive_sub_vault.
+    /// WARNING: mut inputs without authority check inside
     public fun recoup<TOKEN>(
         deposit_vault: &mut DepositVault,
         mut refund_amount: u64,
@@ -379,16 +452,17 @@ module typus_framework::vault {
         (refund_from_active_share, refund_from_deactivating_share)
     }
 
-    // fund internal transfer by settled_share_price
-    // share_price is the share price without premium
-    // i.e. if share_price < multiplier(share_price_decimal)
-    //          => transfer payoff from active & deactivating to bidvault
+    /// Settles the vault based on the final share price.
+    /// If the share price is less than the base (i.e., there was a loss), a payoff is transferred
+    /// from the active and deactivating sub-vaults to the bid vault.
+    /// The shares of depositors are adjusted accordingly.
+    /// WARNING: mut inputs without authority check inside
     public fun settle<D_TOKEN, B_TOKEN>(
         deposit_vault: &mut DepositVault,
         bid_vault: &mut BidVault,
         share_price: u64,
         share_price_decimal: u64,
-        _ctx: &mut TxContext,
+        _ctx: &TxContext,
     ) {
         // safety check
         assert!(share_price > 0, zero_value(deposit_vault.index));
@@ -492,18 +566,24 @@ module typus_framework::vault {
         };
     }
 
+    /// Closes the vault, preventing new activations.
+    /// WARNING: mut inputs without authority check inside
     public fun close(
         deposit_vault: &mut DepositVault
     ) {
         deposit_vault.has_next = false;
     }
 
+    /// Resumes the vault, allowing new activations.
+    /// WARNING: mut inputs without authority check inside
     public fun resume(
         deposit_vault: &mut DepositVault
     ) {
         deposit_vault.has_next = true;
     }
 
+    /// Terminates the vault, moving all funds to the inactive sub-vault.
+    /// WARNING: mut inputs without authority check inside
     public fun terminate<TOKEN>(
         deposit_vault: &mut DepositVault,
         _ctx: &TxContext,
@@ -554,6 +634,7 @@ module typus_framework::vault {
         deposit_vault.has_next = false;
     }
 
+    /// Destroys an empty `DepositVault`.
     public fun drop_deposit_vault<D_TOKEN, B_TOKEN>(deposit_vault: DepositVault) {
         let DepositVault {
             mut id,
@@ -596,7 +677,7 @@ module typus_framework::vault {
 
     // ======== BidVault Functions ========
 
-    /// create new BidVault
+    /// Creates a new `BidVault`.
     public fun new_bid_vault<D_TOKEN, B_TOKEN>(
         index: u64,
         metadata: String,
@@ -623,6 +704,8 @@ module typus_framework::vault {
         bid_vault
     }
 
+    /// Updates the display metadata for a `BidVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_bid_receipt_display(
         bid_vault: &mut BidVault,
         metadata: String,
@@ -630,6 +713,8 @@ module typus_framework::vault {
         bid_vault.metadata = metadata;
     }
 
+    /// Updates the u64 padding for a `TypusBidReceipt`.
+    /// WARNING: mut inputs without authority check inside
     public fun update_bid_receipt_u64_padding(
         bid_receipt: &mut TypusBidReceipt,
         u64_padding: vector<u64>,
@@ -637,6 +722,7 @@ module typus_framework::vault {
         bid_receipt.u64_padding = u64_padding;
     }
 
+    /// Transfers a `TypusBidReceipt` to a user.
     public fun transfer_bid_receipt(receipt: Option<TypusBidReceipt>, user: address) {
         if (option::is_some(&receipt)) {
             transfer::public_transfer(option::destroy_some(receipt), user);
@@ -645,6 +731,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Creates a new bid in the `BidVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun public_new_bid(
         bid_vault: &mut BidVault,
         share: u64,
@@ -665,7 +753,8 @@ module typus_framework::vault {
         receipt
     }
 
-    /// exercise from bid_share
+    /// Exercises a bid, claiming the underlying assets.
+    /// WARNING: mut inputs without authority check inside
     public fun public_exercise<TOKEN>(
         bid_vault: &mut BidVault,
         receipts: vector<TypusBidReceipt>,
@@ -689,6 +778,8 @@ module typus_framework::vault {
         )
     }
 
+    /// A delegated version of `public_exercise`.
+    /// WARNING: mut inputs without authority check inside
     public fun delegate_exercise<TOKEN>(
         bid_vault: &mut BidVault,
         receipts: vector<TypusBidReceipt>,
@@ -697,6 +788,7 @@ module typus_framework::vault {
         (*vector::borrow(&v, 0), *vector::borrow(&v, 1), b)
     }
 
+    /// Calculates the value of exercising a set of bid receipts.
     public fun calculate_exercise_value_for_receipts<TOKEN>(
         bid_vault: &BidVault,
         receipts: &vector<TypusBidReceipt>
@@ -719,6 +811,7 @@ module typus_framework::vault {
         amount
     }
 
+    /// Calculates the value of exercising a single bid receipt.
     public fun calculate_exercise_value<TOKEN>(
         bid_vault: &BidVault,
         receipt: &TypusBidReceipt
@@ -735,8 +828,10 @@ module typus_framework::vault {
         amount
     }
 
-    /// instant withdraw from warmup_sub_vault
-    /// also can use to merge bid receipts if share = None
+    /// Splits a bid receipt into two, or merges multiple receipts.
+    /// If `share` is `Some`, it splits the receipts into a new receipt with the specified share and a remainder receipt.
+    /// If `share` is `None`, it merges all receipts into one.
+    /// WARNING: mut inputs without authority check inside
     public fun split_bid_receipt(
         bid_vault: &mut BidVault,
         receipts: vector<TypusBidReceipt>,
@@ -790,7 +885,9 @@ module typus_framework::vault {
         (amount, split_receipt, remain_receipt)
     }
 
-    /// delivery balance and shares to BidVault
+    /// Delivers premium from a successful round to the deposit vault.
+    /// The premium is distributed to depositors based on their share of the active and deactivating sub-vaults.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery<D_TOKEN, B_TOKEN>(
         deposit_vault: &mut DepositVault,
         bid_vault: &mut BidVault,
@@ -842,7 +939,8 @@ module typus_framework::vault {
         };
     }
 
-    /// delivery balance and shares to BidVault
+    /// Delivers premium and incentives (of deposit token type) to the deposit vault.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery_d<D_TOKEN, B_TOKEN>(
         deposit_vault: &mut DepositVault,
         bid_vault: &mut BidVault,
@@ -908,7 +1006,8 @@ module typus_framework::vault {
         };
     }
 
-    /// delivery balance and shares to BidVault
+    /// Delivers premium and incentives (of bid token type) to the deposit vault.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery_b<D_TOKEN, B_TOKEN>(
         deposit_vault: &mut DepositVault,
         bid_vault: &mut BidVault,
@@ -966,7 +1065,8 @@ module typus_framework::vault {
         };
     }
 
-    /// delivery balance and shares to BidVault
+    /// Delivers premium and incentives (of a third token type) to the deposit vault.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery_i<D_TOKEN, B_TOKEN, I_TOKEN>(
         deposit_vault: &mut DepositVault,
         bid_vault: &mut BidVault,
@@ -1033,7 +1133,8 @@ module typus_framework::vault {
         };
     }
 
-    /// delivery balance and shares to BidVault
+    /// Adds incentives to the `BidVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun incentivise_bidder<TOKEN>(
         bid_vault: &mut BidVault,
         incentive_balance: Balance<TOKEN>,
@@ -1051,14 +1152,18 @@ module typus_framework::vault {
         };
     }
 
+    /// Sets a value in the u64 padding of a `BidVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun set_bid_vault_u64_padding_value(bid_vault: &mut BidVault, i: u64, value: u64) {
         utils::set_u64_padding_value(&mut bid_vault.u64_padding, i, value);
     }
 
+    /// Gets a value from the u64 padding of a `BidVault`.
     public fun get_bid_vault_u64_padding_value(bid_vault: &BidVault, i: u64): u64 {
         utils::get_u64_padding_value(&bid_vault.u64_padding, i)
     }
 
+    /// Destroys an empty `BidVault`.
     public fun drop_bid_vault<TOKEN>(bid_vault: BidVault) {
         let BidVault {
             mut id,
@@ -1080,7 +1185,7 @@ module typus_framework::vault {
 
     // ======== RefundVault Functions ========
 
-    /// create new RefundVault
+    /// Creates a new `RefundVault`.
     public fun new_refund_vault<TOKEN>(
         ctx: &mut TxContext,
     ): RefundVault {
@@ -1100,6 +1205,9 @@ module typus_framework::vault {
         refund_vault
     }
 
+    /// Registers a user for a refund, returning their index in the refund shares vector.
+    /// If the user is already registered, it returns their existing index.
+    /// WARNING: mut inputs without authority check inside
     public fun register_refund<TOKEN>(
         refund_vault: &mut RefundVault,
         user: address
@@ -1139,6 +1247,8 @@ module typus_framework::vault {
         i
     }
 
+    /// Puts a refund into the `RefundVault` for a specific user.
+    /// WARNING: mut inputs without authority check inside
     public fun put_refund<TOKEN>(
         refund_vault: &mut RefundVault,
         balance: Balance<TOKEN>,
@@ -1184,6 +1294,8 @@ module typus_framework::vault {
         );
     }
 
+    /// Puts refunds into the `RefundVault` for multiple users.
+    /// WARNING: mut inputs without authority check inside
     public fun put_refunds<TOKEN>(
         refund_vault: &mut RefundVault,
         balance: Balance<TOKEN>,
@@ -1209,6 +1321,7 @@ module typus_framework::vault {
         };
     }
 
+    /// Destroys an empty `RefundVault`.
     public fun drop_refund_vault<TOKEN>(refund_vault: RefundVault) {
         let RefundVault {
             mut id,
@@ -1224,12 +1337,14 @@ module typus_framework::vault {
         object::delete(id);
     }
 
+    /// Deprecated function.
     #[allow(unused_type_parameter)]
     public fun take_refund<TOKEN>(
         _refund_vault: &mut RefundVault,
         _ctx: &mut TxContext,
     ): u64 { deprecated(); abort 0 }
 
+    /// Deprecated function.
     public fun delegate_take_refund<TOKEN>(
         _refund_vault: &mut RefundVault,
         _user: address,
@@ -1238,6 +1353,8 @@ module typus_framework::vault {
 
     // ======== Public Functions ========
 
+    /// Merges multiple `TypusDepositReceipt` NFTs into a single one.
+    /// WARNING: mut inputs without authority check inside
     public fun merge_deposit_receipts(
         deposit_vault: &mut DepositVault,
         receipts: vector<TypusDepositReceipt>,
@@ -1267,6 +1384,8 @@ module typus_framework::vault {
         (receipt, vector[active_share, deactivating_share, inactive_share, warmup_share, premium_share, incentive_share])
     }
 
+    /// Splits a `TypusDepositReceipt` into two.
+    /// WARNING: mut inputs without authority check inside
     public fun split_deposit_receipt(
         deposit_vault: &mut DepositVault,
         receipt: TypusDepositReceipt,
@@ -1310,6 +1429,8 @@ module typus_framework::vault {
         (receipt_0, receipt_1)
     }
 
+    /// Raises funds for a deposit, using a new balance and optionally existing premium and inactive shares.
+    /// WARNING: mut inputs without authority check inside
     public fun raise_fund<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -1404,6 +1525,8 @@ module typus_framework::vault {
         )
     }
 
+    /// Reduces funds from a deposit, withdrawing from various sub-vaults.
+    /// WARNING: mut inputs without authority check inside
     public fun reduce_fund<D_TOKEN, B_TOKEN, I_TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -1553,6 +1676,8 @@ module typus_framework::vault {
         )
     }
 
+    /// Allows a user to claim their rebate from the `RefundVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun public_rebate<TOKEN>(
         refund_vault: &mut RefundVault,
         user: address,
@@ -1602,6 +1727,9 @@ module typus_framework::vault {
         )
     }
 
+    /// Adjusts the user share ratio for a given share tag to match the actual balance.
+    /// This is used to correct any rounding errors or discrepancies.
+    /// WARNING: mut inputs without authority check inside
     public fun adjust_user_share_ratio<TOKEN>(
         deposit_vault: &mut DepositVault,
         share_tag: u8,
@@ -1662,10 +1790,12 @@ module typus_framework::vault {
 
     // ======== Helper Functions ========
 
+    /// Returns true if the vault has a next round.
     public fun has_next(vault: &DepositVault): bool {
         vault.has_next
     }
 
+    /// Returns the deposit and bid token types for a `DepositVault`.
     public fun get_deposit_vault_token_types(
         deposit_vault: &DepositVault,
     ): (TypeName, TypeName) {
@@ -1675,6 +1805,7 @@ module typus_framework::vault {
         )
     }
 
+    /// Returns the bid and deposit token types for a `BidVault`.
     public fun get_bid_vault_token_types(
         bid_vault: &BidVault,
     ): (TypeName, TypeName) {
@@ -1684,6 +1815,7 @@ module typus_framework::vault {
         )
     }
 
+    /// Returns a reference to a balance in a `DepositVault` sub-vault.
     public fun get_deposit_vault_balance<TOKEN>(
         deposit_vault: &DepositVault,
         share_tag: u8,
@@ -1705,6 +1837,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns a mutable reference to a balance in a `DepositVault` sub-vault.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_deposit_vault_balance<TOKEN>(
         deposit_vault: &mut DepositVault,
         share_tag: u8,
@@ -1726,78 +1860,96 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns the tag for the active share type.
     public fun active_share_tag(): u8 {
         T_ACTIVE_SHARE
     }
 
+    /// Returns the tag for the deactivating share type.
     public fun deactivating_share_tag(): u8 {
         T_DEACTIVATING_SHARE
     }
 
+    /// Returns the tag for the inactive share type.
     public fun inactive_share_tag(): u8 {
         T_INACTIVE_SHARE
     }
 
+    /// Returns the tag for the warmup share type.
     public fun warmup_share_tag(): u8 {
         T_WARMUP_SHARE
     }
 
+    /// Returns the tag for the premium share type.
     public fun premium_share_tag(): u8 {
         T_PREMIUM_SHARE
     }
 
+    /// Returns the tag for the incentive share type.
     public fun incentive_share_tag(): u8 {
         T_INCENTIVE_SHARE
     }
 
+    /// Returns the balance of the active sub-vault.
     public fun active_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_ACTIVE_SHARE))
     }
 
+    /// Returns the balance of the deactivating sub-vault.
     public fun deactivating_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_DEACTIVATING_SHARE))
     }
 
+    /// Returns the balance of the inactive sub-vault.
     public fun inactive_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_INACTIVE_SHARE))
     }
 
+    /// Returns the balance of the warmup sub-vault.
     public fun warmup_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_WARMUP_SHARE))
     }
 
+    /// Returns the balance of the premium sub-vault.
     public fun premium_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_PREMIUM_SHARE))
     }
 
+    /// Returns the balance of the incentive sub-vault.
     public fun incentive_balance<TOKEN>(vault: &DepositVault): u64 {
         balance::value(get_deposit_vault_balance<TOKEN>(vault, T_INCENTIVE_SHARE))
     }
 
+    /// Returns the balance of the `BidVault`.
     public fun bid_vault_balance<TOKEN>(vault: &BidVault): u64 {
         balance::value(get_bid_vault_balance<TOKEN>(vault))
     }
 
+    /// Returns the incentive balance of the `BidVault`.
     public fun bid_vault_incentive_balance<TOKEN>(vault: &BidVault): u64 {
         balance::value(get_bid_vault_incentive_balance<TOKEN>(vault))
     }
 
+    /// Returns the balance of the `RefundVault`.
     public fun refund_vault_balance<TOKEN>(refund_vault: &RefundVault): u64 {
         balance::value(dynamic_field::borrow<vector<u8>, Balance<TOKEN>>(&refund_vault.id, K_REFUND_BALANCE))
     }
 
+    /// Returns a reference to the balance of the `BidVault`.
     public fun get_bid_vault_balance<TOKEN>(
         bid_vault: &BidVault,
     ): &Balance<TOKEN> {
         dynamic_field::borrow<vector<u8>, Balance<TOKEN>>(&bid_vault.id, K_BID_BALANCE)
     }
 
+    /// Returns a reference to the incentive balance of the `BidVault`.
     public fun get_bid_vault_incentive_balance<TOKEN>(
         bid_vault: &BidVault,
     ): &Balance<TOKEN> {
         dynamic_field::borrow<vector<u8>, Balance<TOKEN>>(&bid_vault.id, K_INACTIVE_BALANCE)
     }
 
+    /// Returns the share supply for a given sub-vault in the `DepositVault`.
     public fun get_deposit_vault_share_supply(
         deposit_vault: &DepositVault,
         share_tag: u8,
@@ -1819,6 +1971,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns a mutable reference to the share supply for a given sub-vault in the `DepositVault`.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_deposit_vault_share_supply(
         deposit_vault: &mut DepositVault,
         share_tag: u8,
@@ -1840,79 +1994,105 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns the active share supply.
     public fun active_share_supply(vault: &DepositVault): u64 {
         vault.active_share_supply
     }
 
+    /// Returns a mutable reference to the active share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_active_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.active_share_supply
     }
 
+    /// Returns the deactivating share supply.
     public fun deactivating_share_supply(vault: &DepositVault): u64 {
         vault.deactivating_share_supply
     }
 
+    /// Returns a mutable reference to the deactivating share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_deactivating_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.deactivating_share_supply
     }
 
+    /// Returns the inactive share supply.
     public fun inactive_share_supply(vault: &DepositVault): u64 {
         vault.inactive_share_supply
     }
 
+    /// Returns a mutable reference to the inactive share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_inactive_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.inactive_share_supply
     }
 
+    /// Returns the warmup share supply.
     public fun warmup_share_supply(vault: &DepositVault): u64 {
         vault.warmup_share_supply
     }
 
+    /// Returns a mutable reference to the warmup share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_warmup_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.warmup_share_supply
     }
 
+    /// Returns a mutable reference to the premium share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_premium_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.premium_share_supply
     }
 
+    /// Returns a mutable reference to the incentive share supply.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_incentive_share_supply(vault: &mut DepositVault): &mut u64 {
         &mut vault.incentive_share_supply
     }
 
+    /// Returns the premium share supply.
     public fun premium_share_supply(vault: &DepositVault): u64 {
         vault.premium_share_supply
     }
 
+    /// Returns the bid share supply.
     public fun bid_share_supply(vault: &BidVault): u64 {
         vault.share_supply
     }
 
+    /// Returns the refund vault share supply.
     public fun refund_vault_share_supply(refund_vault: &RefundVault): u64 {
         refund_vault.share_supply
     }
 
+    /// Returns a reference to the `BigVector` of deposit shares.
     public fun get_deposit_shares(deposit_vault: &DepositVault): &BigVector<DepositShare> {
         dynamic_field::borrow<vector<u8>, BigVector<DepositShare>>(&deposit_vault.id, K_DEPOSIT_SHARES)
     }
 
+    /// Returns a mutable reference to the `BigVector` of deposit shares.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_deposit_shares(deposit_vault: &mut DepositVault): &mut BigVector<DepositShare> {
         dynamic_field::borrow_mut<vector<u8>, BigVector<DepositShare>>(&mut deposit_vault.id, K_DEPOSIT_SHARES)
     }
 
+    /// Returns a reference to the `BigVector` of bid shares.
     public fun get_bid_shares(bid_vault: &BidVault): &BigVector<BidShare> {
         dynamic_field::borrow<vector<u8>, BigVector<BidShare>>(&bid_vault.id, K_BID_SHARES)
     }
 
+    /// Returns a reference to the `BigVector` of refund shares.
     public fun get_refund_shares(refund_vault: &RefundVault): &BigVector<RefundShare> {
         dynamic_field::borrow<vector<u8>, BigVector<RefundShare>>(&refund_vault.id, K_REFUND_SHARES)
     }
 
+    /// Returns a reference to a specific `DepositShare`.
     public fun get_deposit_share(deposit_vault: &DepositVault, i: u64): &DepositShare {
         let deposit_shares = get_deposit_shares(deposit_vault);
         big_vector::borrow(deposit_shares, i)
     }
 
+    /// Returns the share value for a given tag from a `DepositShare`.
     public fun get_deposit_share_inner(
         deposit_share_inner: &DepositShare,
         share_tag: u8,
@@ -1934,6 +2114,8 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns a mutable reference to the share value for a given tag from a `DepositShare`.
+    /// WARNING: mut inputs without authority check inside
     public fun get_mut_deposit_share_inner(
         deposit_share_inner: &mut DepositShare,
         share_tag: u8,
@@ -1955,14 +2137,17 @@ module typus_framework::vault {
         }
     }
 
+    /// Returns the fee in basis points.
     public fun fee_bp(vault: &DepositVault): u64 {
         vault.fee_bp
     }
 
+    /// Returns the fee share in basis points.
     public fun fee_share_bp(vault: &DepositVault): u64 {
         vault.fee_share_bp
     }
 
+    /// Checks if a user has an active share in the vault.
     public fun is_active_user(
         vault: &DepositVault,
         receipt: address
@@ -1994,6 +2179,7 @@ module typus_framework::vault {
         false
     }
 
+    /// Checks if a user has a deactivating share in the vault.
     public fun is_deactivating_user(
         vault: &DepositVault,
         receipt: address
@@ -2025,6 +2211,7 @@ module typus_framework::vault {
         false
     }
 
+    /// Checks if a user has an inactive share in the vault.
     public fun is_inactive_user(
         vault: &DepositVault,
         receipt: address
@@ -2056,6 +2243,7 @@ module typus_framework::vault {
         false
     }
 
+    /// Checks if a user has a warmup share in the vault.
     public fun is_warmup_user(
         vault: &DepositVault,
         receipt: address
@@ -2087,6 +2275,7 @@ module typus_framework::vault {
         false
     }
 
+    /// Gets the active deposit share for a given receipt address.
     public fun get_active_deposit_share(
         vault: &DepositVault,
         receipt: address
@@ -2114,6 +2303,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the deactivating deposit share for a given receipt address.
     public fun get_deactivating_deposit_share(
         vault: &DepositVault,
         receipt: address
@@ -2141,6 +2331,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the inactive deposit share for a given receipt address.
     public fun get_inactive_deposit_share(
         vault: &DepositVault,
         receipt: address
@@ -2168,6 +2359,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the warmup deposit share for a given receipt address.
     public fun get_warmup_deposit_share(
         vault: &DepositVault,
         receipt: address
@@ -2195,6 +2387,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the premium deposit share for a given receipt address.
     public fun get_premium_deposit_share(
         vault: &DepositVault,
         receipt: address
@@ -2222,6 +2415,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the bid share for a given receipt address.
     public fun get_bid_share(
         vault: &BidVault,
         receipt: address
@@ -2249,6 +2443,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Gets the refund share for a given user address.
     public fun get_refund_share(
         vault: &RefundVault,
         user: address
@@ -2276,6 +2471,7 @@ module typus_framework::vault {
         0
     }
 
+    /// Summarizes the shares from multiple deposit receipts.
     public fun summarize_deposit_shares(
         deposit_vault: &DepositVault,
         mut receipts: vector<TypusDepositReceipt>,
@@ -2336,6 +2532,7 @@ module typus_framework::vault {
         )
     }
 
+    /// Summarizes the shares from multiple bid receipts.
     public fun summarize_bid_shares(
         bid_vault: &BidVault,
         mut receipts: vector<TypusBidReceipt>,
@@ -2379,28 +2576,34 @@ module typus_framework::vault {
         total_share
     }
 
+    /// Gets the index from a `TypusDepositReceipt`.
     public fun get_deposit_receipt_index(receipt: &TypusDepositReceipt): u64 {
         receipt.index
     }
 
+    /// Gets the vault ID from a `TypusDepositReceipt`.
     public fun get_deposit_receipt_vid(receipt: &TypusDepositReceipt): ID {
         receipt.vid
     }
 
+    /// Gets the index from a `TypusBidReceipt`.
     public fun get_bid_receipt_index(receipt: &TypusBidReceipt): u64 {
         receipt.index
     }
 
+    /// Gets the vault ID from a `TypusBidReceipt`.
     public fun get_bid_receipt_vid(receipt: &TypusBidReceipt): ID {
         receipt.vid
     }
 
+    /// Gets the vault ID, index, and padding from a `TypusBidReceipt`.
     public fun get_bid_receipt_info(receipt: &TypusBidReceipt): (ID, u64, vector<u64>) {
         (receipt.vid, receipt.index, receipt.u64_padding)
     }
 
     // ======== Private Functions ========
 
+    /// Initializes the display information for the vault receipts.
     fun init(otw: VAULT, ctx: &mut TxContext) {
         let publisher = sui::package::claim(otw, ctx);
 
@@ -2422,6 +2625,7 @@ module typus_framework::vault {
         transfer::public_transfer(bid_receipt_display, sender);
     }
 
+    /// Creates a new `TypusBidReceipt` NFT.
     fun new_typus_bid_receipt(
         bid_vault: &BidVault,
         share: u64,
@@ -2436,6 +2640,7 @@ module typus_framework::vault {
         }
     }
 
+    /// Gets a mutable reference to the bid vault's balance.
     fun get_mut_bid_vault_balance<TOKEN>(
         bid_vault: &mut BidVault,
     ): &mut Balance<TOKEN> {
@@ -2448,10 +2653,12 @@ module typus_framework::vault {
     //     dynamic_field::borrow_mut<vector<u8>, Balance<TOKEN>>(&mut bid_vault.id, K_INCENTIVE_BALANCE)
     // }
 
+    /// Gets a mutable reference to the `BigVector` of bid shares.
     fun get_mut_bid_shares(bid_vault: &mut BidVault): &mut BigVector<BidShare> {
         dynamic_field::borrow_mut<vector<u8>, BigVector<BidShare>>(&mut bid_vault.id, K_BID_SHARES)
     }
 
+    /// Adds a new deposit share and returns a new `TypusDepositReceipt` if the total share is greater than zero.
     fun add_deposit_share(
         deposit_vault: &mut DepositVault,
         active_share: u64,
@@ -2490,6 +2697,8 @@ module typus_framework::vault {
         option::none()
     }
 
+    /// Charges a fee from a balance and deposits it into the fee pool.
+    /// WARNING: mut inputs without authority check inside
     public fun charge_fee<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &DepositVault,
@@ -2511,6 +2720,8 @@ module typus_framework::vault {
         )
     }
 
+    /// Charges a fee from a balance based on a given basis point and deposits it into the fee pool.
+    /// WARNING: mut inputs without authority check inside
     public fun charge_fee_by_bp<TOKEN>(
         fee_pool: &mut BalancePool,
         fee_bp: u64,
@@ -2552,6 +2763,8 @@ module typus_framework::vault {
     //     bid_share
     // }
 
+    /// Extracts and summarizes shares from multiple deposit receipts, removing them from the vault.
+    /// WARNING: mut inputs without authority check inside
     fun extract_deposit_shares(
         deposit_vault: &mut DepositVault,
         mut receipts: vector<TypusDepositReceipt>,
@@ -2636,6 +2849,8 @@ module typus_framework::vault {
         )
     }
 
+    /// Extracts and summarizes shares from multiple bid receipts, removing them from the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun extract_bid_shares(
         bid_vault: &mut BidVault,
         mut receipts: vector<TypusBidReceipt>,
@@ -2698,6 +2913,7 @@ module typus_framework::vault {
         (total_share, total_u64_padding)
     }
 
+    /// Verifies that a `TypusDepositReceipt` belongs to a given `DepositVault`.
     fun verify_deposit_receipt(
         deposit_vault: &DepositVault,
         deposit_receipt: &TypusDepositReceipt,
@@ -2706,6 +2922,7 @@ module typus_framework::vault {
             && deposit_vault.index == deposit_receipt.index, invalid_deposit_receipt(deposit_vault.index));
     }
 
+    /// Verifies that a `TypusBidReceipt` belongs to a given `BidVault`.
     fun verify_bid_receipt(
         bid_vault: &BidVault,
         bid_receipt: &TypusBidReceipt,
@@ -2721,6 +2938,8 @@ module typus_framework::vault {
         deposit_vault.shared_fee_pool
     }
 
+    /// Withdraws funds from the active and deactivating sub-vaults for lending.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw_for_lending<TOKEN>(
         deposit_vault: &mut DepositVault,
     ): (Balance<TOKEN>, vector<u64>) {
@@ -2740,6 +2959,9 @@ module typus_framework::vault {
             ],
         )
     }
+    /// Deposits funds from a lending protocol back into the vault.
+    /// It handles the distribution of principal and rewards, and charges fees.
+    /// WARNING: mut inputs without authority check inside
     public fun deposit_from_lending<D_TOKEN, R_TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -2877,6 +3099,8 @@ module typus_framework::vault {
             reward_fee_share_amount,
         ]
     }
+    /// Deposits rewards from a lending protocol into the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun reward_from_lending<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -2983,6 +3207,7 @@ module typus_framework::vault {
 
     // ======== Deprecated =========
 
+    /// Deprecated function.
     public fun deprecated() { abort 0 }
 
     #[allow(dead_code, unused_variable, unused_type_parameter)]

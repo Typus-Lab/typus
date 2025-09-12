@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `Auction` be exposed.
 module typus_framework::dutch {
     use std::type_name::{Self, TypeName};
 
@@ -19,41 +20,69 @@ module typus_framework::dutch {
 
     // ======== Structs ========
 
+    /// One-time witness struct for the `dutch` module.
     public struct DUTCH has drop {}
 
+    /// Represents a Dutch auction.
     public struct Auction has key, store {
         id: UID,
+        /// An index for the auction.
         index: u64,
+        /// The `TypeName` of the token being accepted for bids.
         token: TypeName,
+        /// The start timestamp of the auction in milliseconds.
         start_ts_ms: u64,
+        /// The end timestamp of the auction in milliseconds.
         end_ts_ms: u64,
+        /// The total amount of the asset being auctioned.
         size: u64, // max size
+        /// The speed at which the price decays.
         decay_speed: u64,
+        /// The starting price of the asset.
         initial_price: u64,
+        /// The final price of the asset.
         final_price: u64,
+        /// The fee in basis points.
         fee_bp: u64,
+        /// The incentive in basis points.
         incentive_bp: u64,
+        /// The decimal precision of the bid token.
         token_decimal: u64, // bid token
+        /// The decimal precision of the auctioned asset.
         size_decimal: u64, // contract token / contract size
+        /// The total size of all bids received so far.
         total_bid_size: u64, // sum of bids size
+        /// A boolean indicating if bids can be removed.
         able_to_remove_bid: bool,
+        /// A `BigVector` to store all the bids.
         bids: BigVector<Bid>,
+        /// A counter for the number of bids.
         bid_index: u64,
     }
 
+    /// Represents a single bid in a Dutch auction.
     public struct Bid has store {
+        /// An index for the bid.
         index: u64,
+        /// The address of the bidder.
         bidder: address,
+        /// The price at which the bid was made.
         price: u64,
+        /// The size of the bid.
         size: u64,
+        /// The balance provided by the bidder.
         bidder_balance: u64,
+        /// The incentive balance used for the bid.
         incentive_balance: u64,
+        /// The fee discount applied to the bid.
         fee_discount: u64,
+        /// The timestamp of the bid in milliseconds.
         ts_ms: u64,
     }
 
     // ======== Public Functions ========
 
+    /// Creates a new `Auction`.
     public fun new<TOKEN>(
         index: u64,
         start_ts_ms: u64,
@@ -99,6 +128,8 @@ module typus_framework::dutch {
         }
     }
 
+    /// Allows a user to place a bid on the auction.
+    /// WARNING: mut inputs without authority check inside
     public fun public_new_bid_v2<TOKEN>(
         refund_vault: &mut RefundVault,
         auction: &mut Auction,
@@ -185,6 +216,7 @@ module typus_framework::dutch {
         )
     }
 
+    /// Deprecated function.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun public_new_bid<TOKEN>(
         _bidder: address,
@@ -199,6 +231,7 @@ module typus_framework::dutch {
         abort deprecated()
     }
 
+    /// Deprecated function.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun new_bid_v2<TOKEN>(
         _refund_vault: &mut RefundVault,
@@ -213,6 +246,7 @@ module typus_framework::dutch {
         abort deprecated()
     }
 
+    /// Deprecated function.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun new_bid<TOKEN>(
         _auction: &mut Auction,
@@ -226,6 +260,8 @@ module typus_framework::dutch {
         abort deprecated()
     }
 
+    /// Allows a user to remove their bid.
+    /// WARNING: mut inputs without authority check inside
     #[lint_allow(self_transfer)]
     public fun remove_bid<TOKEN>(
         auction: &mut Auction,
@@ -304,6 +340,8 @@ module typus_framework::dutch {
         )
     }
 
+    /// This function is called after the auction ends to distribute the assets and funds.
+    /// WARNING: mut inputs without authority check inside
     public fun delivery<TOKEN>(
         fee_pool: &mut BalancePool,
         refund_vault: &mut RefundVault,
@@ -445,6 +483,8 @@ module typus_framework::dutch {
         )
     }
 
+    /// An older version of the delivery function.
+    /// WARNING: mut inputs without authority check inside
     public fun old_delivery<TOKEN>(
         fee_pool: &mut BalancePool,
         refund_vault: &mut RefundVault,
@@ -575,6 +615,8 @@ module typus_framework::dutch {
         )
     }
 
+    /// Updates the configuration of an auction before it has started.
+    /// WARNING: mut inputs without authority check inside
     public fun update_auction_config(
         auction: &mut Auction,
         start_ts_ms: u64,
@@ -644,6 +686,8 @@ module typus_framework::dutch {
         });
     }
 
+    /// Terminates an auction and refunds all bidders.
+    /// WARNING: mut inputs without authority check inside
     public fun terminate<TOKEN>(
         auction: Auction,
         refund_vault: &mut RefundVault,
@@ -710,6 +754,7 @@ module typus_framework::dutch {
 
     // ======== Helper Functions ========
 
+    /// Gets the bid information for a given size at a specific time.
     public fun get_bid_info(
         auction: &Auction,
         mut size: u64,
@@ -739,6 +784,7 @@ module typus_framework::dutch {
         (price, size, bid_value, fee)
     }
 
+    /// Calculates the bid value and fee for a given price, size, and fee discount.
     public fun calculate_bid_value(
         fee_bp: u64,
         token_decimal: u64,
@@ -762,6 +808,7 @@ module typus_framework::dutch {
         )
     }
 
+    /// Calculates the bid size for a given balance, price, and fee discount.
     public fun calculate_bid_size(
         fee_bp: u64,
         size_decimal: u64,
@@ -779,42 +826,49 @@ module typus_framework::dutch {
         ((balance as u128) * (size_multiplier as u128) / (price_with_fee + 1 as u128) as u64)
     }
 
+    /// Returns the `TypeName` of the token being accepted for bids.
     public fun token(
         auction: &Auction,
     ): TypeName {
         auction.token
     }
 
+    /// Returns the total size of the asset being auctioned.
     public fun size(
         auction: &Auction,
     ): u64 {
         auction.size
     }
 
+    /// Returns the total size of all bids received so far.
     public fun total_bid_size(
         auction: &Auction,
     ): u64 {
         auction.total_bid_size
     }
 
+    /// Returns the current bid index.
     public fun bid_index(
         auction: &Auction,
     ): u64 {
         auction.bid_index
     }
 
+    /// Returns the incentive in basis points.
     public fun incentive_bp(
         auction: &Auction,
     ): u64 {
         auction.incentive_bp
     }
 
+    /// Returns a reference to the `BigVector` of bids.
     public fun bids(
         auction: &Auction,
     ): &BigVector<Bid> {
         &auction.bids
     }
 
+    /// Returns the current decayed price of the auction.
     public fun get_decayed_price(
         auction: &Auction,
         clock: &Clock,
@@ -829,6 +883,7 @@ module typus_framework::dutch {
         )
     }
 
+    /// Returns information about a specific bid.
     public fun get_user_bid_info(
         auction: &Auction,
         bid_index: u64,
@@ -856,10 +911,12 @@ module typus_framework::dutch {
 
     // ======== Private Functions ========
 
+    /// Private function that is called when the module is published.
     fun init(otw: DUTCH, ctx: &mut TxContext) {
         sui::package::claim_and_keep(otw, ctx);
     }
 
+    /// The core logic for the Dutch auction's price decay.
     /// decayed_price =
     ///     initial_price -
     ///         (initial_price - final_price) *
@@ -888,6 +945,7 @@ module typus_framework::dutch {
     }
     // ======== Events =========
 
+    /// Event emitted when a new bid is placed.
     public struct NewBid has copy, drop {
         signer: address,
         index: u64,
@@ -900,6 +958,7 @@ module typus_framework::dutch {
         ts_ms: u64,
     }
 
+    /// Event emitted when a bid is removed.
     public struct RemoveBid has copy, drop {
         signer: address,
         index: u64,
@@ -913,6 +972,7 @@ module typus_framework::dutch {
         ts_ms: u64,
     }
 
+    /// Event emitted when the auction is delivered.
     public struct Delivery has copy, drop {
         signer: address,
         index: u64,
@@ -925,6 +985,7 @@ module typus_framework::dutch {
         incentive_fee: u64,
     }
 
+    /// Event emitted when the auction configuration is updated.
     public struct UpdateAuctionConfig has copy, drop {
         signer: address,
         index: u64,
@@ -950,6 +1011,7 @@ module typus_framework::dutch {
         able_to_remove_bid: bool,
     }
 
+    /// Event emitted when the auction is terminated.
     public struct Terminate has copy, drop {
         signer: address,
         index: u64,

@@ -4,16 +4,20 @@ module typus_framework::authority {
     const E_UNAUTHORIZED: u64 = 0;
     const E_EMPTY_WHITELIST: u64 = 1;
 
+    /// A struct that holds a whitelist of authorized users.
     public struct Authority has store {
+        /// A linked table mapping user addresses to a boolean `true`.
         whitelist: LinkedTable<address, bool>,
     }
 
+    /// Verifies if the transaction sender is in the authority's whitelist.
     public fun verify(authority: &Authority, ctx: &TxContext) {
         assert!(
             linked_table::contains(&authority.whitelist, tx_context::sender(ctx)),
             E_UNAUTHORIZED
         );
     }
+    /// Verifies if the transaction sender is in either of the two authorities' whitelists.
     public fun double_verify(primary_authority: &Authority, secondary_authority: &Authority, ctx: &TxContext) {
         assert!(
             linked_table::contains(&primary_authority.whitelist, tx_context::sender(ctx))
@@ -22,6 +26,8 @@ module typus_framework::authority {
         );
     }
 
+    /// Creates a new `Authority` object with an initial whitelist.
+    /// The `whitelist` vector should not be empty.
     public fun new(
         mut whitelist: vector<address>,
         ctx: &mut TxContext
@@ -41,6 +47,8 @@ module typus_framework::authority {
         }
     }
 
+    /// Adds a new authorized user to the authority's whitelist.
+    /// WARNING: mut inputs without authority check inside
     public fun add_authorized_user(
         authority: &mut Authority,
         user_address: address,
@@ -50,6 +58,8 @@ module typus_framework::authority {
         }
     }
 
+    /// Removes an authorized user from the authority's whitelist.
+    /// WARNING: mut inputs without authority check inside
     public fun remove_authorized_user(
         authority: &mut Authority,
         user_address: address,
@@ -59,6 +69,7 @@ module typus_framework::authority {
         }
     }
 
+    /// Returns the list of whitelisted user addresses.
     public fun whitelist(authority: &Authority): vector<address> {
         let mut whitelist = vector::empty();
         let mut key = linked_table::front(&authority.whitelist);
@@ -73,6 +84,8 @@ module typus_framework::authority {
         whitelist
     }
 
+    /// Removes all authorized users from the whitelist.
+    /// This is an authorized function.
     public fun remove_all(
         authority: &mut Authority,
         ctx: &TxContext,
@@ -89,6 +102,8 @@ module typus_framework::authority {
         whitelist
     }
 
+    /// Destroys an empty `Authority` object.
+    /// This is an authorized function.
     public fun destroy_empty(
         authority: Authority,
         ctx: &TxContext,
@@ -98,6 +113,8 @@ module typus_framework::authority {
         linked_table::destroy_empty(whitelist);
     }
 
+    /// Destroys an `Authority` object and its whitelist.
+    /// This is an authorized function.
     public fun destroy(
         authority: Authority,
         ctx: &TxContext,

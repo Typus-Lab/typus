@@ -1,3 +1,4 @@
+/// No authority chech in these public functions, do not let `DepositVault` and `ObligationOwnerCap` be exposed.
 module typus_framework::suilend {
     use sui::coin;
     use sui::balance::{Self, Balance};
@@ -11,6 +12,8 @@ module typus_framework::suilend {
 
     const U64_MAX: u64 = 18_446_744_073_709_551_615;
 
+    /// Creates a new `ObligationOwnerCap` for the Suilend protocol.
+    /// WARNING: mut inputs without authority check inside
     public fun new_suilend_obligation_owner_cap(
         suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
         ctx: &mut TxContext,
@@ -18,7 +21,9 @@ module typus_framework::suilend {
         lending_market::create_obligation(suilend_lending_market, ctx)
     }
 
-    // after activate
+    /// Deposits assets into a Suilend lending market.
+    /// This function is called after the vault is activated.
+    /// WARNING: mut inputs without authority check inside
     public fun deposit<TOKEN>(
         deposit_vault: &mut DepositVault,
         suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
@@ -52,7 +57,9 @@ module typus_framework::suilend {
         log
     }
 
-    // withdraw before recoup or settle
+    /// Withdraws assets and claims rewards from a Suilend lending market.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw<D_TOKEN, R_TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -96,7 +103,9 @@ module typus_framework::suilend {
         vault::deposit_from_lending(fee_pool, deposit_vault, incentive, balance, reward, distribute)
     }
 
-    // withdraw before recoup or settle
+    /// Withdraws assets from a Suilend lending market without claiming rewards.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun withdraw_without_reward<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
@@ -128,7 +137,9 @@ module typus_framework::suilend {
         vault::deposit_from_lending(fee_pool, deposit_vault, incentive, balance, balance::zero<TOKEN>(), distribute)
     }
 
-    // withdraw before recoup or settle
+    /// Claims rewards from a Suilend lending market.
+    /// This function is called before recouping or settling the vault.
+    /// WARNING: mut inputs without authority check inside
     public fun reward<TOKEN>(
         fee_pool: &mut BalancePool,
         deposit_vault: &mut DepositVault,
