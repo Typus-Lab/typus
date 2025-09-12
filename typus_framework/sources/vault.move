@@ -1946,7 +1946,7 @@ module typus_framework::vault {
     public fun get_bid_vault_incentive_balance<TOKEN>(
         bid_vault: &BidVault,
     ): &Balance<TOKEN> {
-        dynamic_field::borrow<vector<u8>, Balance<TOKEN>>(&bid_vault.id, K_INACTIVE_BALANCE)
+        dynamic_field::borrow<vector<u8>, Balance<TOKEN>>(&bid_vault.id, K_INCENTIVE_BALANCE)
     }
 
     /// Returns the share supply for a given sub-vault in the `DepositVault`.
