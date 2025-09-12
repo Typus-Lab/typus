@@ -63,6 +63,7 @@ module typus_oracle::oracle {
     }
 
     /// Creates a new oracle.
+    /// Safe with `ManagerCap` check
     public entry fun new_oracle<B_TOKEN, Q_TOKEN>(
         _manager_cap: &ManagerCap,
         base_token: String,
@@ -101,6 +102,7 @@ module typus_oracle::oracle {
     }
 
     /// Creates a new update authority.
+    /// Safe with `ManagerCap` check
     entry fun new_update_authority(
         _manager_cap: &ManagerCap,
         ctx: &mut TxContext
@@ -110,6 +112,7 @@ module typus_oracle::oracle {
     }
 
     /// Adds new addresses to the update authority.
+    /// Safe with `ManagerCap` check
     entry fun add_update_authority(
         _manager_cap: &ManagerCap,
         update_authority: &mut UpdateAuthority,
@@ -122,6 +125,7 @@ module typus_oracle::oracle {
     }
 
     /// Removes addresses from the update authority.
+    /// Safe with `ManagerCap` check
     entry fun remove_update_authority(
         _manager_cap: &ManagerCap,
         update_authority: &mut UpdateAuthority,
@@ -139,6 +143,7 @@ module typus_oracle::oracle {
     const VERSION: u64 = 1;
 
     /// Updates the version of the oracle.
+    /// Safe with `ManagerCap` check
     entry fun update_version(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -162,6 +167,7 @@ module typus_oracle::oracle {
 
     /// Updates the oracle price with the given price and TWAP price.
     /// This function can only be called by the update authority.
+    /// Safe with `UpdateAuthority` check
     public entry fun update_v2(
         oracle: &mut Oracle,
         update_authority: & UpdateAuthority,
@@ -179,6 +185,7 @@ module typus_oracle::oracle {
 
     /// Updates the oracle price with the given price and TWAP price.
     /// This function can only be called by the manager.
+    /// Safe with `ManagerCap` check
     public entry fun update(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -216,6 +223,7 @@ module typus_oracle::oracle {
     use typus_oracle::switchboard_feed_parser;
 
     /// Updates the Switchboard oracle feed ID.
+    /// Safe with `ManagerCap` check
     entry fun update_switchboard_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -227,6 +235,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the oracle price with the Switchboard feed.
+    /// Safe without authority check
     entry fun update_with_switchboard(
         oracle: &mut Oracle,
         feed: &Aggregator,
@@ -263,6 +272,7 @@ module typus_oracle::oracle {
     use pyth::price_info::{PriceInfoObject};
 
     /// Updates the Pyth oracle feed ID.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -278,6 +288,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the oracle price with the Pyth feed.
+    /// Safe without authority check
     public fun update_with_pyth(
         oracle: &mut Oracle,
         state: &PythState,
@@ -329,6 +340,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the Pyth oracle feed ID for USD pairs.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle_usd(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -342,6 +354,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the Pyth oracle feed ID for reciprocal USD pairs.
+    /// Safe with `ManagerCap` check
     entry fun update_pyth_oracle_usd_reciprocal(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -356,6 +369,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the oracle price with the Pyth feed for USD pairs.
+    /// Safe without authority check
     public fun update_with_pyth_usd(
         oracle: &mut Oracle,
         state: &PythState,
@@ -421,6 +435,7 @@ module typus_oracle::oracle {
     use SupraOracle::SupraSValueFeed::OracleHolder;
 
     /// Updates the Supra oracle pair ID.
+    /// Safe with `ManagerCap` check
     entry fun update_supra_oracle(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -436,6 +451,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the oracle price with the Supra feed.
+    /// Safe with `ManagerCap` check
     entry fun update_with_supra(
         oracle: &mut Oracle,
         oracle_holder: &OracleHolder,
@@ -470,6 +486,7 @@ module typus_oracle::oracle {
     }
 
     /// Copies the manager capability.
+    /// Safe with `ManagerCap` check
     public entry fun copy_manager_cap(
         _manager_cap: &ManagerCap,
         recipient: address,
@@ -488,21 +505,21 @@ module typus_oracle::oracle {
         id.delete();
     }
 
-    /// Returns the oracle data.
+    /// getter function Returns the oracle data.
     public fun get_oracle(
         oracle: &Oracle
     ): (u64, u64, u64, u64) {
         (oracle.price, oracle.decimal, oracle.ts_ms, oracle.epoch)
     }
 
-    /// Returns the token data.
+    /// getter function Returns the token data.
     public fun get_token(
         oracle: &Oracle
     ): (String, String, TypeName, TypeName) {
         (oracle.base_token, oracle.quote_token, oracle.base_token_type, oracle.quote_token_type)
     }
 
-    /// Returns the price and decimals of the oracle.
+    /// getter function Returns the price and decimals of the oracle.
     public fun get_price(
         oracle: &Oracle,
         clock: &Clock,
@@ -512,7 +529,7 @@ module typus_oracle::oracle {
         (oracle.price, oracle.decimal)
     }
 
-    /// Returns the TWAP price and decimals of the oracle.
+    /// getter function Returns the TWAP price and decimals of the oracle.
     public fun get_twap_price(
         oracle: &Oracle,
         clock: &Clock,
@@ -522,7 +539,7 @@ module typus_oracle::oracle {
         (oracle.twap_price, oracle.decimal)
     }
 
-    /// Returns the price and decimals of the oracle with a custom time interval.
+    /// getter function Returns the price and decimals of the oracle with a custom time interval.
     public fun get_price_with_interval_ms(
         oracle: &Oracle,
         clock: &Clock,
@@ -534,6 +551,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the time interval of the oracle.
+    /// Safe with `ManagerCap` check
     public entry fun update_time_interval(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
@@ -544,6 +562,7 @@ module typus_oracle::oracle {
     }
 
     /// Updates the token names of the oracle.
+    /// Safe with `ManagerCap` check
     public entry fun update_token(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
