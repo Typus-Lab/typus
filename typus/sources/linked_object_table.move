@@ -1,41 +1,52 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Similar to `sui::linked_table` but the values are stored by dynamic_object_field
+/// This module implements a `LinkedObjectTable`, which is similar to `sui::linked_table` but stores
+/// its values as dynamic object fields. This allows the values to be objects themselves, which can be
+/// useful for storing complex data structures. The table maintains a doubly-linked list of its entries,
+/// allowing for efficient iteration in both forward and reverse order.
 module typus::linked_object_table {
+    use std::option::{Self, Option};
+
     use sui::dynamic_field as field;
     use sui::dynamic_object_field as ofield;
+    use sui::object::{Self, UID};
+    use sui::tx_context::TxContext;
 
     // ======== Error Code ========
 
+    /// Error when trying to destroy a non-empty table.
     const ETableNotEmpty: u64 = 0;
+    /// Error when trying to pop from an empty table.
     const ETableIsEmpty: u64 = 1;
 
     // ======== Structs ========
 
+    /// A doubly-linked list of key-value pairs where values are stored as dynamic object fields.
     public struct LinkedObjectTable<K: copy + drop + store, phantom V: key + store> has key, store {
-        /// the UID for Node storage
+        /// The UID for storing the nodes of the linked list.
         id: UID,
-        /// the UID for value storage
+        /// The UID for storing the values as dynamic object fields.
         vid: UID,
-        /// the number of key-value pairs in the table
+        /// The number of key-value pairs in the table.
         size: u64,
-        /// the front of the table, i.e. the key of the first entry
+        /// The key of the first entry in the table.
         head: Option<K>,
-        /// the back of the table, i.e. the key of the last entry
+        /// The key of the last entry in the table.
         tail: Option<K>,
     }
 
+    /// A node in the linked list, containing pointers to the previous and next keys.
     public struct Node<K: copy + drop + store, phantom V: key + store> has store {
-        /// the previous key
+        /// The key of the previous entry.
         prev: Option<K>,
-        /// the next key
+        /// The key of the next entry.
         next: Option<K>,
     }
 
     // ======== Public Functions ========
 
-    /// Creates a new, empty table
+    /// Creates a new, empty `LinkedObjectTable`.
     public fun new<K: copy + drop + store, V: key + store>(ctx: &mut TxContext): LinkedObjectTable<K, V> {
         LinkedObjectTable {
             id: object::new(ctx),
@@ -46,20 +57,18 @@ module typus::linked_object_table {
         }
     }
 
-    /// Returns the key for the first element in the table, or None if the table is empty
+    /// Returns the key of the first element in the table, or `None` if the table is empty.
     public fun front<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>): &Option<K> {
         &table.head
     }
 
-    /// Returns the key for the last element in the table, or None if the table is empty
+    /// Returns the key of the last element in the table, or `None` if the table is empty.
     public fun back<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>): &Option<K> {
         &table.tail
     }
 
-    /// Inserts a key-value pair at the front of the table, i.e. the newly inserted pair will be
-    /// the first element in the table
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
-    /// that key `k: K`.
+    /// Inserts a key-value pair at the front of the table.
+    /// Aborts if the key already exists.
     public fun push_front<K: copy + drop + store, V: key + store>(
         table: &mut LinkedObjectTable<K, V>,
         k: K,
@@ -80,10 +89,8 @@ module typus::linked_object_table {
         table.size = table.size + 1;
     }
 
-    /// Inserts a key-value pair at the back of the table, i.e. the newly inserted pair will be
-    /// the last element in the table
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
-    /// that key `k: K`.
+    /// Inserts a key-value pair at the back of the table.
+    /// Aborts if the key already exists.
     public fun push_back<K: copy + drop + store, V: key + store>(
         table: &mut LinkedObjectTable<K, V>,
         k: K,
@@ -104,18 +111,16 @@ module typus::linked_object_table {
         table.size = table.size + 1;
     }
 
+    /// Borrows an immutable reference to the value associated with the given key.
+    /// Aborts if the key does not exist.
     #[syntax(index)]
-    /// Immutable borrows the value associated with the key in the table `table: &LinkedObjectTable<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`.
     public fun borrow<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>, k: K): &V {
         ofield::borrow<K, V>(&table.vid, k)
     }
 
+    /// Borrows a mutable reference to the value associated with the given key.
+    /// Aborts if the key does not exist.
     #[syntax(index)]
-    /// Mutably borrows the value associated with the key in the table `table: &mut LinkedObjectTable<K, V>`.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`.
     public fun borrow_mut<K: copy + drop + store, V: key + store>(
         table: &mut LinkedObjectTable<K, V>,
         k: K,
@@ -123,26 +128,22 @@ module typus::linked_object_table {
         ofield::borrow_mut<K, V>(&mut table.vid, k)
     }
 
-    /// Borrows the key for the previous entry of the specified key `k: K` in the table
-    /// `table: &LinkedObjectTable<K, V>`. Returns None if the entry does not have a predecessor.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`
+    /// Returns the key of the previous entry for the specified key.
+    /// Returns `None` if there is no previous entry.
+    /// Aborts if the key does not exist.
     public fun prev<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>, k: K): &Option<K> {
         &field::borrow<K, Node<K, V>>(&table.id, k).prev
     }
 
-    /// Borrows the key for the next entry of the specified key `k: K` in the table
-    /// `table: &LinkedObjectTable<K, V>`. Returns None if the entry does not have a predecessor.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`
+    /// Returns the key of the next entry for the specified key.
+    /// Returns `None` if there is no next entry.
+    /// Aborts if the key does not exist.
     public fun next<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>, k: K): &Option<K> {
         &field::borrow<K, Node<K, V>>(&table.id, k).next
     }
 
-    /// Removes the key-value pair in the table `table: &mut LinkedObjectTable<K, V>` and returns the value.
-    /// This splices the element out of the ordering.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`. Note: this is also what happens when the table is empty.
+    /// Removes the key-value pair with the given key from the table and returns the value.
+    /// Aborts if the key does not exist.
     public fun remove<K: copy + drop + store, V: key + store>(table: &mut LinkedObjectTable<K, V>, k: K): V {
         let Node<K, V> { prev, next } = field::remove(&mut table.id, k);
         let v = ofield::remove(&mut table.vid, k);
@@ -158,39 +159,39 @@ module typus::linked_object_table {
         v
     }
 
-    /// Removes the front of the table `table: &mut LinkedObjectTable<K, V>` and returns the value.
-    /// Aborts with `ETableIsEmpty` if the table is empty
+    /// Removes the first entry from the table and returns its key and value.
+    /// Aborts if the table is empty.
     public fun pop_front<K: copy + drop + store, V: key + store>(table: &mut LinkedObjectTable<K, V>): (K, V) {
         assert!(option::is_some(&table.head), ETableIsEmpty);
         let head = *option::borrow(&table.head);
         (head, remove(table, head))
     }
 
-    /// Removes the back of the table `table: &mut LinkedObjectTable<K, V>` and returns the value.
-    /// Aborts with `ETableIsEmpty` if the table is empty
+    /// Removes the last entry from the table and returns its key and value.
+    /// Aborts if the table is empty.
     public fun pop_back<K: copy + drop + store, V: key + store>(table: &mut LinkedObjectTable<K, V>): (K, V) {
         assert!(option::is_some(&table.tail), ETableIsEmpty);
         let tail = *option::borrow(&table.tail);
         (tail, remove(table, tail))
     }
 
-    /// Returns true iff there is a value associated with the key `k: K` in table
-    /// `table: &LinkedObjectTable<K, V>`
+    /// Returns `true` if the table contains an entry with the given key.
     public fun contains<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>, k: K): bool {
         field::exists_with_type<K, Node<K, V>>(&table.id, k)
     }
 
-    /// Returns the size of the table, the number of key-value pairs
+    /// Returns the number of key-value pairs in the table.
     public fun length<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>): u64 {
         table.size
     }
 
-    /// Returns true iff the table is empty (if `length` returns `0`)
+    /// Returns `true` if the table is empty.
     public fun is_empty<K: copy + drop + store, V: key + store>(table: &LinkedObjectTable<K, V>): bool {
         table.size == 0
     }
 
-    /// Destroys an empty table
+    /// Destroys an empty table.
+    /// Aborts if the table is not empty.
     public fun destroy_empty<K: copy + drop + store, V: key + store>(table: LinkedObjectTable<K, V>) {
         let LinkedObjectTable { id, vid, size, head: _, tail: _ } = table;
         assert!(size == 0, ETableNotEmpty);
@@ -198,25 +199,27 @@ module typus::linked_object_table {
         object::delete(vid);
     }
 
+    /// A macro for iterating over the elements of a `LinkedObjectTable` with immutable references.
     public macro fun do_ref<$K, $V>($lot: &LinkedObjectTable<$K, $V>, $f: |$K, &$V|) {
         let lot = $lot;
         let mut front = lot.front();
-        while (front.is_some()) {
-            let key = *front.borrow();
-            let value = lot.borrow(key);
+        while (option::is_some(front)) {
+            let key = *option::borrow(front);
+            let value = borrow(lot, key);
             $f(key, value);
-            front = lot.next(key);
+            front = next(lot, key);
         };
     }
 
+    /// A macro for iterating over the elements of a `LinkedObjectTable` with mutable references.
     public macro fun do_mut<$K, $V>($lot: &mut LinkedObjectTable<$K, $V>, $f: |$K, &mut $V|) {
         let lot = $lot;
-        let mut front = lot.front();
-        while (front.is_some()) {
-            let key = *front.borrow();
-            let value = lot.borrow_mut(key);
+        let mut front = *front(lot);
+        while (option::is_some(&front)) {
+            let key = option::destroy_some(front);
+            let value = borrow_mut(lot, key);
             $f(key, value);
-            front = lot.next(key);
+            front = *next(lot, key);
         };
     }
 }

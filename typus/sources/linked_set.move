@@ -1,38 +1,48 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Similar to `sui::linked_table` but the values are stored by dynamic_object_field
+/// This module implements a `LinkedSet`, a data structure that stores a set of keys in a doubly-linked list.
+/// It is similar to `sui::linked_table` but only stores keys, not values. This is useful when you need to
+/// maintain an ordered set of unique elements.
 module typus::linked_set {
+    use std::option::{Self, Option};
+
     use sui::dynamic_field as field;
+    use sui::object::{Self, UID};
+    use sui::tx_context::TxContext;
 
     // ======== Error Code ========
 
-    const ETableNotEmpty: u64 = 0;
-    const ETableIsEmpty: u64 = 1;
+    /// Error when trying to destroy a non-empty set.
+    const ESetNotEmpty: u64 = 0;
+    /// Error when trying to pop from an empty set.
+    const ESetIsEmpty: u64 = 1;
 
     // ======== Structs ========
 
+    /// A doubly-linked list of unique keys.
     public struct LinkedSet<K: copy + drop + store> has key, store {
-        /// the UID for Node storage
+        /// The UID for storing the nodes of the linked list.
         id: UID,
-        /// the number of key-value pairs in the table
+        /// The number of keys in the set.
         size: u64,
-        /// the front of the table, i.e. the key of the first entry
+        /// The first key in the set.
         head: Option<K>,
-        /// the back of the table, i.e. the key of the last entry
+        /// The last key in the set.
         tail: Option<K>,
     }
 
+    /// A node in the linked list, containing pointers to the previous and next keys.
     public struct Node<K: copy + drop + store> has store {
-        /// the previous key
+        /// The previous key in the list.
         prev: Option<K>,
-        /// the next key
+        /// The next key in the list.
         next: Option<K>,
     }
 
     // ======== Public Functions ========
 
-    /// Creates a new, empty table
+    /// Creates a new, empty `LinkedSet`.
     public fun new<K: copy + drop + store>(ctx: &mut TxContext): LinkedSet<K> {
         LinkedSet {
             id: object::new(ctx),
@@ -42,137 +52,129 @@ module typus::linked_set {
         }
     }
 
-    /// Returns the key for the first element in the table, or None if the table is empty
-    public fun front<K: copy + drop + store>(table: &LinkedSet<K>): &Option<K> {
-        &table.head
+    /// Returns the first key in the set, or `None` if the set is empty.
+    public fun front<K: copy + drop + store>(set: &LinkedSet<K>): &Option<K> {
+        &set.head
     }
 
-    /// Returns the key for the last element in the table, or None if the table is empty
-    public fun back<K: copy + drop + store>(table: &LinkedSet<K>): &Option<K> {
-        &table.tail
+    /// Returns the last key in the set, or `None` if the set is empty.
+    public fun back<K: copy + drop + store>(set: &LinkedSet<K>): &Option<K> {
+        &set.tail
     }
 
-    /// Inserts a key-value pair at the front of the table, i.e. the newly inserted pair will be
-    /// the first element in the table
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
-    /// that key `k: K`.
+    /// Inserts a key at the front of the set.
+    /// Aborts if the key already exists.
     public fun push_front<K: copy + drop + store>(
-        table: &mut LinkedSet<K>,
+        set: &mut LinkedSet<K>,
         k: K,
     ) {
-        let old_head = option::swap_or_fill(&mut table.head, k);
-        if (option::is_none(&table.tail)) option::fill(&mut table.tail, k);
+        let old_head = option::swap_or_fill(&mut set.head, k);
+        if (option::is_none(&set.tail)) option::fill(&mut set.tail, k);
         let prev = option::none();
         let next = if (option::is_some(&old_head)) {
             let old_head_k = option::destroy_some(old_head);
-            field::borrow_mut<K, Node<K>>(&mut table.id, old_head_k).prev = option::some(k);
+            field::borrow_mut<K, Node<K>>(&mut set.id, old_head_k).prev = option::some(k);
             option::some(old_head_k)
         } else {
             option::none()
         };
-        field::add(&mut table.id, k, Node<K> { prev, next });
-        table.size = table.size + 1;
+        field::add(&mut set.id, k, Node<K> { prev, next });
+        set.size = set.size + 1;
     }
 
-    /// Inserts a key-value pair at the back of the table, i.e. the newly inserted pair will be
-    /// the last element in the table
-    /// Aborts with `sui::dynamic_field::EFieldAlreadyExists` if the table already has an entry with
-    /// that key `k: K`.
+    /// Inserts a key at the back of the set.
+    /// Aborts if the key already exists.
     public fun push_back<K: copy + drop + store>(
-        table: &mut LinkedSet<K>,
+        set: &mut LinkedSet<K>,
         k: K,
     ) {
-        if (option::is_none(&table.head)) option::fill(&mut table.head, k);
-        let old_tail = option::swap_or_fill(&mut table.tail, k);
+        if (option::is_none(&set.head)) option::fill(&mut set.head, k);
+        let old_tail = option::swap_or_fill(&mut set.tail, k);
         let prev = if (option::is_some(&old_tail)) {
             let old_tail_k = option::destroy_some(old_tail);
-            field::borrow_mut<K, Node<K>>(&mut table.id, old_tail_k).next = option::some(k);
+            field::borrow_mut<K, Node<K>>(&mut set.id, old_tail_k).next = option::some(k);
             option::some(old_tail_k)
         } else {
             option::none()
         };
         let next = option::none();
-        field::add(&mut table.id, k, Node<K> { prev, next });
-        table.size = table.size + 1;
+        field::add(&mut set.id, k, Node<K> { prev, next });
+        set.size = set.size + 1;
     }
 
-    /// Borrows the key for the previous entry of the specified key `k: K` in the table
-    /// `table: &LinkedSet<K>`. Returns None if the entry does not have a predecessor.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`
-    public fun prev<K: copy + drop + store>(table: &LinkedSet<K>, k: K): &Option<K> {
-        &field::borrow<K, Node<K>>(&table.id, k).prev
+    /// Returns the previous key for the specified key.
+    /// Returns `None` if there is no previous key.
+    /// Aborts if the key does not exist.
+    public fun prev<K: copy + drop + store>(set: &LinkedSet<K>, k: K): &Option<K> {
+        &field::borrow<K, Node<K>>(&set.id, k).prev
     }
 
-    /// Borrows the key for the next entry of the specified key `k: K` in the table
-    /// `table: &LinkedSet<K>`. Returns None if the entry does not have a predecessor.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`
-    public fun next<K: copy + drop + store>(table: &LinkedSet<K>, k: K): &Option<K> {
-        &field::borrow<K, Node<K>>(&table.id, k).next
+    /// Returns the next key for the specified key.
+    /// Returns `None` if there is no next key.
+    /// Aborts if the key does not exist.
+    public fun next<K: copy + drop + store>(set: &LinkedSet<K>, k: K): &Option<K> {
+        &field::borrow<K, Node<K>>(&set.id, k).next
     }
 
-    /// Removes the key-value pair in the table `table: &mut LinkedSet<K>` and returns the value.
-    /// This splices the element out of the ordering.
-    /// Aborts with `sui::dynamic_field::EFieldDoesNotExist` if the table does not have an entry with
-    /// that key `k: K`. Note: this is also what happens when the table is empty.
-    public fun remove<K: copy + drop + store>(table: &mut LinkedSet<K>, k: K) {
-        let Node<K> { prev, next } = field::remove(&mut table.id, k);
-        table.size = table.size - 1;
+    /// Removes the key from the set.
+    /// Aborts if the key does not exist.
+    public fun remove<K: copy + drop + store>(set: &mut LinkedSet<K>, k: K) {
+        let Node<K> { prev, next } = field::remove(&mut set.id, k);
+        set.size = set.size - 1;
         if (option::is_some(&prev)) {
-            field::borrow_mut<K, Node<K>>(&mut table.id, *option::borrow(&prev)).next = next
+            field::borrow_mut<K, Node<K>>(&mut set.id, *option::borrow(&prev)).next = next
         };
         if (option::is_some(&next)) {
-            field::borrow_mut<K, Node<K>>(&mut table.id, *option::borrow(&next)).prev = prev
+            field::borrow_mut<K, Node<K>>(&mut set.id, *option::borrow(&next)).prev = prev
         };
-        if (option::borrow(&table.head) == &k) table.head = next;
-        if (option::borrow(&table.tail) == &k) table.tail = prev;
+        if (option::borrow(&set.head) == &k) set.head = next;
+        if (option::borrow(&set.tail) == &k) set.tail = prev;
     }
 
-    /// Removes the front of the table `table: &mut LinkedSet<K>` and returns the value.
-    /// Aborts with `ETableIsEmpty` if the table is empty
-    public fun pop_front<K: copy + drop + store>(table: &mut LinkedSet<K>): K {
-        assert!(option::is_some(&table.head), ETableIsEmpty);
-        let head = *option::borrow(&table.head);
-        remove(table, head);
+    /// Removes the first key from the set and returns it.
+    /// Aborts if the set is empty.
+    public fun pop_front<K: copy + drop + store>(set: &mut LinkedSet<K>): K {
+        assert!(option::is_some(&set.head), ESetIsEmpty);
+        let head = *option::borrow(&set.head);
+        remove(set, head);
         head
     }
 
-    /// Removes the back of the table `table: &mut LinkedSet<K>` and returns the value.
-    /// Aborts with `ETableIsEmpty` if the table is empty
-    public fun pop_back<K: copy + drop + store>(table: &mut LinkedSet<K>): K {
-        assert!(option::is_some(&table.tail), ETableIsEmpty);
-        let tail = *option::borrow(&table.tail);
-        remove(table, tail);
+    /// Removes the last key from the set and returns it.
+    /// Aborts if the set is empty.
+    public fun pop_back<K: copy + drop + store>(set: &mut LinkedSet<K>): K {
+        assert!(option::is_some(&set.tail), ESetIsEmpty);
+        let tail = *option::borrow(&set.tail);
+        remove(set, tail);
         tail
     }
 
-    /// Returns true iff there is a value associated with the key `k: K` in table
-    /// `table: &LinkedSet<K>`
-    public fun contains<K: copy + drop + store>(table: &LinkedSet<K>, k: K): bool {
-        field::exists_with_type<K, Node<K>>(&table.id, k)
+    /// Returns `true` if the set contains the given key.
+    public fun contains<K: copy + drop + store>(set: &LinkedSet<K>, k: K): bool {
+        field::exists_with_type<K, Node<K>>(&set.id, k)
     }
 
-    /// Returns the size of the table, the number of key-value pairs
-    public fun length<K: copy + drop + store>(table: &LinkedSet<K>): u64 {
-        table.size
+    /// Returns the number of keys in the set.
+    public fun length<K: copy + drop + store>(set: &LinkedSet<K>): u64 {
+        set.size
     }
 
-    /// Returns true iff the table is empty (if `length` returns `0`)
-    public fun is_empty<K: copy + drop + store>(table: &LinkedSet<K>): bool {
-        table.size == 0
+    /// Returns `true` if the set is empty.
+    public fun is_empty<K: copy + drop + store>(set: &LinkedSet<K>): bool {
+        set.size == 0
     }
 
-    /// Destroys an empty table
-    public fun destroy_empty<K: copy + drop + store>(table: LinkedSet<K>) {
-        let LinkedSet { id, size, head: _, tail: _ } = table;
-        assert!(size == 0, ETableNotEmpty);
+    /// Destroys an empty set.
+    /// Aborts if the set is not empty.
+    public fun destroy_empty<K: copy + drop + store>(set: LinkedSet<K>) {
+        let LinkedSet { id, size, head: _, tail: _ } = set;
+        assert!(size == 0, ESetNotEmpty);
         object::delete(id);
     }
 
-    /// Drop a possibly non-empty table.
-    public fun drop<K: copy + drop + store>(table: LinkedSet<K>) {
-        let LinkedSet { id, size: _, head: _, tail: _ } = table;
+    /// Destroys a set, regardless of whether it is empty or not.
+    public fun drop<K: copy + drop + store>(set: LinkedSet<K>) {
+        let LinkedSet { id, size: _, head: _, tail: _ } = set;
         object::delete(id)
     }
 }
