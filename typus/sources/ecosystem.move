@@ -8,12 +8,9 @@ module typus::ecosystem {
     use std::type_name::{Self, TypeName};
 
     use sui::balance::{Self, Balance};
-    use sui::coin::{Self, Coin};
+    use sui::coin;
     use sui::dynamic_field;
     use sui::event::emit;
-    use sui::object::{Self, UID};
-    use sui::transfer::{Self, public_transfer};
-    use sui::tx_context::{Self, TxContext};
     use sui::vec_set::{Self, VecSet};
 
     // ======== Constants ========
@@ -45,7 +42,7 @@ module typus::ecosystem {
         version: &Version,
         ctx: &TxContext,
     ): ManagerCap {
-        verify(version, ctx);
+        version.verify(ctx);
 
         ManagerCap { }
     }
@@ -57,7 +54,7 @@ module typus::ecosystem {
         manager_cap: ManagerCap,
         ctx: &TxContext,
     ) {
-        verify(version, ctx);
+        version.verify(ctx);
         let ManagerCap { } = manager_cap;
     }
 
@@ -96,7 +93,7 @@ module typus::ecosystem {
 
     /// Upgrades the version of the ecosystem to the latest version.
     entry fun upgrade(version: &mut Version) {
-        version_check(version);
+        version.version_check();
         version.value = CVersion;
     }
 
@@ -125,10 +122,10 @@ module typus::ecosystem {
         version: &Version,
         ctx: &TxContext,
     ) {
-        version_check(version);
+        version.version_check();
 
         assert!(
-            vec_set::contains(&version.authority, &ctx.sender()),
+            version.authority.contains(&ctx.sender()),
             EUnauthorized
         );
     }
@@ -140,10 +137,10 @@ module typus::ecosystem {
         user_address: address,
         ctx: &TxContext,
     ) {
-        verify(version, ctx);
+        version.verify(ctx);
 
-        assert!(!vec_set::contains(&version.authority, &user_address), EAuthorityAlreadyExists);
-        vec_set::insert(&mut version.authority, user_address);
+        assert!(!version.authority.contains(&user_address), EAuthorityAlreadyExists);
+        version.authority.insert(user_address);
     }
 
     /// Removes an authorized user from the authority list.
@@ -154,11 +151,11 @@ module typus::ecosystem {
         user_address: address,
         ctx: &TxContext,
     ) {
-        verify(version, ctx);
+        version.verify(ctx);
 
-        assert!(vec_set::contains(&version.authority, &user_address), EAuthorityDoesNotExist);
-        vec_set::remove(&mut version.authority, &user_address);
-        assert!(vec_set::size(&version.authority) > 0, EAuthorityEmpty);
+        assert!(version.authority.contains(&user_address), EAuthorityDoesNotExist);
+        version.authority.remove(&user_address);
+        assert!(version.authority.size() > 0, EAuthorityEmpty);
     }
 
     // ======== Fee Pool ========
@@ -189,18 +186,17 @@ module typus::ecosystem {
         bcs_padding: vector<vector<u8>>,
     }
     /// Sends the collected fees for a specific token to a designated fee address.
-    /// WARNING: mut inputs without authority check inside
     entry fun send_fee<TOKEN>(
         version: &mut Version,
         ctx: &mut TxContext,
     ) {
-        version_check(version);
+        version.version_check();
 
         let mut i = 0;
-        while (i < vector::length(&version.fee_pool.fee_infos)) {
-            let fee_info = vector::borrow_mut(&mut version.fee_pool.fee_infos, i);
+        while (i < version.fee_pool.fee_infos.length()) {
+            let fee_info = version.fee_pool.fee_infos.borrow_mut(i);
             if (fee_info.token == type_name::get<TOKEN>()) {
-                public_transfer(
+                transfer::public_transfer(
                     coin::from_balance<TOKEN>(
                         balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>())),
                         ctx,

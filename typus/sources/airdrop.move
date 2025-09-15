@@ -5,16 +5,12 @@
 /// It allows for setting up airdrops, claiming them, and removing them.
 module typus::airdrop {
     use std::ascii::String;
-    use std::option::{Self, Option};
     use std::type_name::{Self, TypeName};
 
     use sui::balance::{Self, Balance};
-    use sui::coin::{Self, Coin};
+    use sui::coin::Coin;
     use sui::dynamic_field;
     use sui::event::emit;
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
 
     use typus::big_vector::{Self, BigVector};
     use typus::ecosystem::Version;
@@ -206,12 +202,12 @@ module typus::airdrop {
     /// Allows a user to claim their airdrop.
     /// It iterates through the airdrop list to find the user's entry and sends them the tokens.
     /// If the user has already claimed, the value will be 0, and they won't receive anything.
-    /// WARNING: mut inputs without authority check inside
+    /// Safe with ctx.sender as verification
     public fun claim_airdrop<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
         key: String,
-        ctx: &mut TxContext,
+        ctx: &TxContext,
     ): Option<Balance<TOKEN>> {
         version.version_check();
 
@@ -254,13 +250,13 @@ module typus::airdrop {
 
     /// Allows a user to claim their airdrop by providing the index of their airdrop entry.
     /// This is more efficient than `claim_airdrop` if the user knows their index.
-    /// WARNING: mut inputs without authority check inside
+    /// Safe with ctx.sender as verification
     public fun claim_airdrop_by_index<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
         key: String,
         i: u64,
-        ctx: &mut TxContext,
+        ctx: &TxContext,
     ): Option<Balance<TOKEN>> {
         version.version_check();
 

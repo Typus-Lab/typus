@@ -5,10 +5,7 @@
 /// for searching and storing keys. This implementation uses `u64` keys and generic values.
 /// The tree is composed of internal nodes and leaf nodes, stored in tables.
 module typus::critbit {
-    use std::u64;
-
     use sui::table::{Self, Table};
-    use sui::tx_context::TxContext;
 
     // ======== Error Code ========
 
@@ -93,75 +90,75 @@ module typus::critbit {
 
     /// Returns the number of leaves in the tree.
     public fun size<V: store>(tree: &CritbitTree<V>): u64 {
-        table::length(&tree.leaves)
+        tree.leaves.length()
     }
 
     /// Returns `true` if the tree is empty.
     public fun is_empty<V: store>(tree: &CritbitTree<V>): bool {
-        table::is_empty(&tree.leaves)
+        tree.leaves.is_empty()
     }
 
     /// Returns `true` if a leaf with the given key exists in the tree.
     public fun has_leaf<V: store>(tree: &CritbitTree<V>, key: u64): bool {
-        let (has_leaf, _) = find_leaf(tree, key);
+        let (has_leaf, _) = tree.find_leaf(key);
         has_leaf
     }
 
     /// Returns `true` if a leaf with the given index exists in the tree.
     public fun has_index<V: store>(tree: &CritbitTree<V>, index: u64): bool {
-        table::contains(&tree.leaves, index)
+        tree.leaves.contains(index)
     }
 
     /// Returns the key and index of the leaf with the minimum key in the tree.
     /// Aborts if the tree is empty.
     public fun min_leaf<V: store>(tree: &CritbitTree<V>): (u64, u64) {
-        assert!(!is_empty(tree), ELeafNotExist);
-        let min_leaf = table::borrow(&tree.leaves, tree.min_leaf_index);
+        assert!(!tree.is_empty(), ELeafNotExist);
+        let min_leaf = tree.leaves.borrow(tree.min_leaf_index);
         (min_leaf.key, tree.min_leaf_index)
     }
 
     /// Returns the key and index of the leaf with the maximum key in the tree.
     /// Aborts if the tree is empty.
     public fun max_leaf<V: store>(tree: &CritbitTree<V>): (u64, u64) {
-        assert!(!is_empty(tree), ELeafNotExist);
-        let max_leaf = table::borrow(&tree.leaves, tree.max_leaf_index);
+        assert!(!tree.is_empty(), ELeafNotExist);
+        let max_leaf = tree.leaves.borrow(tree.max_leaf_index);
         (max_leaf.key, tree.max_leaf_index)
     }
 
     /// Returns the key and index of the leaf that comes before the given key in sorted order.
     /// Returns `(0, PARTITION_INDEX)` if there is no previous leaf.
     public fun previous_leaf<V: store>(tree: &CritbitTree<V>, key: u64): (u64, u64) {
-        let (has_leaf, mut index) = find_leaf(tree, key);
+        let (has_leaf, mut index) = tree.find_leaf(key);
         assert!(has_leaf, ELeafNotExist);
         let mut ptr = MAX_U64 - index;
-        let mut parent = table::borrow(&tree.leaves, index).parent;
-        while (parent != PARTITION_INDEX && is_left_child(tree, parent, ptr)) {
+        let mut parent = tree.leaves.borrow(index).parent;
+        while (parent != PARTITION_INDEX && tree.is_left_child(parent, ptr)) {
             ptr = parent;
-            parent = table::borrow(&tree.internal_nodes, ptr).parent;
+            parent = tree.internal_nodes.borrow(ptr).parent;
         };
         if(parent == PARTITION_INDEX) {
             return (0, PARTITION_INDEX)
         };
-        index = MAX_U64 - right_most_leaf(tree, table::borrow(&tree.internal_nodes, parent).left_child);
-        (table::borrow(&tree.leaves, index).key, index)
+        index = MAX_U64 - tree.right_most_leaf(tree.internal_nodes.borrow(parent).left_child);
+        (tree.leaves.borrow(index).key, index)
     }
 
     /// Returns the key and index of the leaf that comes after the given key in sorted order.
     /// Returns `(0, PARTITION_INDEX)` if there is no next leaf.
     public fun next_leaf<V: store>(tree: &CritbitTree<V>, key: u64): (u64, u64) {
-        let (has_leaf, mut index) = find_leaf(tree, key);
+        let (has_leaf, mut index) = tree.find_leaf(key);
         assert!(has_leaf, ELeafNotExist);
         let mut ptr = MAX_U64 - index;
-        let mut parent = table::borrow(&tree.leaves, index).parent;
-        while (parent != PARTITION_INDEX && !is_left_child(tree, parent, ptr)) {
+        let mut parent = tree.leaves.borrow(index).parent;
+        while (parent != PARTITION_INDEX && !tree.is_left_child(parent, ptr)) {
             ptr = parent;
-            parent = table::borrow(&tree.internal_nodes, ptr).parent;
+            parent = tree.internal_nodes.borrow(ptr).parent;
         };
         if(parent == PARTITION_INDEX) {
             return (0, PARTITION_INDEX)
         };
-        index = MAX_U64 - left_most_leaf(tree, table::borrow(&tree.internal_nodes, parent).right_child);
-        (table::borrow(&tree.leaves, index).key, index)
+        index = MAX_U64 - tree.left_most_leaf(tree.internal_nodes.borrow(parent).right_child);
+        (tree.leaves.borrow(index).key, index)
     }
 
     /// Inserts a new leaf with the given key and value into the tree.
@@ -176,9 +173,9 @@ module typus::critbit {
         let new_leaf_index = tree.next_leaf_index;
         tree.next_leaf_index = tree.next_leaf_index + 1;
         assert!(new_leaf_index < MAX_CAPACITY - 1, EExceedCapacity);
-        table::add(&mut tree.leaves, new_leaf_index, new_leaf);
+        tree.leaves.add(new_leaf_index, new_leaf);
 
-        let closest_leaf_index = get_closest_leaf_index_by_key(tree, key);
+        let closest_leaf_index = tree.get_closest_leaf_index_by_key(key);
 
         // handle the first insertion
         if(closest_leaf_index == PARTITION_INDEX) {
@@ -189,7 +186,7 @@ module typus::critbit {
             return 0
         };
 
-        let closest_key = table::borrow(&tree.leaves, closest_leaf_index).key;
+        let closest_key = tree.leaves.borrow(closest_leaf_index).key;
         assert!(closest_key != key, EKeyAlreadyExist);
 
         // note that we reserve count_leading_zeros of form u128 for future usage
@@ -204,13 +201,13 @@ module typus::critbit {
         };
         let new_internal_node_index = tree.next_internal_node_index;
         tree.next_internal_node_index = tree.next_internal_node_index + 1;
-        table::add(&mut tree.internal_nodes, new_internal_node_index, new_internal_node);
+        tree.internal_nodes.add(new_internal_node_index, new_internal_node);
 
         let mut ptr = tree.root;
         let mut new_internal_node_parent_index = PARTITION_INDEX;
         // search position of the new internal node
         while (ptr < PARTITION_INDEX) {
-            let internal_node = table::borrow(&tree.internal_nodes, ptr);
+            let internal_node = tree.internal_nodes.borrow(ptr);
             if (new_mask > internal_node.mask) {
                 break
             };
@@ -229,19 +226,19 @@ module typus::critbit {
         } else{
             // In another case, we update the child field of the new internal node's parent
             // and the parent field of the new internal node
-            let is_left_child = is_left_child(tree, new_internal_node_parent_index, ptr);
-            update_child(tree, new_internal_node_parent_index, new_internal_node_index, is_left_child);
+            let is_left_child = tree.is_left_child(new_internal_node_parent_index, ptr);
+            tree.update_child(new_internal_node_parent_index, new_internal_node_index, is_left_child);
         };
 
         // finally, we update the child filed of the new internal node
         let is_left_child = new_mask & key == 0;
-        update_child(tree, new_internal_node_index, MAX_U64 - new_leaf_index, is_left_child);
-        update_child(tree, new_internal_node_index, ptr, !is_left_child);
+        tree.update_child(new_internal_node_index, MAX_U64 - new_leaf_index, is_left_child);
+        tree.update_child(new_internal_node_index, ptr, !is_left_child);
 
-        if (table::borrow(&tree.leaves, tree.min_leaf_index).key > key) {
+        if (tree.leaves.borrow(tree.min_leaf_index).key > key) {
             tree.min_leaf_index = new_leaf_index;
         };
-        if (table::borrow(&tree.leaves, tree.max_leaf_index).key < key) {
+        if (tree.leaves.borrow(tree.max_leaf_index).key < key) {
             tree.max_leaf_index = new_leaf_index;
         };
         new_leaf_index
@@ -250,11 +247,11 @@ module typus::critbit {
     /// Finds a leaf with the given key and returns a boolean indicating if it was found,
     /// along with the index of the leaf if found.
     public fun find_leaf<V: store>(tree: & CritbitTree<V>, key: u64): (bool, u64) {
-        if (is_empty(tree)) {
+        if (tree.is_empty()) {
             return (false, PARTITION_INDEX)
         };
-        let closest_leaf_index = get_closest_leaf_index_by_key(tree, key);
-        let closeset_leaf = table::borrow(&tree.leaves, closest_leaf_index);
+        let closest_leaf_index = tree.get_closest_leaf_index_by_key(key);
+        let closeset_leaf = tree.leaves.borrow(closest_leaf_index);
         if (closeset_leaf.key != key) {
             (false, PARTITION_INDEX)
         } else {
@@ -265,40 +262,40 @@ module typus::critbit {
     /// Finds the key of the leaf that is closest to the given key.
     /// Returns 0 if the tree is empty.
     public fun find_closest_key<V: store>(tree: & CritbitTree<V>, key: u64): u64 {
-        if (is_empty(tree)) {
+        if (tree.is_empty()) {
             return 0
         };
-        let closest_leaf_index = get_closest_leaf_index_by_key(tree, key);
-        let closeset_leaf = table::borrow(&tree.leaves, closest_leaf_index);
+        let closest_leaf_index = tree.get_closest_leaf_index_by_key(key);
+        let closeset_leaf = tree.leaves.borrow(closest_leaf_index);
         closeset_leaf.key
     }
 
     /// Removes the leaf with the minimum key from the tree and returns its value.
     public fun remove_min_leaf<V: store>(tree: &mut CritbitTree<V>): V {
         let index = tree.min_leaf_index;
-        remove_leaf_by_index(tree, index)
+        tree.remove_leaf_by_index(index)
     }
 
     /// Removes the leaf with the maximum key from the tree and returns its value.
     public fun remove_max_leaf<V: store>(tree: &mut CritbitTree<V>): V {
         let index = tree.max_leaf_index;
-        remove_leaf_by_index(tree, index)
+        tree.remove_leaf_by_index(index)
     }
 
     /// Removes a leaf from the tree by its index and returns its value.
     public fun remove_leaf_by_index<V: store>(tree: &mut CritbitTree<V>, index: u64): V {
-        let key = table::borrow(&tree.leaves, index).key;
+        let key = tree.leaves.borrow(index).key;
         if(tree.min_leaf_index == index) {
-            let (_, next_index) = next_leaf(tree, key);
+            let (_, next_index) = tree.next_leaf(key);
             tree.min_leaf_index = next_index;
         };
         if(tree.max_leaf_index == index) {
-            let (_, previous_index) = previous_leaf(tree, key);
+            let (_, previous_index) = tree.previous_leaf(key);
             tree.max_leaf_index = previous_index;
         };
 
         let mut is_left_child_;
-        let Leaf<V> {key: _, value, parent: removed_leaf_parent_index} = table::remove(&mut tree.leaves, index);
+        let Leaf<V> {key: _, value, parent: removed_leaf_parent_index} = tree.leaves.remove(index);
         if (size(tree) == 0) {
             tree.root = PARTITION_INDEX;
             tree.min_leaf_index = PARTITION_INDEX;
@@ -307,11 +304,11 @@ module typus::critbit {
             tree.next_leaf_index = 0;
         } else{
             assert!(removed_leaf_parent_index != PARTITION_INDEX, EIndexOutOfRange);
-            let removed_leaf_parent = table::borrow(&tree.internal_nodes, removed_leaf_parent_index);
+            let removed_leaf_parent = tree.internal_nodes.borrow(removed_leaf_parent_index);
             let removed_leaf_grand_parent_index = removed_leaf_parent.parent;
 
             // note that sibling of the removed leaf can be a leaf or a internal node
-            is_left_child_ = is_left_child(tree, removed_leaf_parent_index, MAX_U64 - index);
+            is_left_child_ = tree.is_left_child(removed_leaf_parent_index, MAX_U64 - index);
             let sibling_index = if (is_left_child_) { removed_leaf_parent.right_child }
             else { removed_leaf_parent.left_child };
 
@@ -320,19 +317,19 @@ module typus::critbit {
                 // update the parent of the sibling node and and set sibling as the tree root
                 if (sibling_index < PARTITION_INDEX) {
                     // sibling is a internal node
-                    table::borrow_mut(&mut tree.internal_nodes, sibling_index).parent = PARTITION_INDEX;
+                    tree.internal_nodes.borrow_mut(sibling_index).parent = PARTITION_INDEX;
                 } else{
                     // sibling is a leaf
-                    table::borrow_mut(&mut tree.leaves, MAX_U64 - sibling_index).parent = PARTITION_INDEX;
+                    tree.leaves.borrow_mut(MAX_U64 - sibling_index).parent = PARTITION_INDEX;
                 };
                 tree.root = sibling_index;
             } else {
                 // grand parent of the removed leaf is a internal node
                 // set sibling as the child of the grand parent of the removed leaf
-                is_left_child_ = is_left_child(tree, removed_leaf_grand_parent_index, removed_leaf_parent_index);
-                update_child(tree, removed_leaf_grand_parent_index, sibling_index, is_left_child_);
+                is_left_child_ = tree.is_left_child(removed_leaf_grand_parent_index, removed_leaf_parent_index);
+                tree.update_child(removed_leaf_grand_parent_index, sibling_index, is_left_child_);
             };
-            table::remove(&mut tree.internal_nodes, removed_leaf_parent_index);
+            tree.internal_nodes.remove(removed_leaf_parent_index);
         };
         value
     }
@@ -340,37 +337,37 @@ module typus::critbit {
     /// Removes a leaf from the tree by its key and returns its value.
     /// Aborts if the key does not exist.
     public fun remove_leaf_by_key<V: store>(tree: &mut CritbitTree<V>, key: u64): V {
-        let (is_exist, index) = find_leaf(tree, key);
+        let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
-        remove_leaf_by_index(tree, index)
+        tree.remove_leaf_by_index(index)
     }
 
     /// Borrows a mutable reference to the value of a leaf by its index.
     public fun borrow_mut_leaf_by_index<V: store>(tree: &mut CritbitTree<V>, index: u64): &mut V {
-        let entry = table::borrow_mut(&mut tree.leaves, index);
+        let entry = tree.leaves.borrow_mut(index);
         &mut entry.value
     }
 
     /// Borrows a mutable reference to the value of a leaf by its key.
     /// Aborts if the key does not exist.
     public fun borrow_mut_leaf_by_key<V: store>(tree: &mut CritbitTree<V>, key: u64): &mut V {
-        let (is_exist, index) = find_leaf(tree, key);
+        let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
-        borrow_mut_leaf_by_index(tree, index)
+        tree.borrow_mut_leaf_by_index(index)
     }
 
     /// Borrows an immutable reference to the value of a leaf by its index.
     public fun borrow_leaf_by_index<V: store>(tree: & CritbitTree<V>, index: u64): &V {
-        let entry = table::borrow(&tree.leaves, index);
+        let entry = tree.leaves.borrow(index);
         &entry.value
     }
 
     /// Borrows an immutable reference to the value of a leaf by its key.
     /// Aborts if the key does not exist.
     public fun borrow_leaf_by_key<V: store>(tree: & CritbitTree<V>, key: u64): &V {
-        let (is_exist, index) = find_leaf(tree, key);
+        let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
-        borrow_leaf_by_index(tree, index)
+        tree.borrow_leaf_by_index(index)
     }
 
     /// Destroys the tree, dropping all the entries within.
@@ -386,14 +383,14 @@ module typus::critbit {
             next_leaf_index: _,
 
         } = tree;
-        table::drop(internal_nodes);
-        table::drop(leaves);
+        internal_nodes.drop();
+        leaves.drop();
     }
 
     /// Destroys an empty tree.
     /// Aborts if the tree is not empty.
     public fun destroy_empty<V: store>(tree: CritbitTree<V>) {
-        assert!(table::length(&tree.leaves) == 0, ETreeNotEmpty);
+        assert!(tree.leaves.length() == 0, 0);
 
         let CritbitTree<V> {
             root: _,
@@ -404,8 +401,8 @@ module typus::critbit {
             next_internal_node_index: _,
             next_leaf_index: _,
         } = tree;
-        table::destroy_empty(leaves);
-        table::destroy_empty(internal_nodes);
+        leaves.destroy_empty();
+        internal_nodes.destroy_empty();
     }
 
     // === Helper functions ===
@@ -414,7 +411,7 @@ module typus::critbit {
     fun left_most_leaf<V: store>(tree: &CritbitTree<V>, root: u64): u64 {
         let mut ptr = root;
         while (ptr < PARTITION_INDEX) {
-            ptr = table::borrow(&tree.internal_nodes, ptr).left_child;
+            ptr = tree.internal_nodes.borrow(ptr).left_child;
         };
         ptr
     }
@@ -423,7 +420,7 @@ module typus::critbit {
     fun right_most_leaf<V: store>(tree: &CritbitTree<V>, root: u64): u64 {
         let mut ptr = root;
         while (ptr < PARTITION_INDEX) {
-            ptr = table::borrow(&tree.internal_nodes, ptr).right_child;
+            ptr = tree.internal_nodes.borrow(ptr).right_child;
         };
         ptr
     }
@@ -434,7 +431,7 @@ module typus::critbit {
         // if tree is empty, return the patrition index
         if(ptr == PARTITION_INDEX) return PARTITION_INDEX;
         while (ptr < PARTITION_INDEX) {
-            let node = table::borrow(&tree.internal_nodes, ptr);
+            let node = tree.internal_nodes.borrow(ptr);
             if (key & node.mask == 0) {
                 ptr = node.left_child;
             } else {
@@ -448,22 +445,22 @@ module typus::critbit {
     fun update_child<V: store>(tree: &mut CritbitTree<V>, parent_index: u64, new_child: u64, is_left_child: bool) {
         assert!(parent_index != PARTITION_INDEX, ENullParent);
         if (is_left_child) {
-            table::borrow_mut(&mut tree.internal_nodes, parent_index).left_child = new_child;
+            tree.internal_nodes.borrow_mut(parent_index).left_child = new_child;
         } else{
-            table::borrow_mut(&mut tree.internal_nodes, parent_index).right_child = new_child;
+            tree.internal_nodes.borrow_mut(parent_index).right_child = new_child;
         };
         if (new_child != PARTITION_INDEX) {
             if (new_child > PARTITION_INDEX) {
-                table::borrow_mut(&mut tree.leaves, MAX_U64 - new_child).parent = parent_index;
+                tree.leaves.borrow_mut(MAX_U64 - new_child).parent = parent_index;
             }else{
-                table::borrow_mut(&mut tree.internal_nodes, new_child).parent = parent_index;
+                tree.internal_nodes.borrow_mut(new_child).parent = parent_index;
             }
         };
     }
 
     /// Returns `true` if the node at `index` is the left child of the node at `parent_index`.
     fun is_left_child<V: store>(tree: &CritbitTree<V>, parent_index: u64, index: u64): bool {
-        table::borrow(&tree.internal_nodes, parent_index).left_child == index
+        tree.internal_nodes.borrow(parent_index).left_child == index
     }
 
     /// Counts the number of leading zeros in a u128 integer.

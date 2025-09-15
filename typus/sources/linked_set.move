@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// This module implements a `LinkedSet`, a data structure that stores a set of keys in a doubly-linked list.
-/// It is similar to `sui::linked_table` but only stores keys, not values. This is useful when you need to
+/// It is similar to `sui::linked_set` but only stores keys, not values. This is useful when you need to
 /// maintain an ordered set of unique elements.
 module typus::linked_set {
-    use std::option::{Self, Option};
-
     use sui::dynamic_field as field;
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
 
     // ======== Error Code ========
 

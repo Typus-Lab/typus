@@ -6,12 +6,8 @@
 /// useful for storing complex data structures. The table maintains a doubly-linked list of its entries,
 /// allowing for efficient iteration in both forward and reverse order.
 module typus::linked_object_table {
-    use std::option::{Self, Option};
-
     use sui::dynamic_field as field;
     use sui::dynamic_object_field as ofield;
-    use sui::object::{Self, UID};
-    use sui::tx_context::TxContext;
 
     // ======== Error Code ========
 
@@ -203,23 +199,23 @@ module typus::linked_object_table {
     public macro fun do_ref<$K, $V>($lot: &LinkedObjectTable<$K, $V>, $f: |$K, &$V|) {
         let lot = $lot;
         let mut front = lot.front();
-        while (option::is_some(front)) {
-            let key = *option::borrow(front);
-            let value = borrow(lot, key);
+        while (front.is_some()) {
+            let key = *front.borrow();
+            let value = lot.borrow(key);
             $f(key, value);
-            front = next(lot, key);
+            front = lot.next(key);
         };
     }
 
     /// A macro for iterating over the elements of a `LinkedObjectTable` with mutable references.
     public macro fun do_mut<$K, $V>($lot: &mut LinkedObjectTable<$K, $V>, $f: |$K, &mut $V|) {
         let lot = $lot;
-        let mut front = *front(lot);
-        while (option::is_some(&front)) {
-            let key = option::destroy_some(front);
-            let value = borrow_mut(lot, key);
+        let mut front = lot.front();
+        while (front.is_some()) {
+            let key = *front.borrow();
+            let value = lot.borrow_mut(key);
             $f(key, value);
-            front = *next(lot, key);
+            front = lot.next(key);
         };
     }
 }

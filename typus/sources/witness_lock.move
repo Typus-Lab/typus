@@ -2,13 +2,10 @@
 /// that can only be called if a specific witness type is provided. This is a common pattern in Sui Move
 /// for creating authorization mechanisms that are not tied to a specific authority address.
 module typus::witness_lock {
-    use std::string::String;
     use std::type_name::{Self};
+    use std::string::{String};
+    use typus::ecosystem::{Version};
 
-    use typus::ecosystem::Version;
-
-    /// A struct that wraps an object of type `T` and a witness string.
-    /// This "locks" the object, and it can only be unwrapped by providing the correct witness type.
     public struct HotPotato<T> {
         obj: T,
         witness: String
@@ -43,7 +40,7 @@ module typus::witness_lock {
 
         let HotPotato { obj, witness } = hot_potato;
         // check witness
-        assert!(type_name::get<W>().into_string() == witness, invalid_witness());
+        assert!(type_name::get<W>().into_string().to_string() == witness, invalid_witness());
         obj
     }
 

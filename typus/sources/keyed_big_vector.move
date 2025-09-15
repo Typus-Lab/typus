@@ -6,12 +6,9 @@
 /// them in slices, while maintaining a mapping from keys to indices in a `Table`.
 module typus::keyed_big_vector {
     use std::type_name::{Self, TypeName};
-    use std::vector;
 
     use sui::dynamic_field;
-    use sui::object::{Self, UID};
-    use sui::table::{Self, Table};
-    use sui::tx_context::TxContext;
+    use sui::table;
 
     // ======== Constants ========
 
@@ -122,16 +119,16 @@ module typus::keyed_big_vector {
 
     /// Returns the number of elements in the slice.
     public fun get_slice_length<K: copy + drop + store, V: store>(slice: &Slice<K, V>): u64 {
-        vector::length(&slice.vector)
+        slice.vector.length()
     }
 
     /// Pushes a new element to the end of the KeyedBigVector.
     /// Aborts if the key already exists or if the maximum number of slices is reached.
     public fun push_back<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K, value: V) {
-        assert!(!contains(kbv, key), duplicate_key());
+        assert!(!kbv.contains(key), duplicate_key());
         let element = Element { key, value };
-        if (is_empty(kbv) || length(kbv) % (slice_size(kbv) as u64) == 0) {
-            kbv.slice_idx = (length(kbv) / (slice_size(kbv) as u64) as u16);
+        if (kbv.is_empty() || kbv.length() % (kbv.slice_size as u64) == 0) {
+            kbv.slice_idx = (kbv.length() / (kbv.slice_size as u64) as u16);
             assert!(kbv.slice_idx < CMaxSliceAmount, max_slice_amount_reached());
             let new_slice = Slice {
                 idx: kbv.slice_idx,
@@ -140,8 +137,8 @@ module typus::keyed_big_vector {
             dynamic_field::add(&mut kbv.id, kbv.slice_idx, new_slice);
         }
         else {
-            let slice = borrow_slice_mut_(kbv.id_mut(), kbv.slice_idx);
-            vector::push_back(&mut slice.vector, element);
+            let slice = borrow_slice_mut_(&mut kbv.id, kbv.slice_idx);
+            slice.vector.push_back(element);
         };
         table::add(dynamic_field::borrow_mut(&mut kbv.id, SKeyIndexTable.to_string()), key, kbv.length);
         kbv.length = kbv.length + 1;
@@ -150,11 +147,11 @@ module typus::keyed_big_vector {
     /// Pops an element from the end of the KeyedBigVector and returns its key and value.
     /// Aborts if the KeyedBigVector is empty.
     public fun pop_back<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector): (K, V) {
-        assert!(!is_empty(kbv), index_out_of_bounds());
+        assert!(!kbv.is_empty(), index_out_of_bounds());
 
-        let slice = borrow_slice_mut_(kbv.id_mut(), kbv.slice_idx);
-        let Element { key, value } = vector::pop_back(&mut slice.vector);
-        trim_slice<K, V>(kbv);
+        let slice = borrow_slice_mut_(&mut kbv.id, kbv.slice_idx);
+        let Element { key, value } = slice.vector.pop_back();
+        kbv.trim_slice<K, V>();
         table::remove<K, u64>(dynamic_field::borrow_mut(&mut kbv.id, SKeyIndexTable.to_string()), key);
         kbv.length = kbv.length - 1;
 
@@ -175,7 +172,7 @@ module typus::keyed_big_vector {
     public fun borrow_slice_mut<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, slice_idx: u16): &mut Slice<K, V> {
         assert!(slice_idx <= kbv.slice_idx, index_out_of_bounds());
 
-        borrow_slice_mut_(kbv.id_mut(), slice_idx)
+        borrow_slice_mut_(&mut kbv.id, slice_idx)
     }
     fun borrow_slice_mut_<K: copy + drop + store, V: store>(id: &mut UID, slice_idx: u16): &mut Slice<K, V> {
         dynamic_field::borrow_mut(id, slice_idx)
@@ -210,7 +207,7 @@ module typus::keyed_big_vector {
     /// Borrows an element by its key from the KeyedBigVector.
     #[syntax(index)]
     public fun borrow_by_key<K: copy + drop + store, V: store>(kbv: &KeyedBigVector, key: K): &V {
-        assert!(contains(kbv, key), key_not_found());
+        assert!(kbv.contains(key), key_not_found());
 
         let i = *table::borrow<K, u64>(dynamic_field::borrow(&kbv.id, SKeyIndexTable.to_string()), key);
         let (_, v) = borrow_<K, V>(kbv, i);
@@ -221,7 +218,7 @@ module typus::keyed_big_vector {
     /// Borrows a mutable element by its key from the KeyedBigVector.
     #[syntax(index)]
     public fun borrow_by_key_mut<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K): &mut V {
-        assert!(contains(kbv, key), key_not_found());
+        assert!(kbv.contains(key), key_not_found());
 
         let i = *table::borrow<K, u64>(dynamic_field::borrow(&kbv.id, SKeyIndexTable.to_string()), key);
         let (_, v) = borrow_mut_<K, V>(kbv, i);
@@ -231,7 +228,7 @@ module typus::keyed_big_vector {
 
     /// Borrows an element at index `i` from a slice.
     public fun borrow_from_slice<K: copy + drop + store, V: store>(slice: &Slice<K, V>, i: u64): (K, &V) {
-        assert!(i < vector::length(&slice.vector), index_out_of_bounds());
+        assert!(i < slice.vector.length(), index_out_of_bounds());
 
         let element = &slice.vector[i];
 
@@ -240,7 +237,7 @@ module typus::keyed_big_vector {
 
     /// Borrows a mutable element at index `i` from a slice.
     public fun borrow_from_slice_mut<K: copy + drop + store, V: store>(slice: &mut Slice<K, V>, i: u64): (K, &mut V) {
-        assert!(i < vector::length(&slice.vector), index_out_of_bounds());
+        assert!(i < slice.vector.length(), index_out_of_bounds());
 
         let element = &mut slice.vector[i];
 
@@ -260,8 +257,8 @@ module typus::keyed_big_vector {
         } else {
             table::add(dynamic_field::borrow_mut(&mut kbv.id, SKeyIndexTable.to_string()), key, i);
             let slice = borrow_slice_mut_(&mut kbv.id, (i / (kbv.slice_size as u64) as u16));
-            vector::push_back(&mut slice.vector, Element { key, value });
-            let Element { key, value } = vector::swap_remove(&mut slice.vector, i % (kbv.slice_size as u64));
+            slice.vector.push_back(Element { key, value });
+            let Element { key, value } = slice.vector.swap_remove(i % (kbv.slice_size as u64));
             table::remove<K, u64>(dynamic_field::borrow_mut(&mut kbv.id, SKeyIndexTable.to_string()), key);
             (key, value)
         }
@@ -269,7 +266,7 @@ module typus::keyed_big_vector {
 
     /// Swaps the element with the given key with the last element and removes it.
     public fun swap_remove_by_key<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K): V {
-        assert!(contains(kbv, key), key_not_found());
+        assert!(kbv.contains(key), key_not_found());
 
         let i = *table::borrow<K, u64>(dynamic_field::borrow(&kbv.id, SKeyIndexTable.to_string()), key);
         let (_, v) = swap_remove_<K, V>(kbv, i);
@@ -326,12 +323,12 @@ module typus::keyed_big_vector {
     /// Removes an empty slice after an element has been removed from it.
     fun trim_slice<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector) {
         let slice = borrow_slice_(&kbv.id, kbv.slice_idx);
-        if (vector::is_empty<Element<K, V>>(&slice.vector)) {
+        if (slice.vector.is_empty<Element<K, V>>()) {
             let Slice {
                 idx: _,
                 vector: v,
             } = dynamic_field::remove(&mut kbv.id, kbv.slice_idx);
-            vector::destroy_empty<Element<K, V>>(v);
+            v.destroy_empty<Element<K, V>>();
             if (kbv.slice_idx > 0) {
                 kbv.slice_idx = kbv.slice_idx - 1;
             };
@@ -378,18 +375,17 @@ module typus::keyed_big_vector {
 #[test_only]
 module typus::test_keyed_big_vector {
     use std::bcs;
-    use std::vector;
 
     use sui::test_scenario::{Self, Scenario};
 
-    use typus::keyed_big_vector::{Self, KeyedBigVector, completely_drop, new, push_back, pop_back, borrow, borrow_mut, swap_remove, borrow_by_key, borrow_by_key_mut, swap_remove_by_key};
+    use typus::keyed_big_vector::{Self, KeyedBigVector};
 
     #[test]
     fun test_kbv_do() {
         let (scenario, mut kbv) = new_scenario();
 
         // [(0xA, 2), (0xB, 3)], [(0xC, 4), (0xD, 5)], [(0xE, 6)]
-        do_mut!<address, u64>(&mut kbv, |_, value| {
+        kbv.do_mut!<address, u64>(|_, value| {
             *value = *value + 1;
         });
         assert_result(&kbv, bcs::to_bytes(&vector[
@@ -401,7 +397,7 @@ module typus::test_keyed_big_vector {
         ]));
 
         // [(0xA, 4), (0xB, 4)], [(0xC, 8), (0xD, 6)], [(0xE, 12)]
-        do_mut!<address, u64>(&mut kbv, |_, value| {
+        kbv.do_mut!<address, u64>(|_, value| {
             if (*value % 2 == 0) {
                 *value = *value * 2;
             } else {
@@ -416,7 +412,7 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&12)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
@@ -427,7 +423,7 @@ module typus::test_keyed_big_vector {
         // []
         let mut count = 0;
         while (count < 5) {
-            pop_back<address, u64>(&mut kbv);
+            kbv.pop_back<address, u64>();
             count = count + 1;
         };
         assert_result(
@@ -436,9 +432,9 @@ module typus::test_keyed_big_vector {
         );
 
         // [(0xA, 1), (0xB, 2)], [(0xC, 3)]
-        push_back(&mut kbv, @0xA, 1);
-        push_back(&mut kbv, @0xB, 2);
-        push_back(&mut kbv, @0xC, 3);
+        kbv.push_back(@0xA, 1);
+        kbv.push_back(@0xB, 2);
+        kbv.push_back(@0xC, 3);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xB), bcs::to_bytes(&2)],
@@ -448,7 +444,7 @@ module typus::test_keyed_big_vector {
         // [(0xA, 1)]
         let mut count = 0;
         while (count < 2) {
-            pop_back<address, u64>(&mut kbv);
+            kbv.pop_back<address, u64>();
             count = count + 1;
         };
         assert_result(&kbv, bcs::to_bytes(&vector[
@@ -456,15 +452,15 @@ module typus::test_keyed_big_vector {
         ]));
 
         // [(0xA, 1), (0xD, 4)], [(0xE, 5)]
-        push_back(&mut kbv, @0xD, 4);
-        push_back(&mut kbv, @0xE, 5);
+        kbv.push_back(@0xD, 4);
+        kbv.push_back(@0xE, 5);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xD), bcs::to_bytes(&4)],
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
@@ -473,11 +469,11 @@ module typus::test_keyed_big_vector {
         let (scenario, mut kbv) = new_scenario();
 
         // [(0xA, 1), (0xB, 2)], [(0xC, 3), (0xD, 4)], [(0xE, 5)]
-        let (k, v) = borrow<address, u64>(&kbv, 2);
+        let (k, v) = kbv.borrow<address, u64>(2);
         assert!(k == @0xC && v ==&3, 0);
 
         // [(0xA, 1), (0xD, 4)], [(0xE, 5)]
-        let (_, v) = borrow_mut<address, u64>(&mut kbv, 2);
+        let (_, v) = kbv.borrow_mut<address, u64>(2);
         *v = *v * *v;
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
@@ -487,7 +483,7 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
@@ -496,7 +492,7 @@ module typus::test_keyed_big_vector {
         let (scenario, mut kbv) = new_scenario();
 
         // [(0xA, 1), (0xB, 2)], [(0xE, 5), (0xD, 4)]
-        swap_remove<address, u64>(&mut kbv, 2);
+        kbv.swap_remove<address, u64>(2);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xB), bcs::to_bytes(&2)],
@@ -505,14 +501,14 @@ module typus::test_keyed_big_vector {
         ]));
 
         // [(0xA, 1), (0xD, 4)], [(0xE, 5)]
-        swap_remove<address, u64>(&mut kbv, 1);
+        kbv.swap_remove<address, u64>(1);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xD), bcs::to_bytes(&4)],
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
@@ -521,10 +517,10 @@ module typus::test_keyed_big_vector {
         let (scenario, mut kbv) = new_scenario();
 
         // [(0xA, 1), (0xB, 2)], [(0xC, 3), (0xD, 4)], [(0xE, 5)]
-        assert!(*borrow_by_key(&kbv, @0xC) == 3, 0);
+        assert!(kbv.borrow_by_key(@0xC) == 3, 0);
 
         // [(0xA, 1), (0xD, 4)], [(0xE, 5)]
-        let v: &mut u64 = borrow_by_key_mut(&mut kbv, @0xC);
+        let v: &mut u64 = kbv.borrow_by_key_mut(@0xC);
         *v = *v * *v;
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
@@ -534,7 +530,7 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
@@ -543,7 +539,7 @@ module typus::test_keyed_big_vector {
         let (scenario, mut kbv) = new_scenario();
 
         // [(0xA, 1), (0xB, 2)], [(0xE, 5), (0xD, 4)]
-        swap_remove_by_key<address, u64>(&mut kbv, @0xC);
+        kbv.swap_remove_by_key<address, u64>(@0xC);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xB), bcs::to_bytes(&2)],
@@ -552,27 +548,27 @@ module typus::test_keyed_big_vector {
         ]));
 
         // [(0xA, 1), (0xD, 4)], [(0xE, 5)]
-        swap_remove_by_key<address, u64>(&mut kbv, @0xB);
+        kbv.swap_remove_by_key<address, u64>(@0xB);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xD), bcs::to_bytes(&4)],
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        completely_drop<address, u64>(kbv);
+        kbv.completely_drop<address, u64>();
         test_scenario::end(scenario);
     }
 
     #[test_only]
     fun new_scenario(): (Scenario, KeyedBigVector) {
         let mut scenario = test_scenario::begin(@0xABCD);
-        let mut kbv = new<address, u64>(2, test_scenario::ctx(&mut scenario));
+        let mut kbv = keyed_big_vector::new<address, u64>(2, test_scenario::ctx(&mut scenario));
         // [(0xA, 1), (0xB, 2)], [(0xC, 3), (0xD, 4)], [(0xE, 5)]
-        push_back(&mut kbv, @0xA, 1);
-        push_back(&mut kbv, @0xB, 2);
-        push_back(&mut kbv, @0xC, 3);
-        push_back(&mut kbv, @0xD, 4);
-        push_back(&mut kbv, @0xE, 5);
+        kbv.push_back(@0xA, 1);
+        kbv.push_back(@0xB, 2);
+        kbv.push_back(@0xC, 3);
+        kbv.push_back(@0xD, 4);
+        kbv.push_back(@0xE, 5);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
             vector[bcs::to_bytes(&@0xB), bcs::to_bytes(&2)],
@@ -590,10 +586,10 @@ module typus::test_keyed_big_vector {
         expected_result: vector<u8>,
     ) {
         let mut result = vector[];
-        do_ref!<address, u64>(keyed_big_vector, |key, value| {
+        keyed_big_vector.do_ref!<address, u64>(|key, value| {
             // std::debug::print(&key);
             // std::debug::print(value);
-            vector::push_back(&mut result, vector[bcs::to_bytes(&key), bcs::to_bytes(value)]);
+            result.push_back(vector[bcs::to_bytes(&key), bcs::to_bytes(value)]);
         });
         assert!(expected_result == bcs::to_bytes(&result), 0);
     }

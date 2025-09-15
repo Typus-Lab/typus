@@ -2,11 +2,8 @@
 /// It provides functionalities for creating, accessing, and transferring accounts.
 module typus::account {
     use std::bcs;
-    use std::option::{Self, Option};
 
     use sui::dynamic_object_field;
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
     use sui::vec_map;
 
     use typus::ecosystem::Version;
@@ -25,9 +22,9 @@ module typus::account {
         /// The unique identifier of the AccountRegistry object.
         id: UID,
         /// A keyed big vector mapping account addresses to `Account` objects.
-        accounts: KeyedBigVector, // account address, account entity
+        accounts: KeyedBigVector, // <address, Account>
         /// A keyed big vector mapping user addresses to their corresponding account addresses.
-        user_account: KeyedBigVector, // user address, account address
+        user_account: KeyedBigVector, // <address, address>
     }
 
     /// Represents a user account.
@@ -98,7 +95,7 @@ module typus::account {
 
     /// Borrows a mutable reference to the user's `Account` object.
     /// The user is identified by the transaction sender's address.
-    /// WARNING: mut inputs without authority check inside
+    /// Safe with ctx.sender as verification
     public fun borrow_user_account(
         version: &mut Version,
         ctx: &TxContext,
@@ -122,7 +119,7 @@ module typus::account {
 
     /// Borrows a mutable reference to an `Account` object using an `AccountCap`.
     /// This allows authorized users to access and modify an account.
-    /// WARNING: mut inputs without authority check inside
+    /// Safe with `AccountCap` as verification
     public fun borrow_user_account_with_account_cap(
         version: &mut Version,
         account_cap: &AccountCap,
@@ -143,7 +140,6 @@ module typus::account {
     /// Creates a new `Account` and returns an `AccountCap` for it.
     /// This function can be used to create accounts that are not directly tied to a user's address.
     /// The `AccountCap` can be transferred to other users to grant them access to the account.
-    /// WARNING: mut inputs without authority check inside
     public fun new_account(
         version: &mut Version,
         ctx: &mut TxContext,
@@ -189,7 +185,6 @@ module typus::account {
 
     /// Creates a new `Account` for the transaction sender and associates it with their address.
     /// If the user already has an account, this function does nothing.
-    /// WARNING: mut inputs without authority check inside
     public fun create_account(
         version: &mut Version,
         ctx: &mut TxContext,
@@ -238,7 +233,7 @@ module typus::account {
 
     /// Transfers the sender's account to a new recipient address.
     /// It asserts that the sender has an account and the recipient does not have an account yet.
-    /// WARNING: mut inputs without authority check inside
+    /// Safe with ctx.sender as verification
     public fun transfer_account(
         version: &mut Version,
         recipient: address,

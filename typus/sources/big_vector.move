@@ -6,11 +6,8 @@
 /// Each `Slice` is a dynamic field of the `BigVector` object.
 module typus::big_vector {
     use std::type_name::{Self, TypeName};
-    use std::vector;
 
     use sui::dynamic_field;
-    use sui::object::{UID, self};
-    use sui::tx_context::TxContext;
 
     // ======== Constants ========
 
@@ -102,8 +99,8 @@ module typus::big_vector {
     /// Pushes a new element to the end of the BigVector.
     /// If the current slice is full, it creates a new slice.
     public fun push_back<Element: store>(bv: &mut BigVector, element: Element) {
-        if (is_empty(bv) || length(bv) % (slice_size(bv) as u64) == 0) {
-            bv.slice_idx = length(bv) / (slice_size(bv) as u64);
+        if (bv.is_empty() || bv.length() % (bv.slice_size as u64) == 0) {
+            bv.slice_idx = bv.length() / (bv.slice_size as u64);
             let new_slice = Slice {
                 idx: bv.slice_idx,
                 vector: vector[element]
@@ -111,8 +108,8 @@ module typus::big_vector {
             dynamic_field::add(&mut bv.id, bv.slice_idx, new_slice);
         }
         else {
-            let slice = borrow_slice_mut_(bv.id_mut(), bv.slice_idx);
-            vector::push_back(&mut slice.vector, element);
+            let slice = borrow_slice_mut_(&mut bv.id, bv.slice_idx);
+            slice.vector.push_back(element);
         };
         bv.length = bv.length + 1;
     }
@@ -120,11 +117,11 @@ module typus::big_vector {
     /// Pops an element from the end of the BigVector.
     /// Aborts if the BigVector is empty.
     public fun pop_back<Element: store>(bv: &mut BigVector): Element {
-        assert!(!is_empty(bv), EIsEmpty);
+        assert!(!bv.is_empty(), EIsEmpty);
 
-        let slice = borrow_slice_mut_(bv.id_mut(), bv.slice_idx);
-        let element = vector::pop_back(&mut slice.vector);
-        trim_slice<Element>(bv);
+        let slice = borrow_slice_mut_(&mut bv.id, bv.slice_idx);
+        let element = slice.vector.pop_back();
+        bv.trim_slice<Element>();
         bv.length = bv.length - 1;
 
         element
@@ -135,10 +132,10 @@ module typus::big_vector {
     #[syntax(index)]
     public fun borrow<Element: store>(bv: &BigVector, i: u64): &Element {
         assert!(i < bv.length, EIndexOutOfBounds);
-        assert!(!is_empty(bv), EIsEmpty);
+        assert!(!bv.is_empty(), EIsEmpty);
 
-        let slice = borrow_slice_(bv.id(), i / (slice_size(bv) as u64));
-        vector::borrow(&slice.vector, i % (slice_size(bv) as u64))
+        let slice = borrow_slice_(&bv.id, i / (bv.slice_size as u64));
+        &slice.vector[i % (bv.slice_size as u64)]
     }
 
     /// Borrows a mutable element at index `i` from the BigVector.
@@ -146,19 +143,19 @@ module typus::big_vector {
     #[syntax(index)]
     public fun borrow_mut<Element: store>(bv: &mut BigVector, i: u64): &mut Element {
         assert!(i < bv.length, EIndexOutOfBounds);
-        assert!(!is_empty(bv), EIsEmpty);
+        assert!(!bv.is_empty(), EIsEmpty);
 
-        let slice = borrow_slice_mut_(bv.id_mut(), i / (slice_size(bv) as u64));
-        vector::borrow_mut(&mut slice.vector, i % (slice_size(bv) as u64))
+        let slice = borrow_slice_mut_(&mut bv.id, i / (bv.slice_size as u64));
+        &mut slice.vector[i % (bv.slice_size as u64)]
     }
 
     /// Borrows a slice from the BigVector at `slice_idx`.
     /// Aborts if the `slice_idx` is out of bounds.
     public fun borrow_slice<Element: store>(bv: &BigVector, slice_idx: u64): &Slice<Element> {
         assert!(slice_idx <= bv.slice_idx, EIndexOutOfBounds);
-        assert!(!is_empty(bv), EIsEmpty);
+        assert!(!bv.is_empty(), EIsEmpty);
 
-        borrow_slice_(bv.id(), slice_idx)
+        borrow_slice_(&bv.id, slice_idx)
     }
     fun borrow_slice_<Element: store>(id: &UID, slice_idx: u64): &Slice<Element> {
         dynamic_field::borrow(id, slice_idx)
@@ -168,9 +165,9 @@ module typus::big_vector {
     /// Aborts if the `slice_idx` is out of bounds.
     public fun borrow_slice_mut<Element: store>(bv: &mut BigVector, slice_idx: u64): &mut Slice<Element> {
         assert!(slice_idx <= bv.slice_idx, EIndexOutOfBounds);
-        assert!(!is_empty(bv), EIsEmpty);
+        assert!(!bv.is_empty(), EIsEmpty);
 
-        borrow_slice_mut_(bv.id_mut(), slice_idx)
+        borrow_slice_mut_(&mut bv.id, slice_idx)
     }
     fun borrow_slice_mut_<Element: store>(id: &mut UID, slice_idx: u64): &mut Slice<Element> {
         dynamic_field::borrow_mut(id, slice_idx)
@@ -180,30 +177,30 @@ module typus::big_vector {
     /// Aborts if the index is out of bounds.
     #[syntax(index)]
     public fun borrow_from_slice<Element: store>(slice: &Slice<Element>, i: u64): &Element {
-        assert!(i < vector::length(&slice.vector), EIndexOutOfBounds);
+        assert!(i < slice.vector.length(), EIndexOutOfBounds);
 
-        vector::borrow(&slice.vector, i)
+        &slice.vector[i]
     }
 
     /// Borrows a mutable element at index `i` from a slice.
     /// Aborts if the index is out of bounds.
     #[syntax(index)]
     public fun borrow_from_slice_mut<Element: store>(slice: &mut Slice<Element>, i: u64): &mut Element {
-        assert!(i < vector::length(&slice.vector), EIndexOutOfBounds);
+        assert!(i < slice.vector.length(), EIndexOutOfBounds);
 
-        vector::borrow_mut(&mut slice.vector, i)
+        &mut slice.vector[i]
     }
 
     /// Swaps the element at index `i` with the last element and removes it.
     /// This is more efficient than `remove` as it does not require shifting elements.
     public fun swap_remove<Element: store>(bv: &mut BigVector, i: u64): Element {
         let result = pop_back(bv);
-        if (i == length(bv)) {
+        if (i == bv.length()) {
             result
         } else {
-            let slice = borrow_slice_mut_(bv.id_mut(), i / (slice_size(bv) as u64));
-            vector::push_back(&mut slice.vector, result);
-            vector::swap_remove(&mut slice.vector, i % (slice_size(bv) as u64))
+            let slice = borrow_slice_mut_(&mut bv.id, i / (bv.slice_size as u64));
+            slice.vector.push_back(result);
+            slice.vector.swap_remove(i % (bv.slice_size as u64))
         }
     }
 
@@ -211,19 +208,19 @@ module typus::big_vector {
     /// This is a costly function, especially for large BigVectors. Use with caution.
     /// Aborts when referencing more than 1000 slices.
     public fun remove<Element: store>(bv: &mut BigVector, i: u64): Element {
-        assert!(i < length(bv), EIndexOutOfBounds);
+        assert!(i < bv.length(), EIndexOutOfBounds);
 
-        let slice = borrow_slice_mut_(bv.id_mut(), (i / (slice_size(bv) as u64)));
-        let result = vector::remove(&mut slice.vector, i % (slice_size(bv) as u64));
+        let slice = borrow_slice_mut_(&mut bv.id, (i / (bv.slice_size as u64)));
+        let result = slice.vector.remove(i % (bv.slice_size as u64));
         let mut slice_idx = bv.slice_idx;
-        while (slice_idx > i / (slice_size(bv) as u64) && slice_idx > 0) {
-            let slice = borrow_slice_mut_(bv.id_mut(), slice_idx);
-            let tmp: Element = vector::remove(&mut slice.vector, 0);
-            let prev_slice = borrow_slice_mut_(bv.id_mut(), slice_idx - 1);
-            vector::push_back(&mut prev_slice.vector, tmp);
+        while (slice_idx > i / (bv.slice_size as u64) && slice_idx > 0) {
+            let slice = borrow_slice_mut_(&mut bv.id, slice_idx);
+            let tmp: Element = slice.vector.remove(0);
+            let prev_slice = borrow_slice_mut_(&mut bv.id, slice_idx - 1);
+            prev_slice.vector.push_back(tmp);
             slice_idx = slice_idx - 1;
         };
-        trim_slice<Element>(bv);
+        bv.trim_slice<Element>();
         bv.length = bv.length - 1;
 
         result
@@ -265,12 +262,12 @@ module typus::big_vector {
     /// Removes an empty slice after an element has been removed from it.
     fun trim_slice<Element: store>(bv: &mut BigVector) {
         let slice = borrow_slice_(&bv.id, bv.slice_idx);
-        if (vector::is_empty<Element>(&slice.vector)) {
+        if (slice.vector.is_empty<Element>()) {
             let Slice {
                 idx: _,
                 vector: v,
             } = dynamic_field::remove(&mut bv.id, bv.slice_idx);
-            vector::destroy_empty<Element>(v);
+            v.destroy_empty<Element>();
             if (bv.slice_idx > 0) {
                 bv.slice_idx = bv.slice_idx - 1;
             };

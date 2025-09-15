@@ -8,9 +8,6 @@ module typus::user {
 
     use sui::event::emit;
     use sui::linked_table::{Self, LinkedTable};
-    use sui::object::{Self, UID};
-    use sui::transfer;
-    use sui::tx_context::TxContext;
 
     use typus::ecosystem::{ManagerCap, Version};
     use typus::tgld::{Self, TgldRegistry};
@@ -68,16 +65,15 @@ module typus::user {
         if (amount == 0) {
             return vector[0]
         };
-        if (!linked_table::contains(&typus_user_registry.metadata, user)) {
-            linked_table::push_back(
-                &mut typus_user_registry.metadata,
+        if (!typus_user_registry.metadata.contains(user)) {
+            typus_user_registry.metadata.push_back(
                 user,
                 Metadata {
                     content: vector[],
                 },
             );
         };
-        let metadata = linked_table::borrow_mut(&mut typus_user_registry.metadata, user);
+        let metadata = typus_user_registry.metadata.borrow_mut(user);
         utility::increase_u64_vector_value(&mut metadata.content, IAccumulatedTgldAmount, amount);
         tgld::mint(
             manager_cap,
@@ -116,16 +112,15 @@ module typus::user {
         if (amount == 0) {
             return vector[0]
         };
-        if (!linked_table::contains(&typus_user_registry.metadata, user)) {
-            linked_table::push_back(
-                &mut typus_user_registry.metadata,
+        if (!typus_user_registry.metadata.contains(user)) {
+            typus_user_registry.metadata.push_back(
                 user,
                 Metadata {
                     content: vector[],
                 },
             );
         };
-        let metadata = linked_table::borrow_mut(&mut typus_user_registry.metadata, user);
+        let metadata = typus_user_registry.metadata.borrow_mut(user);
         utility::increase_u64_vector_value(&mut metadata.content, ITailsExpAmount, amount);
         emit(AddTailsExpAmount {
             user,
@@ -148,16 +143,15 @@ module typus::user {
         if (amount == 0) {
             return vector[0]
         };
-        if (!linked_table::contains(&typus_user_registry.metadata, user)) {
-            linked_table::push_back(
-                &mut typus_user_registry.metadata,
+        if (!typus_user_registry.metadata.contains(user)) {
+            typus_user_registry.metadata.push_back(
                 user,
                 Metadata {
                     content: vector[],
                 },
             );
         };
-        let metadata = linked_table::borrow_mut(&mut typus_user_registry.metadata, user);
+        let metadata = typus_user_registry.metadata.borrow_mut(user);
         utility::increase_u64_vector_value(&mut metadata.content, ITailsExpAmount, amount);
         emit(AddTailsExpAmount {
             user,
@@ -204,16 +198,15 @@ module typus::user {
         if (amount == 0) {
             return vector[0]
         };
-        if (!linked_table::contains(&typus_user_registry.metadata, user)) {
-            linked_table::push_back(
-                &mut typus_user_registry.metadata,
+        if (!typus_user_registry.metadata.contains(user)) {
+            typus_user_registry.metadata.push_back(
                 user,
                 Metadata {
                     content: vector[],
                 },
             );
         };
-        let metadata = linked_table::borrow_mut(&mut typus_user_registry.metadata, user);
+        let metadata = typus_user_registry.metadata.borrow_mut(user);
         utility::decrease_u64_vector_value(&mut metadata.content, ITailsExpAmount, amount);
         emit(RemoveTailsExpAmount {
             user,
@@ -232,10 +225,10 @@ module typus::user {
     ): vector<u8> {
         version.version_check();
 
-        if (!linked_table::contains(&typus_user_registry.metadata, user)) {
+        if (!typus_user_registry.metadata.contains(user)) {
             bcs::to_bytes(&Metadata { content: vector[] })
         } else {
-            bcs::to_bytes(linked_table::borrow(&typus_user_registry.metadata, user))
+            bcs::to_bytes(typus_user_registry.metadata.borrow(user))
         }
 
     }

@@ -7,16 +7,12 @@
 /// User scores can be updated, and rankings can be retrieved.
 module typus::leaderboard {
     use std::ascii::String;
-    use std::option::{Self, Option};
 
     use sui::bcs;
     use sui::clock::Clock;
     use sui::dynamic_field;
     use sui::event::emit;
-    use sui::object::{Self, UID};
     use sui::table::{Self, Table};
-    use sui::transfer;
-    use sui::tx_context::TxContext;
 
     use typus::critbit::{Self, CritbitTree};
     use typus::ecosystem::{ManagerCap, Version};
@@ -98,8 +94,7 @@ module typus::leaderboard {
             log: vector[start_ts_ms, end_ts_ms],
             bcs_padding: vector[],
         });
-        linked_object_table::push_back(
-            leaderboards,
+        leaderboards.push_back(
             object::id_address(&leaderboard),
             leaderboard,
         );
@@ -204,19 +199,19 @@ module typus::leaderboard {
             end_ts_ms: _,
             score,
             mut ranking,
-        } = linked_object_table::remove(leaderboards, id);
+        } = leaderboards.remove(id);
         emit(RemoveLeaderboardEvent {
             key,
             id: object::uid_to_address(&id),
             log: vector[],
             bcs_padding: vector[],
         });
-        object::delete(id);
-        table::drop(score);
-        while (critbit::size(&ranking) > 0) {
-            critbit::remove_min_leaf(&mut ranking).drop();
+        id.delete();
+        score.drop();
+        while (ranking.size() > 0) {
+            ranking.remove_min_leaf().drop();
         };
-        critbit::destroy_empty(ranking);
+        ranking.destroy_empty();
     }
 
     /// Event emitted when a user's score is updated.
@@ -272,18 +267,18 @@ module typus::leaderboard {
         };
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> = dynamic_field::borrow_mut(&mut registry.active_leaderboard_registry, key);
         let ts_ms = clock.timestamp_ms();
-        let mut first = *linked_object_table::front(leaderboards);
+        let mut first = *leaderboards.front();
         while (option::is_some(&first)) {
             let id = option::destroy_some(first);
-            let leaderboard = linked_object_table::borrow_mut(leaderboards, id);
+            let leaderboard = leaderboards.borrow_mut(id);
             if (ts_ms >= leaderboard.start_ts_ms && ts_ms < leaderboard.end_ts_ms) {
-                if (!table::contains(&leaderboard.score, user)) {
-                    table::add(&mut leaderboard.score, user, 0);
+                if (!leaderboard.score.contains(user)) {
+                    leaderboard.score.add(user, 0);
                 };
-                let user_score = table::borrow_mut(&mut leaderboard.score, user);
-                let (has_leaf, index) = critbit::find_leaf(&leaderboard.ranking, *user_score);
+                let user_score = leaderboard.score.borrow_mut(user);
+                let (has_leaf, index) = leaderboard.ranking.find_leaf(*user_score);
                 if (has_leaf) {
-                    if (linked_set::length(critbit::borrow_mut_leaf_by_index(&mut leaderboard.ranking, index)) == 1) {
+                    if (critbit::borrow_mut_leaf_by_index(&mut leaderboard.ranking, index).length() == 1) {
                         critbit::remove_leaf_by_index(&mut leaderboard.ranking, index).drop();
                     } else {
                         linked_set::remove(
@@ -293,7 +288,7 @@ module typus::leaderboard {
                     };
                 };
                 *user_score = *user_score + score;
-                let (has_leaf, mut index) = critbit::find_leaf(&leaderboard.ranking, *user_score);
+                let (has_leaf, mut index) = leaderboard.ranking.find_leaf(*user_score);
                 if (!has_leaf) {
                     index = critbit::insert_leaf(
                         &mut leaderboard.ranking,
@@ -314,7 +309,7 @@ module typus::leaderboard {
                 });
                 return vector[score]
             };
-            first = *linked_object_table::next(leaderboards, id);
+            first = *leaderboards.next(id);
         };
 
         vector[0]
@@ -373,18 +368,18 @@ module typus::leaderboard {
         };
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> = dynamic_field::borrow_mut(&mut registry.active_leaderboard_registry, key);
         let ts_ms = clock.timestamp_ms();
-        let mut first = *linked_object_table::front(leaderboards);
+        let mut first = *leaderboards.front();
         while (option::is_some(&first)) {
             let id = option::destroy_some(first);
-            let leaderboard = linked_object_table::borrow_mut(leaderboards, id);
+            let leaderboard = leaderboards.borrow_mut(id);
             if (ts_ms >= leaderboard.start_ts_ms && ts_ms < leaderboard.end_ts_ms) {
-                if (!table::contains(&leaderboard.score, user)) {
+                if (!leaderboard.score.contains(user)) {
                     return vector[0]
                 };
-                let user_score = table::borrow_mut(&mut leaderboard.score, user);
-                let (has_leaf, index) = critbit::find_leaf(&leaderboard.ranking, *user_score);
+                let user_score = leaderboard.score.borrow_mut(user);
+                let (has_leaf, index) = leaderboard.ranking.find_leaf(*user_score);
                 if (has_leaf) {
-                    if (linked_set::length(critbit::borrow_mut_leaf_by_index(&mut leaderboard.ranking, index)) == 1) {
+                    if (critbit::borrow_mut_leaf_by_index(&mut leaderboard.ranking, index).length() == 1) {
                         critbit::remove_leaf_by_index(&mut leaderboard.ranking, index).drop();
                     } else {
                         linked_set::remove(
@@ -394,10 +389,10 @@ module typus::leaderboard {
                     };
                 };
                 *user_score = *user_score - score;
-                if (*user_score == 0) {
+                if (user_score == 0) {
                     return vector[score]
                 };
-                let (has_leaf, mut index) = critbit::find_leaf(&leaderboard.ranking, *user_score);
+                let (has_leaf, mut index) = leaderboard.ranking.find_leaf(*user_score);
                 if (!has_leaf) {
                     index = critbit::insert_leaf(
                         &mut leaderboard.ranking,
@@ -418,7 +413,7 @@ module typus::leaderboard {
                 });
                 return vector[score]
             };
-            first = *linked_object_table::next(leaderboards, id);
+            first = *leaderboards.next(id);
         };
 
         vector[0]
@@ -443,30 +438,30 @@ module typus::leaderboard {
             &registry.inactive_leaderboard_registry
         };
         let leaderboards: &LinkedObjectTable<address, Leaderboard> = dynamic_field::borrow(uid, key);
-        let leaderboard: &Leaderboard = linked_object_table::borrow(leaderboards, id);
-        if (critbit::is_empty(&leaderboard.ranking)) {
+        let leaderboard: &Leaderboard = leaderboards.borrow(id);
+        if (leaderboard.ranking.is_empty()) {
             return vector[bcs::to_bytes(&0)]
         };
-        let mut result = if (table::contains(&leaderboard.score, user)) {
-            vector[bcs::to_bytes(table::borrow(&leaderboard.score, user))]
+        let mut result = if (leaderboard.score.contains(user)) {
+            vector[bcs::to_bytes(leaderboard.score.borrow(user))]
         } else {
             vector[bcs::to_bytes(&0)]
         };
-        let (mut max_score, mut max_score_index) = critbit::max_leaf(&leaderboard.ranking);
+        let (mut max_score, mut max_score_index) = leaderboard.ranking.max_leaf();
         let mut max_leaf_bcs = bcs::to_bytes(&max_score);
         let mut max_leaf_users = vector[];
-        let mut max_rankings = critbit::borrow_leaf_by_index(&leaderboard.ranking, max_score_index);
-        let mut front = *linked_set::front(max_rankings).borrow();
+        let mut max_rankings = leaderboard.ranking.borrow_leaf_by_index(max_score_index);
+        let mut front = *max_rankings.front().borrow();
         while (ranks > 0) {
             max_leaf_users.push_back(front);
             ranks = ranks - 1;
-            let next = linked_set::next(max_rankings, front);
-            if (option::is_some(&next)) {
-                front = *option::borrow(&next);
+            let next = max_rankings.next(front);
+            if (next.is_some()) {
+                front = *next.borrow();
             } else {
                 max_leaf_bcs.append(bcs::to_bytes(&max_leaf_users));
                 result.push_back(max_leaf_bcs);
-                let (next_max_score, next_max_score_index) = critbit::previous_leaf(&leaderboard.ranking, max_score);
+                let (next_max_score, next_max_score_index) = leaderboard.ranking.previous_leaf(max_score);
                 if (next_max_score == 0) {
                     break
                 };
@@ -474,8 +469,8 @@ module typus::leaderboard {
                 max_score_index = next_max_score_index;
                 max_leaf_bcs = bcs::to_bytes(&max_score);
                 max_leaf_users = vector[];
-                max_rankings = critbit::borrow_leaf_by_index(&leaderboard.ranking, max_score_index);
-                front = *linked_set::front(max_rankings).borrow();
+                max_rankings = leaderboard.ranking.borrow_leaf_by_index(max_score_index);
+                front = *max_rankings.front().borrow();
             };
         };
 
@@ -492,7 +487,7 @@ module typus::leaderboard {
         active: bool,
         from: u64,
         to: u64,
-        ctx: &mut TxContext,
+        ctx: &TxContext,
     ) {
         version.verify(ctx);
 
@@ -502,15 +497,15 @@ module typus::leaderboard {
             &mut registry.inactive_leaderboard_registry
         };
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> = dynamic_field::borrow_mut(uid, key);
-        let leaderboard: &mut Leaderboard = linked_object_table::borrow_mut(leaderboards, id);
-        if (critbit::is_empty(&leaderboard.ranking)) {
+        let leaderboard: &mut Leaderboard = leaderboards.borrow_mut(id);
+        if (leaderboard.ranking.is_empty()) {
             return
         };
         let mut index = from;
         while (index <= to) {
-            if (critbit::has_index(&leaderboard.ranking, index)) {
-                if (linked_set::is_empty(critbit::borrow_leaf_by_index(&leaderboard.ranking, index))) {
-                    critbit::remove_leaf_by_index(&mut leaderboard.ranking, index).drop();
+            if (leaderboard.ranking.has_index(index)) {
+                if (leaderboard.ranking.borrow_leaf_by_index(index).is_empty()) {
+                    leaderboard.ranking.remove_leaf_by_index(index).drop();
                 }
             };
             index = index + 1;
