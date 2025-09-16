@@ -1,5 +1,8 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module manages user data for the Typus ecosystem. It provides a registry for storing
+/// user metadata, such as accumulated TGLD and Tails EXP amounts.
 module typus::user {
     use std::bcs;
 
@@ -12,20 +15,27 @@ module typus::user {
 
     // ======== Metadata content index ========
 
+    /// Index for the accumulated TGLD amount in the metadata content vector.
     const IAccumulatedTgldAmount: u64 = 0;
+    /// Index for the Tails EXP amount in the metadata content vector.
     const ITailsExpAmount: u64 = 1;
 
     // ======== Typus User ========
 
+    /// A registry for storing user metadata.
     public struct TypusUserRegistry has key {
         id: UID,
+        /// A linked table mapping user addresses to their `Metadata`.
         metadata: LinkedTable<address, Metadata>,
     }
 
+    /// Stores user-specific metadata.
     public struct Metadata has store, drop {
+        /// A vector of `u64` values representing user metadata.
         content: vector<u64>,
     }
 
+    /// Initializes the `TypusUserRegistry`.
     fun init(ctx: &mut TxContext) {
         transfer::share_object(TypusUserRegistry {
             id: object::new(ctx),
@@ -33,11 +43,14 @@ module typus::user {
         });
     }
 
+    /// Event emitted when a user's accumulated TGLD amount is increased.
     public struct AddAccumulatedTgldAmount has copy, drop {
         user: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Increases a user's accumulated TGLD amount and mints the corresponding amount of `TGLD` tokens.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun add_accumulated_tgld_amount(
         manager_cap: &ManagerCap,
         version: &Version,
@@ -79,11 +92,14 @@ module typus::user {
         vector[amount]
     }
 
+    /// Event emitted when a user's Tails EXP amount is increased.
     public struct AddTailsExpAmount has copy, drop {
         user: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Increases a user's Tails EXP amount.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun add_tails_exp_amount(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -114,6 +130,8 @@ module typus::user {
 
         vector[amount]
     }
+    /// Increases a user's Tails EXP amount. This is a package-private function.
+    /// WARNING: mut inputs without authority check inside
     public(package) fun add_tails_exp_amount_(
         version: &Version,
         typus_user_registry: &mut TypusUserRegistry,
@@ -145,11 +163,14 @@ module typus::user {
     }
 
 
+    /// Event emitted when a user's Tails EXP amount is decreased.
     public struct RemoveTailsExpAmount has copy, drop {
         user: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Decreases a user's Tails EXP amount.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun remove_tails_exp_amount(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -164,6 +185,8 @@ module typus::user {
             amount,
         )
     }
+    /// Decreases a user's Tails EXP amount. This is a package-private function.
+    /// WARNING: mut inputs without authority check inside
     public(package) fun remove_tails_exp_amount_(
         version: &Version,
         typus_user_registry: &mut TypusUserRegistry,
@@ -194,6 +217,7 @@ module typus::user {
         vector[amount]
     }
 
+    /// Retrieves the metadata for a specific user.
     public fun get_user_metadata(
         version: &Version,
         typus_user_registry: &TypusUserRegistry,

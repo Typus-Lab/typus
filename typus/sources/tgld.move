@@ -1,5 +1,8 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module defines the `TGLD` (Typus Gold) token, a fungible token used within the Typus ecosystem.
+/// It provides functions for creating, minting, and burning the token.
 module typus::tgld {
     use std::ascii;
 
@@ -12,14 +15,40 @@ module typus::tgld {
 
     // ======== Structs ========
 
+    /// A struct representing the Typus Gold token type.
     public struct TGLD has drop {}
 
+    /// A registry object that holds the `TreasuryCap` and `TokenPolicyCap` for the `TGLD` token.
     public struct TgldRegistry has key {
         id: UID,
+        /// The treasury capability for the `TGLD` token, which allows for minting and burning.
         treasury_cap: TreasuryCap<TGLD>,
+        /// The token policy capability, which allows for managing the token's transfer policy.
         token_policy_cap: TokenPolicyCap<TGLD>,
     }
 
+    /// An event emitted when new `TGLD` tokens are minted.
+    public struct MintEvent has copy, drop {
+        /// The address of the recipient of the minted tokens.
+        recipient: address,
+        /// Log data: [minted_amount]
+        log: vector<u64>,
+        /// Padding for BCS.
+        bcs_padding: vector<vector<u8>>,
+    }
+
+    /// An event emitted when `TGLD` tokens are burned.
+    public struct BurnEvent has copy, drop {
+        /// Log data: [burned_amount]
+        log: vector<u64>,
+        /// Padding for BCS.
+        bcs_padding: vector<vector<u8>>,
+    }
+
+    // ======== Public Functions ========
+
+    /// Initializes the `TGLD` token, creating the `TreasuryCap`, `CoinMetadata`, and `TokenPolicy`.
+    /// It also creates and shares the `TgldRegistry`. This function is called only once during deployment.
     #[lint_allow(share_owned)]
     fun init(witness: TGLD, ctx: &mut TxContext) {
         let (treasury_cap, coin_metadata) = coin::create_currency<TGLD>(
@@ -42,11 +71,8 @@ module typus::tgld {
         transfer::share_object(registry);
     }
 
-    public struct MintEvent has copy, drop {
-        recipient: address,
-        log: vector<u64>,
-        bcs_padding: vector<vector<u8>>,
-    }
+    /// Mints new `TGLD` tokens and transfers them to a recipient.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun mint(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -73,10 +99,8 @@ module typus::tgld {
         });
     }
 
-    public struct BurnEvent has copy, drop {
-        log: vector<u64>,
-        bcs_padding: vector<vector<u8>>,
-    }
+    /// Burns `TGLD` tokens.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun burn(
         _manager_cap: &ManagerCap,
         version: &Version,

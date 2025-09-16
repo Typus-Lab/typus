@@ -1,54 +1,81 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module implements a Crit-bit tree, a binary trie data structure that is highly efficient
+/// for searching and storing keys. This implementation uses `u64` keys and generic values.
+/// The tree is composed of internal nodes and leaf nodes, stored in tables.
 module typus::critbit {
     use sui::table::{Self, Table};
 
     // ======== Error Code ========
 
+    /// Error when the tree's capacity is exceeded.
     const EExceedCapacity: u64 = 0;
+    /// Error when trying to destroy a non-empty tree.
     const ETreeNotEmpty: u64 = 1;
+    /// Error when a key to be inserted already exists in the tree.
     const EKeyAlreadyExist: u64 = 2;
+    /// Error when a leaf does not exist.
     const ELeafNotExist: u64 = 3;
+    /// Error for out-of-bounds access.
     const EIndexOutOfRange: u64 = 4;
+    /// Error when a parent node is null.
     const ENullParent: u64 = 5;
 
     // === Constants ===
 
+    /// A special value used to distinguish between internal nodes and leaves.
     const PARTITION_INDEX: u64 = 0x8000000000000000; // 9223372036854775808
+    /// The maximum value of a u64 integer.
     const MAX_U64: u64 = 0xFFFFFFFFFFFFFFFF; // 18446744073709551615
+    /// The maximum capacity of the tree.
     const MAX_CAPACITY: u64 = 0x7fffffffffffffff;
 
     // === Structs ===
 
-    /// Internal leaf type
+    /// Represents a leaf node in the Crit-bit tree, storing a key-value pair.
     public struct Leaf<V> has store, drop {
+        /// The key of the leaf.
         key: u64,
+        /// The value of the leaf.
         value: V,
+        /// The index of the parent node.
         parent: u64,
     }
 
-    /// Internal node type
+    /// Represents an internal node in the Crit-bit tree.
     public struct InternalNode has store, drop {
+        /// The mask used to determine the branching direction.
         mask: u64,
+        /// The index of the left child.
         left_child: u64,
+        /// The index of the right child.
         right_child: u64,
+        /// The index of the parent node.
         parent: u64,
     }
 
-    /// Critbit tree
+    /// The main Crit-bit tree structure.
     public struct CritbitTree<V: store> has store {
+        /// The index of the root node.
         root: u64,
+        /// A table storing the internal nodes of the tree.
         internal_nodes: Table<u64, InternalNode>,
+        /// A table storing the leaves of the tree.
         leaves: Table<u64, Leaf<V>>,
+        /// The index of the leaf with the minimum key.
         min_leaf_index: u64,
+        /// The index of the leaf with the maximum key.
         max_leaf_index: u64,
+        /// The index to be used for the next internal node.
         next_internal_node_index: u64,
+        /// The index to be used for the next leaf.
         next_leaf_index: u64
     }
 
     // ======== Public Functions ========
 
-    /// Create a new critbit tree
+    /// Creates a new, empty Crit-bit tree.
     public fun new<V: store>(ctx: &mut TxContext): CritbitTree<V> {
         CritbitTree<V>{
             root: PARTITION_INDEX,
@@ -61,42 +88,45 @@ module typus::critbit {
         }
     }
 
-    /// Return size of tree
+    /// Returns the number of leaves in the tree.
     public fun size<V: store>(tree: &CritbitTree<V>): u64 {
         tree.leaves.length()
     }
 
-    /// Return whether tree is empty
+    /// Returns `true` if the tree is empty.
     public fun is_empty<V: store>(tree: &CritbitTree<V>): bool {
         tree.leaves.is_empty()
     }
 
-    /// Return whether leaf exists
+    /// Returns `true` if a leaf with the given key exists in the tree.
     public fun has_leaf<V: store>(tree: &CritbitTree<V>, key: u64): bool {
         let (has_leaf, _) = tree.find_leaf(key);
         has_leaf
     }
 
-    /// Return whether index exists
+    /// Returns `true` if a leaf with the given index exists in the tree.
     public fun has_index<V: store>(tree: &CritbitTree<V>, index: u64): bool {
         tree.leaves.contains(index)
     }
 
-    /// Return (key, index) of the leaf with minimum value
+    /// Returns the key and index of the leaf with the minimum key in the tree.
+    /// Aborts if the tree is empty.
     public fun min_leaf<V: store>(tree: &CritbitTree<V>): (u64, u64) {
         assert!(!tree.is_empty(), ELeafNotExist);
         let min_leaf = tree.leaves.borrow(tree.min_leaf_index);
         (min_leaf.key, tree.min_leaf_index)
     }
 
-    /// Return (key, index) of the leaf with maximum value
+    /// Returns the key and index of the leaf with the maximum key in the tree.
+    /// Aborts if the tree is empty.
     public fun max_leaf<V: store>(tree: &CritbitTree<V>): (u64, u64) {
         assert!(!tree.is_empty(), ELeafNotExist);
         let max_leaf = tree.leaves.borrow(tree.max_leaf_index);
         (max_leaf.key, tree.max_leaf_index)
     }
 
-    /// Return the previous leaf (key, index) from the input leaf
+    /// Returns the key and index of the leaf that comes before the given key in sorted order.
+    /// Returns `(0, PARTITION_INDEX)` if there is no previous leaf.
     public fun previous_leaf<V: store>(tree: &CritbitTree<V>, key: u64): (u64, u64) {
         let (has_leaf, mut index) = tree.find_leaf(key);
         assert!(has_leaf, ELeafNotExist);
@@ -113,7 +143,8 @@ module typus::critbit {
         (tree.leaves.borrow(index).key, index)
     }
 
-    /// Return the next leaf (key, index) of the input leaf
+    /// Returns the key and index of the leaf that comes after the given key in sorted order.
+    /// Returns `(0, PARTITION_INDEX)` if there is no next leaf.
     public fun next_leaf<V: store>(tree: &CritbitTree<V>, key: u64): (u64, u64) {
         let (has_leaf, mut index) = tree.find_leaf(key);
         assert!(has_leaf, ELeafNotExist);
@@ -130,7 +161,9 @@ module typus::critbit {
         (tree.leaves.borrow(index).key, index)
     }
 
-    /// Insert new leaf to the tree, returning the index of the new leaf
+    /// Inserts a new leaf with the given key and value into the tree.
+    /// Returns the index of the new leaf.
+    /// Aborts if the key already exists or if the tree exceeds its capacity.
     public fun insert_leaf<V: store>(tree: &mut CritbitTree<V>, key: u64, value: V): u64 {
         let new_leaf = Leaf<V>{
             key,
@@ -211,7 +244,8 @@ module typus::critbit {
         new_leaf_index
     }
 
-    /// Return true and the index if the leaf exists
+    /// Finds a leaf with the given key and returns a boolean indicating if it was found,
+    /// along with the index of the leaf if found.
     public fun find_leaf<V: store>(tree: & CritbitTree<V>, key: u64): (bool, u64) {
         if (tree.is_empty()) {
             return (false, PARTITION_INDEX)
@@ -225,7 +259,8 @@ module typus::critbit {
         }
     }
 
-    /// Return true and the index if the leaf exists
+    /// Finds the key of the leaf that is closest to the given key.
+    /// Returns 0 if the tree is empty.
     public fun find_closest_key<V: store>(tree: & CritbitTree<V>, key: u64): u64 {
         if (tree.is_empty()) {
             return 0
@@ -235,19 +270,19 @@ module typus::critbit {
         closeset_leaf.key
     }
 
-    /// Remove min leaf from the tree
+    /// Removes the leaf with the minimum key from the tree and returns its value.
     public fun remove_min_leaf<V: store>(tree: &mut CritbitTree<V>): V {
         let index = tree.min_leaf_index;
         tree.remove_leaf_by_index(index)
     }
 
-    /// Remove max leaf from the tree
+    /// Removes the leaf with the maximum key from the tree and returns its value.
     public fun remove_max_leaf<V: store>(tree: &mut CritbitTree<V>): V {
         let index = tree.max_leaf_index;
         tree.remove_leaf_by_index(index)
     }
 
-    /// Remove leaf from the tree by index
+    /// Removes a leaf from the tree by its index and returns its value.
     public fun remove_leaf_by_index<V: store>(tree: &mut CritbitTree<V>, index: u64): V {
         let key = tree.leaves.borrow(index).key;
         if(tree.min_leaf_index == index) {
@@ -299,40 +334,44 @@ module typus::critbit {
         value
     }
 
-    /// Remove leaf from the tree by key
+    /// Removes a leaf from the tree by its key and returns its value.
+    /// Aborts if the key does not exist.
     public fun remove_leaf_by_key<V: store>(tree: &mut CritbitTree<V>, key: u64): V {
         let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
         tree.remove_leaf_by_index(index)
     }
 
-    /// Mutably borrow leaf from the tree by index
+    /// Borrows a mutable reference to the value of a leaf by its index.
     public fun borrow_mut_leaf_by_index<V: store>(tree: &mut CritbitTree<V>, index: u64): &mut V {
         let entry = tree.leaves.borrow_mut(index);
         &mut entry.value
     }
 
-    /// Mutably borrow leaf from the tree by key
+    /// Borrows a mutable reference to the value of a leaf by its key.
+    /// Aborts if the key does not exist.
     public fun borrow_mut_leaf_by_key<V: store>(tree: &mut CritbitTree<V>, key: u64): &mut V {
         let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
         tree.borrow_mut_leaf_by_index(index)
     }
 
-    /// Borrow leaf from the tree by index
+    /// Borrows an immutable reference to the value of a leaf by its index.
     public fun borrow_leaf_by_index<V: store>(tree: & CritbitTree<V>, index: u64): &V {
         let entry = tree.leaves.borrow(index);
         &entry.value
     }
 
-    /// Borrow leaf from the tree by key
+    /// Borrows an immutable reference to the value of a leaf by its key.
+    /// Aborts if the key does not exist.
     public fun borrow_leaf_by_key<V: store>(tree: & CritbitTree<V>, key: u64): &V {
         let (is_exist, index) = tree.find_leaf(key);
         assert!(is_exist, ELeafNotExist);
         tree.borrow_leaf_by_index(index)
     }
 
-    /// Destroy tree dropping all the entries within
+    /// Destroys the tree, dropping all the entries within.
+    /// The value type must have the `drop` ability.
     public fun drop<V: store + drop>(tree: CritbitTree<V>) {
         let CritbitTree<V> {
             root: _,
@@ -348,7 +387,8 @@ module typus::critbit {
         leaves.drop();
     }
 
-    /// Destroy empty tree
+    /// Destroys an empty tree.
+    /// Aborts if the tree is not empty.
     public fun destroy_empty<V: store>(tree: CritbitTree<V>) {
         assert!(tree.leaves.length() == 0, 0);
 
@@ -367,6 +407,7 @@ module typus::critbit {
 
     // === Helper functions ===
 
+    /// Finds the leftmost leaf starting from a given root.
     fun left_most_leaf<V: store>(tree: &CritbitTree<V>, root: u64): u64 {
         let mut ptr = root;
         while (ptr < PARTITION_INDEX) {
@@ -375,6 +416,7 @@ module typus::critbit {
         ptr
     }
 
+    /// Finds the rightmost leaf starting from a given root.
     fun right_most_leaf<V: store>(tree: &CritbitTree<V>, root: u64): u64 {
         let mut ptr = root;
         while (ptr < PARTITION_INDEX) {
@@ -383,6 +425,7 @@ module typus::critbit {
         ptr
     }
 
+    /// Finds the index of the leaf that is closest to the given key.
     fun get_closest_leaf_index_by_key<V: store>(tree: &CritbitTree<V>, key: u64): u64 {
         let mut ptr = tree.root;
         // if tree is empty, return the patrition index
@@ -398,6 +441,7 @@ module typus::critbit {
         MAX_U64 - ptr
     }
 
+    /// Updates the child of a parent node.
     fun update_child<V: store>(tree: &mut CritbitTree<V>, parent_index: u64, new_child: u64, is_left_child: bool) {
         assert!(parent_index != PARTITION_INDEX, ENullParent);
         if (is_left_child) {
@@ -414,10 +458,12 @@ module typus::critbit {
         };
     }
 
+    /// Returns `true` if the node at `index` is the left child of the node at `parent_index`.
     fun is_left_child<V: store>(tree: &CritbitTree<V>, parent_index: u64, index: u64): bool {
         tree.internal_nodes.borrow(parent_index).left_child == index
     }
 
+    /// Counts the number of leading zeros in a u128 integer.
     fun count_leading_zeros(mut x: u128): u8 {
         if (x == 0) {
             128

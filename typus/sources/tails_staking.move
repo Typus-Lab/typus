@@ -1,3 +1,9 @@
+// Copyright (c) Typus Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+/// This module implements the staking functionality for Typus Tails NFTs.
+/// It allows users to stake their Tails NFTs to earn rewards, participate in profit sharing,
+/// and level up their NFTs by gaining experience points (EXP).
 module typus::tails_staking {
     use std::bcs;
     use std::string;
@@ -22,60 +28,96 @@ module typus::tails_staking {
 
     use typus_nft::typus_nft::{Self, Tails, ManagerCap as TailsManagerCap};
 
+    /// Constant for the number of milliseconds in a day.
     const CMillisecondsADay: u64 = 24 * 60 * 60 * 1000;
 
     // ======== TailsStakingRegistry config Index ========
 
+    /// Index for the maximum number of Tails a user can stake.
     const IMaxStakeAmount: u64 = 0;
+    /// Index for the fee required to stake a Tails NFT (in SUI).
     const IStakeTailsFee: u64 = 1;
+    /// Index for the fee required to transfer a Tails NFT (in SUI).
     const ITransferTailsFee: u64 = 2;
+    /// Index for the amount of EXP gained from a daily sign-up.
     const IDailySignUpExp: u64 = 3;
+    /// Index for the fee required for a daily sign-up (in SUI).
     const IDailySignUpFee: u64 = 4;
+    /// Index for the fee required to convert EXP back to the user's balance (in SUI).
     const IExpDownFee: u64 = 5;
 
     // ======== StakingInfo u64_padding Index ========
 
+    /// Index for the timestamp of the last daily sign-up.
     const ILastSignUpTsMs: u64 = 0;
 
     // ======== Tails Metadata Key ========
 
+    /// Key for the vector of Tails NFT IDs.
     const KTailsIds: vector<u8> = b"tails_ids";                 // vector<address>
+    /// Key for the vector of Tails NFT levels.
     const KTailsLevels: vector<u8> = b"tails_levels";           // vector<u64>
+    /// Key for the table of Tails IPFS URLs.
     const KTailsIpfsUrls: vector<u8> = b"tails_ipfs_urls";      // Table<u64(level), BigVector(vector<u8>)>
+    /// Key for the table of Tails WEBP images.
     const KTailsWebpImages: vector<u8> = b"tails_webp_images";  // Table<u64(level*10000+number), vector<u8>>
 
     // ======== Error Code ========
 
+    /// Error when a user has already signed up for the day.
     const EAlreadySignedUp: u64 = 0;
+    /// Error for insufficient balance.
     const EInsufficientBalance: u64 = 1;
+    /// Error for insufficient experience points.
     const EInsufficientExp: u64 = 2;
+    /// Error for an invalid fee amount.
     const EInvalidFee: u64 = 3;
+    /// Error for invalid input.
     const EInvalidInput: u64 = 4;
+    /// Error for an invalid token type.
     const EInvalidToken: u64 = 5;
+    /// Error when the maximum stake amount is reached.
     const EMaxStakeAmountReached: u64 = 6;
+    /// Error when staking information for a user is not found.
     const EStakingInfoNotFound: u64 = 7;
+    /// Error for a deprecated function.
     const EDeprecated: u64 = 999;
 
     // ======== Tails Staking ========
 
+    /// The main registry for the Tails NFT staking system.
     public struct TailsStakingRegistry has key {
         id: UID,
+        /// A vector of configuration values for the staking system.
         config: vector<u64>,
+        /// The manager capability for the Tails NFT contract.
         tails_manager_cap: TailsManagerCap,
+        /// A table storing the staked Tails NFTs.
         tails: ObjectTable<address, Tails>,
+        /// A bag for storing various metadata related to Tails NFTs.
         tails_metadata: Bag,
+        /// A big vector of `StakingInfo` structs for all users.
         staking_infos: BigVector,
+        /// A vector of token types that are used for profit sharing.
         profit_assets: vector<TypeName>,
+        /// The transfer policy for Tails NFTs.
         transfer_policy: TransferPolicy<Tails>,
     }
 
+    /// Stores staking information for a single user.
     public struct StakingInfo has store, drop {
+        /// The address of the user.
         user: address,
+        /// A vector of the numbers of the Tails NFTs staked by the user.
         tails: vector<u64>,
+        /// A vector of the profits earned by the user from profit sharing.
         profits: vector<u64>,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// Initializes the `TailsStakingRegistry`.
+    /// This is an authorized function.
     entry fun init_tails_staking_registry(
         version: &Version,
         tails_manager_cap: TailsManagerCap,
@@ -114,6 +156,8 @@ module typus::tails_staking {
         });
     }
 
+    /// Uploads a vector of placeholder IDs for Tails NFTs.
+    /// This is an authorized function used for initialization.
     entry fun upload_ids(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -130,21 +174,8 @@ module typus::tails_staking {
         }
     }
 
-    // entry fun remove_ids(
-    //     version: &Version,
-    //     tails_staking_registry: &mut TailsStakingRegistry,
-    //     mut count: u64,
-    //     ctx: &TxContext,
-    // ) {
-    //     version.verify(ctx);
-
-    //     let tails_ids: &mut vector<address> = &mut tails_staking_registry.tails_metadata[KTailsIds];
-    //     while (count > 0) {
-    //         tails_ids.pop_back();
-    //         count = count - 1;
-    //     }
-    // }
-
+    /// Uploads a vector of placeholder levels for Tails NFTs.
+    /// This is an authorized function used for initialization.
     entry fun upload_levels(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -161,21 +192,8 @@ module typus::tails_staking {
         }
     }
 
-    // entry fun remove_levels(
-    //     version: &Version,
-    //     tails_staking_registry: &mut TailsStakingRegistry,
-    //     mut count: u64,
-    //     ctx: &TxContext,
-    // ) {
-    //     version.verify(ctx);
-
-    //     let tails_levels: &mut vector<u64> = &mut tails_staking_registry.tails_metadata[KTailsLevels];
-    //     while (count > 0) {
-    //         tails_levels.pop_back();
-    //         count = count - 1;
-    //     }
-    // }
-
+    /// Uploads IPFS URLs for a specific level of Tails NFTs.
+    /// This is an authorized function.
     entry fun upload_ipfs_urls(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -192,6 +210,8 @@ module typus::tails_staking {
         }
     }
 
+    /// Removes all IPFS URLs for a specific level.
+    /// This is an authorized function.
     entry fun remove_ipfs_urls(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -205,6 +225,8 @@ module typus::tails_staking {
         tails_ipfs_urls.add(level, big_vector::new<vector<u8>>(1111, ctx));
     }
 
+    /// Uploads the WEBP image bytes for a specific Tails NFT.
+    /// This is an authorized function.
     entry fun upload_webp_bytes(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -226,6 +248,8 @@ module typus::tails_staking {
         };
     }
 
+    /// Removes the WEBP image bytes for a specific Tails NFT.
+    /// This is an authorized function.
     entry fun remove_webp_bytes(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -239,11 +263,14 @@ module typus::tails_staking {
         tails_webp_images.remove(level * 10000 + number);
     }
 
+    /// Event emitted when the staking registry config is updated.
     public struct UpdateTailsStakingRegistryConfigEvent has copy, drop {
         index: u64,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Updates a configuration value in the `TailsStakingRegistry`.
+    /// This is an authorized function.
     entry fun update_tails_staking_registry_config(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -264,6 +291,7 @@ module typus::tails_staking {
         *&mut tails_staking_registry.config[index] = value;
     }
 
+    /// Event emitted when profit sharing is set.
     public struct SetProfitSharingEvent has copy, drop {
         token: TypeName,
         level_profits: vector<u64>,
@@ -271,6 +299,8 @@ module typus::tails_staking {
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Sets the profit sharing for a specific token.
+    /// This is an authorized function.
     entry fun set_profit_sharing<TOKEN, N_TOKEN>(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -341,11 +371,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when profit sharing is removed.
     public struct RemoveProfitSharingEvent has copy, drop {
         token: TypeName,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Removes a profit sharing token from the registry.
+    /// This is an authorized function.
     entry fun remove_profit_sharing<TOKEN>(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -388,6 +421,8 @@ module typus::tails_staking {
         });
     }
 
+    /// Imports a vector of Tails NFTs and assigns them to users.
+    /// This is an authorized function used for initialization.
     public fun import_tails(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -436,12 +471,15 @@ module typus::tails_staking {
         tailses.destroy_empty();
     }
 
+    /// Event emitted when a user claims their profit sharing.
     public struct ClaimProfitSharingEvent has copy, drop {
         tails: vector<u64>,
         profit_asset: TypeName,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Allows a user to claim their profit sharing for a specific token.
+    /// Safe with ctx.sender as verification
     public fun claim_profit_sharing<TOKEN>(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -487,11 +525,13 @@ module typus::tails_staking {
         abort EStakingInfoNotFound
     }
 
+    /// Event emitted when a Tails NFT is staked.
     public struct StakeTailsEvent has copy, drop {
         tails: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Stakes a Tails NFT.
     public fun stake_tails(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -527,11 +567,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when a Tails NFT is unstaked.
     public struct UnstakeTailsEvent has copy, drop {
         tails: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Unstakes a Tails NFT.
+    /// Safe with ctx.sender as verification
     public fun unstake_tails(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -558,12 +601,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when a Tails NFT is transferred.
     public struct TransferTailsEvent has copy, drop {
         tails: address,
         recipient: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Transfers a Tails NFT to another user.
     #[lint_allow(share_owned)]
     public fun transfer_tails(
         version: &mut Version,
@@ -601,11 +646,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when a user performs a daily sign-up.
     public struct DailySignUpEvent has copy, drop {
         tails: vector<u64>,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Allows a user to perform a daily sign-up to earn EXP for their staked Tails NFTs.
+    /// Safe with ctx.sender as verification
     entry fun daily_sign_up(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -669,11 +717,14 @@ module typus::tails_staking {
         abort EStakingInfoNotFound
     }
 
+    /// Event emitted when a Tails NFT's EXP is increased.
     public struct ExpUpEvent has copy, drop {
         tails: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Increases the EXP of a staked Tails NFT.
+    /// Safe with ctx.sender as verification
     public fun exp_up(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -682,7 +733,8 @@ module typus::tails_staking {
         amount: u64,
         ctx: &TxContext,
     ) {
-        version.version_check();
+        let user = tx_context::sender(ctx);
+        verify_staking(version, tails_staking_registry, user, tails);
 
         if (!tails_staking_registry.tails.contains(tails)) {
             abort EStakingInfoNotFound
@@ -708,6 +760,7 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Increases the EXP of a non-staked Tails NFT.
     public fun exp_up_without_staking(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -741,6 +794,8 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Publicly increases the EXP of a staked Tails NFT.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun public_exp_up(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -768,6 +823,8 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Publicly increases the EXP of a non-staked Tails NFT.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun public_exp_up_without_staking(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -795,11 +852,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when a Tails NFT's EXP is decreased.
     public struct ExpDownEvent has copy, drop {
         tails: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Decreases the EXP of a staked Tails NFT, with a fee.
+    /// Safe with ctx.sender as verification
     public fun exp_down_with_fee(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -809,7 +869,8 @@ module typus::tails_staking {
         coin: Coin<SUI>,
         ctx: &TxContext,
     ) {
-        version.version_check();
+        let user = tx_context::sender(ctx);
+        verify_staking(version, tails_staking_registry, user, tails);
 
         assert!(coin.value() == tails_staking_registry.config[IExpDownFee], EInvalidFee);
         version.charge_fee(coin.into_balance());
@@ -849,6 +910,7 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Decreases the EXP of a non-staked Tails NFT, with a fee.
     public fun exp_down_without_staking_with_fee(
         version: &mut Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -895,6 +957,8 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Publicly decreases the EXP of a staked Tails NFT.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun public_exp_down(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -934,6 +998,8 @@ module typus::tails_staking {
             bcs_padding: vector[],
         });
     }
+    /// Publicly decreases the EXP of a non-staked Tails NFT.
+    /// This is an authorized function that requires a `ManagerCap`.
     public fun public_exp_down_without_staking(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -971,11 +1037,14 @@ module typus::tails_staking {
         });
     }
 
+    /// Event emitted when a Tails NFT levels up.
     public struct LevelUpEvent has copy, drop {
         tails: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Levels up a staked Tails NFT.
+    /// WARNING: no owner check
     entry fun level_up(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -1020,6 +1089,7 @@ module typus::tails_staking {
         });
     }
 
+    /// Internal function to handle the logic of staking a Tails NFT.
     fun stake_tails_(
         tails_staking_registry: &mut TailsStakingRegistry,
         mut tails: Tails,
@@ -1083,6 +1153,7 @@ module typus::tails_staking {
         tails_staking_registry.tails.add(object::id_address(&tails), tails);
     }
 
+    /// Internal function to handle the logic of unstaking a Tails NFT.
     fun unstake_tails_(
         tails_staking_registry: &mut TailsStakingRegistry,
         tails: address,
@@ -1125,6 +1196,7 @@ module typus::tails_staking {
         abort EStakingInfoNotFound
     }
 
+    /// Retrieves the staking information for a specific user.
     public(package) fun get_staking_info(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -1154,6 +1226,7 @@ module typus::tails_staking {
         vector[]
     }
 
+    /// Retrieves all staking information for a specific user.
     public(package) fun get_staking_infos(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -1184,6 +1257,7 @@ module typus::tails_staking {
         result
     }
 
+    /// Retrieves the counts of staked Tails NFTs for each level.
     public(package) fun get_level_counts(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -1220,6 +1294,52 @@ module typus::tails_staking {
         level_counts
     }
 
+    /// Verifies if a user has a staked Tails NFT of the certain address.
+    public fun verify_staking(
+        version: &Version,
+        tails_staking_registry: &TailsStakingRegistry,
+        user: address,
+        tails: address,
+    ): bool {
+        version.version_check();
+
+        let tails_ids: &vector<address> = &tails_staking_registry.tails_metadata[KTailsIds];
+        let length = big_vector::length(&tails_staking_registry.staking_infos);
+        let slice_size = (big_vector::slice_size(&tails_staking_registry.staking_infos) as u64);
+        let mut slice_idx = 0;
+        let mut slice = big_vector::borrow_slice(&tails_staking_registry.staking_infos, slice_idx);
+        let mut slice_length = big_vector::get_slice_length(slice);
+        let mut i = 0;
+        while (i < length) {
+            let staking_info = big_vector::borrow_from_slice<StakingInfo>(slice, i % slice_size);
+            if (staking_info.user == user) {
+                let mut i = 0;
+                let length = vector::length(&staking_info.tails);
+                while (i < length) {
+                    let tails_number = *vector::borrow(&staking_info.tails, i);
+                    if (*vector::borrow(tails_ids, tails_number - 1) == tails) {
+                        return true
+                    };
+                    i = i + 1;
+                };
+                return false
+            };
+            // jump to next slice
+            if (i + 1 < length && i + 1 == slice_idx * slice_size + slice_length) {
+                slice_idx = big_vector::get_slice_idx(slice) + 1;
+                slice = big_vector::borrow_slice(
+                    &tails_staking_registry.staking_infos,
+                    slice_idx,
+                );
+                slice_length = big_vector::get_slice_length(slice);
+            };
+            i = i + 1;
+        };
+
+        false
+    }
+
+    /// Verifies if a user has a staked Tails NFT of a certain level or higher.
     public fun verify_staking_identity(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -1267,6 +1387,7 @@ module typus::tails_staking {
         false
     }
 
+    /// Retrieves the maximum level of a user's staked Tails NFTs.
     public fun get_max_staking_level(
         version: &Version,
         tails_staking_registry: &TailsStakingRegistry,
@@ -1313,6 +1434,7 @@ module typus::tails_staking {
         level
     }
 
+    /// Aborts with a deprecated error.
     fun deprecated() { abort EDeprecated }
 
     #[deprecated(note = b"Use `exp_down_with_fee` instead.")]

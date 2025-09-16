@@ -1,5 +1,8 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module implements an airdrop mechanism for distributing tokens to a list of users.
+/// It allows for setting up airdrops, claiming them, and removing them.
 module typus::airdrop {
     use std::ascii::String;
     use std::type_name::{Self, TypeName};
@@ -15,38 +18,59 @@ module typus::airdrop {
 
     // ======== Error Code ========
 
+    /// Error when the balance of the airdrop is insufficient.
     const EInsufficientBalance: u64 = 0;
+    /// Error for invalid input parameters.
     const EInvalidInput: u64 = 1;
 
     // ======== Typus Airdrop ========
 
+    /// A registry for all airdrops. This is a shared object that holds all `AirdropInfo` objects as dynamic fields.
     public struct TypusAirdropRegistry has key {
         id: UID,
     }
 
+    /// Stores the information for a specific airdrop.
+    /// The `TOKEN` type parameter indicates the type of token being airdropped.
     public struct AirdropInfo<phantom TOKEN> has key, store {
+        /// The unique identifier of the AirdropInfo object.
         id: UID,
+        /// The balance of tokens available for this airdrop.
         balance: Balance<TOKEN>,
+        /// A big vector containing the list of `Airdrop` structs for each user.
         airdrops: BigVector,
     }
 
+    /// Represents a single airdrop for a user.
     public struct Airdrop has store, drop { // 40
+        /// The address of the user who is eligible for the airdrop.
         user: address,                      // 32
+        /// The amount of tokens the user will receive.
         value: u64,                         // 8
     }
 
+    /// Initializes the `TypusAirdropRegistry` and shares it.
     fun init(ctx: &mut TxContext) {
         transfer::share_object(TypusAirdropRegistry {
             id: object::new(ctx),
         });
     }
 
+    /// Event emitted when an airdrop is set or updated.
     public struct SetAirdropEvent has copy, drop {
+        /// The type name of the token being airdropped.
         token: TypeName,
+        /// The key identifying the airdrop.
         key: String,
+        /// Log data: [total_value, spent_value]
         log: vector<u64>,
+        /// Padding for BCS.
         bcs_padding: vector<vector<u8>>,
     }
+    /// Sets up or updates an airdrop.
+    /// This function is authorized and can only be called by the admin.
+    /// It takes a list of users and corresponding values to be airdropped.
+    /// It also takes a vector of coins to fund the airdrop.
     public fun set_airdrop<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
@@ -56,6 +80,7 @@ module typus::airdrop {
         mut values: vector<u64>,
         ctx: &mut TxContext,
     ) {
+        // This is an authorized function
         version.verify(ctx);
         assert!(users.length() == values.length(), EInvalidInput);
 
@@ -121,18 +146,26 @@ module typus::airdrop {
         });
     }
 
+    /// Event emitted when an airdrop is removed.
     public struct RemoveAirdropEvent has copy, drop {
+        /// The type name of the token being airdropped.
         token: TypeName,
+        /// The key identifying the airdrop.
         key: String,
+        /// Log data: [balance_value]
         log: vector<u64>,
+        /// Padding for BCS.
         bcs_padding: vector<vector<u8>>,
     }
+    /// Removes an airdrop and returns the remaining balance to the admin.
+    /// This function is authorized and can only be called by the admin.
     public fun remove_airdrop<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
         key: String,
         ctx: &mut TxContext,
     ): Balance<TOKEN> {
+        // This is an authorized function
         version.verify(ctx);
 
         let AirdropInfo {
@@ -153,13 +186,23 @@ module typus::airdrop {
         balance
     }
 
+    /// Event emitted when a user claims an airdrop.
     public struct ClaimAirdropEvent has copy, drop {
+        /// The type name of the token being airdropped.
         token: TypeName,
+        /// The key identifying the airdrop.
         key: String,
+        /// The address of the user claiming the airdrop.
         user: address,
+        /// Log data: [claimed_value]
         log: vector<u64>,
+        /// Padding for BCS.
         bcs_padding: vector<vector<u8>>,
     }
+    /// Allows a user to claim their airdrop.
+    /// It iterates through the airdrop list to find the user's entry and sends them the tokens.
+    /// If the user has already claimed, the value will be 0, and they won't receive anything.
+    /// Safe with ctx.sender as verification
     public fun claim_airdrop<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
@@ -204,6 +247,10 @@ module typus::airdrop {
 
         option::none()
     }
+
+    /// Allows a user to claim their airdrop by providing the index of their airdrop entry.
+    /// This is more efficient than `claim_airdrop` if the user knows their index.
+    /// Safe with ctx.sender as verification
     public fun claim_airdrop_by_index<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &mut TypusAirdropRegistry,
@@ -235,6 +282,9 @@ module typus::airdrop {
         option::none()
     }
 
+    /// Retrieves the airdrop information for a specific user.
+    /// Returns a vector containing the index and value of the airdrop.
+    /// If the user is not found, it returns `[0, 0]`.
     public(package) fun get_airdrop<TOKEN>(
         version: &Version,
         typus_airdrop_registry: &TypusAirdropRegistry,

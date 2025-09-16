@@ -1,5 +1,10 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module implements a leaderboard system for tracking user scores and rankings.
+/// It supports multiple leaderboards, each with its own start and end time.
+/// Leaderboards can be activated, extended, deactivated, and removed.
+/// User scores can be updated, and rankings can be retrieved.
 module typus::leaderboard {
     use std::ascii::String;
 
@@ -16,20 +21,30 @@ module typus::leaderboard {
 
     // ======== Typus Leaderboard ========
 
+    /// A registry for all leaderboards, separating them into active and inactive categories.
     public struct TypusLeaderboardRegistry has key {
         id: UID,
+        /// A UID for the dynamic field that stores the active leaderboards.
         active_leaderboard_registry: UID,
+        /// A UID for the dynamic field that stores the inactive leaderboards.
         inactive_leaderboard_registry: UID,
     }
 
+    /// Represents a single leaderboard.
     public struct Leaderboard has key, store {
+        /// The unique identifier of the Leaderboard object.
         id: UID,
+        /// The start timestamp of the leaderboard in milliseconds.
         start_ts_ms: u64,
+        /// The end timestamp of the leaderboard in milliseconds.
         end_ts_ms: u64,
+        /// A table mapping user addresses to their scores.
         score: Table<address, u64>,
+        /// A Crit-bit tree for ranking users by score. The value is a linked set of user addresses with the same score.
         ranking: CritbitTree<LinkedSet<address>>,
     }
 
+    /// Initializes the `TypusLeaderboardRegistry` and shares it.
     fun init(ctx: &mut TxContext) {
         transfer::share_object(TypusLeaderboardRegistry {
             id: object::new(ctx),
@@ -38,12 +53,15 @@ module typus::leaderboard {
         });
     }
 
+    /// Event emitted when a leaderboard is activated.
     public struct ActivateLeaderboardEvent has copy, drop {
         key: String,
         id: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Activates a new leaderboard.
+    /// This is an authorized function.
     public fun activate_leaderboard(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -82,12 +100,15 @@ module typus::leaderboard {
         );
     }
 
+    /// Event emitted when a leaderboard's end time is extended.
     public struct ExtendLeaderboardEvent has copy, drop {
         key: String,
         id: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Extends the end time of an active leaderboard.
+    /// This is an authorized function.
     public fun extend_leaderboard(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -109,12 +130,15 @@ module typus::leaderboard {
         });
     }
 
+    /// Event emitted when a leaderboard is deactivated.
     public struct DeactivateLeaderboardEvent has copy, drop {
         key: String,
         id: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Deactivates a leaderboard, moving it from the active to the inactive registry.
+    /// This is an authorized function.
     public fun deactivate_leaderboard(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -133,7 +157,7 @@ module typus::leaderboard {
         };
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> =
             dynamic_field::borrow_mut(&mut registry.active_leaderboard_registry, key);
-        let leaderboard: Leaderboard = leaderboards.remove(id);
+        let leaderboard: Leaderboard = linked_object_table::remove(leaderboards, id);
         emit(DeactivateLeaderboardEvent {
             key,
             id: object::id_address(&leaderboard),
@@ -142,18 +166,22 @@ module typus::leaderboard {
         });
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> =
             dynamic_field::borrow_mut(&mut registry.inactive_leaderboard_registry, key);
-        leaderboards.push_back(
+        linked_object_table::push_back(
+            leaderboards,
             object::id_address(&leaderboard),
             leaderboard,
         );
     }
 
+    /// Event emitted when a leaderboard is removed.
     public struct RemoveLeaderboardEvent has copy, drop {
         key: String,
         id: address,
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// Removes a leaderboard from the inactive registry.
+    /// This is an authorized function.
     public fun remove_leaderboard(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -186,6 +214,7 @@ module typus::leaderboard {
         ranking.destroy_empty();
     }
 
+    /// Event emitted when a user's score is updated.
     public struct ScoreEvent has copy, drop {
         key: String,
         id: address,
@@ -193,6 +222,8 @@ module typus::leaderboard {
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// A wrapper function that delegates the call to the `score` function.
+    /// It requires a `ManagerCap` for authorization.
     public fun delegate_score(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -217,6 +248,8 @@ module typus::leaderboard {
 
         log
     }
+    /// Updates a user's score on all active leaderboards.
+    /// This function is authorized by requiring a `ManagerCap`.
     public fun score(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -282,6 +315,7 @@ module typus::leaderboard {
         vector[0]
     }
 
+    /// Event emitted when a user's score is deducted.
     public struct DeductEvent has copy, drop {
         key: String,
         id: address,
@@ -289,6 +323,8 @@ module typus::leaderboard {
         log: vector<u64>,
         bcs_padding: vector<vector<u8>>,
     }
+    /// A wrapper function that delegates the call to the `deduct` function.
+    /// It requires a `ManagerCap` for authorization.
     public fun delegate_deduct(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,
@@ -313,6 +349,8 @@ module typus::leaderboard {
 
         log
     }
+    /// Deducts a user's score on all active leaderboards.
+    /// This function is authorized by requiring a `ManagerCap`.
     public fun deduct(
         _manager_cap: &ManagerCap,
         version: &Version,
@@ -381,6 +419,8 @@ module typus::leaderboard {
         vector[0]
     }
 
+    /// Retrieves the rankings from a leaderboard.
+    /// It returns the user's score and the top `ranks` users.
     public(package) fun get_rankings(
         version: &Version,
         registry: &TypusLeaderboardRegistry,
@@ -437,6 +477,8 @@ module typus::leaderboard {
         result
     }
 
+    /// Trims empty leaves from a leaderboard's ranking tree.
+    /// This is an authorized function.
     entry fun trim_leaderboard(
         version: &Version,
         registry: &mut TypusLeaderboardRegistry,

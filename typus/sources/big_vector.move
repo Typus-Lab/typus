@@ -1,5 +1,9 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module implements a `BigVector`, a vector-like data structure that can store a large number of elements
+/// by splitting them into smaller `Slice` objects. This allows it to overcome the object size limit in Sui.
+/// Each `Slice` is a dynamic field of the `BigVector` object.
 module typus::big_vector {
     use std::type_name::{Self, TypeName};
 
@@ -7,42 +11,50 @@ module typus::big_vector {
 
     // ======== Constants ========
 
+    /// The maximum size of a slice.
     const CMaxSliceSize: u32 = 262144;
 
     // ======== Errors ========
 
+    /// Error for invalid slice size.
     const EInvalidSliceSize: u64 = 0;
+    /// Error when trying to destroy a non-empty BigVector.
     const ENotEmpty: u64 = 1;
+    /// Error when trying to pop from an empty BigVector.
     const EIsEmpty: u64 = 2;
+    /// Error for out-of-bounds access.
     const EIndexOutOfBounds: u64 = 3;
 
     // ======== Structs ========
 
+    /// A vector-like data structure that can store a large number of elements.
     public struct BigVector has key, store {
-        /// the ID of the BigVector
+        /// The unique identifier of the BigVector object.
         id: UID,
-        /// the element type of the BigVector
+        /// The type name of the elements stored in the BigVector.
         element_type: TypeName,
-        /// the latest index of the Slice in the BigVector
+        /// The index of the latest slice in the BigVector.
         slice_idx: u64,
-        /// the max size of each Slice in the BigVector
+        /// The maximum size of each slice in the BigVector.
         slice_size: u32,
-        /// the length of the BigVector
+        /// The total number of elements in the BigVector.
         length: u64,
     }
 
+    /// A slice of the BigVector, containing a vector of elements.
     public struct Slice<Element> has store, drop {
-        /// the index of the Slice
+        /// The index of the slice.
         idx: u64,
-        /// the vector which stores elements
+        /// The vector that stores the elements.
         vector: vector<Element>,
     }
 
     // ======== Functions ========
 
-    /// create BigVector
+    /// Creates a new `BigVector`.
+    /// The `slice_size` determines the maximum number of elements in each slice.
+    /// `slice_size * sizeof(Element)` should be below the object size limit of 256000 bytes.
     public fun new<Element: store>(slice_size: u32, ctx: &mut TxContext): BigVector {
-        // slice_size * sizeof(Element) should be below the object size limit 256000 bytes.
         assert!(slice_size > 0 && slice_size <= CMaxSliceSize, EInvalidSliceSize);
 
         BigVector {
@@ -54,37 +66,38 @@ module typus::big_vector {
         }
     }
 
-    /// return the latest index of the Slice in the BigVector
+    /// Returns the index of the latest slice in the BigVector.
     public fun slice_idx(bv: &BigVector): u64 {
         bv.slice_idx
     }
 
-    /// return the max size of each Slice in the BigVector
+    /// Returns the maximum size of each slice in the BigVector.
     public fun slice_size(bv: &BigVector): u32 {
         bv.slice_size
     }
 
-    /// return the length of the BigVector
+    /// Returns the total number of elements in the BigVector.
     public fun length(bv: &BigVector): u64 {
         bv.length
     }
 
-    /// return true if the BigVector is empty
+    /// Returns `true` if the BigVector is empty.
     public fun is_empty(bv: &BigVector): bool {
         bv.length == 0
     }
 
-    /// return the index of the Slice
+    /// Returns the index of the slice.
     public fun get_slice_idx<Element>(slice: &Slice<Element>): u64 {
         slice.idx
     }
 
-    /// return the length of the element in the Slice
+    /// Returns the number of elements in the slice.
     public fun get_slice_length<Element>(slice: &Slice<Element>): u64 {
-        slice.vector.length()
+        vector::length(&slice.vector)
     }
 
-    /// push a new element at the end of the BigVector
+    /// Pushes a new element to the end of the BigVector.
+    /// If the current slice is full, it creates a new slice.
     public fun push_back<Element: store>(bv: &mut BigVector, element: Element) {
         if (bv.is_empty() || bv.length() % (bv.slice_size as u64) == 0) {
             bv.slice_idx = bv.length() / (bv.slice_size as u64);
@@ -101,7 +114,8 @@ module typus::big_vector {
         bv.length = bv.length + 1;
     }
 
-    /// pop an element from the end of the BigVector
+    /// Pops an element from the end of the BigVector.
+    /// Aborts if the BigVector is empty.
     public fun pop_back<Element: store>(bv: &mut BigVector): Element {
         assert!(!bv.is_empty(), EIsEmpty);
 
@@ -113,8 +127,9 @@ module typus::big_vector {
         element
     }
 
+    /// Borrows an element at index `i` from the BigVector.
+    /// Aborts if the index is out of bounds.
     #[syntax(index)]
-    /// borrow an element at index i from the BigVector
     public fun borrow<Element: store>(bv: &BigVector, i: u64): &Element {
         assert!(i < bv.length, EIndexOutOfBounds);
         assert!(!bv.is_empty(), EIsEmpty);
@@ -123,8 +138,9 @@ module typus::big_vector {
         &slice.vector[i % (bv.slice_size as u64)]
     }
 
+    /// Borrows a mutable element at index `i` from the BigVector.
+    /// Aborts if the index is out of bounds.
     #[syntax(index)]
-    /// borrow a mutable element at index i from the BigVector
     public fun borrow_mut<Element: store>(bv: &mut BigVector, i: u64): &mut Element {
         assert!(i < bv.length, EIndexOutOfBounds);
         assert!(!bv.is_empty(), EIsEmpty);
@@ -133,7 +149,8 @@ module typus::big_vector {
         &mut slice.vector[i % (bv.slice_size as u64)]
     }
 
-    /// borrow a slice from the BigVector
+    /// Borrows a slice from the BigVector at `slice_idx`.
+    /// Aborts if the `slice_idx` is out of bounds.
     public fun borrow_slice<Element: store>(bv: &BigVector, slice_idx: u64): &Slice<Element> {
         assert!(slice_idx <= bv.slice_idx, EIndexOutOfBounds);
         assert!(!bv.is_empty(), EIsEmpty);
@@ -144,7 +161,8 @@ module typus::big_vector {
         dynamic_field::borrow(id, slice_idx)
     }
 
-    /// borrow a mutable slice from the BigVector
+    /// Borrows a mutable slice from the BigVector at `slice_idx`.
+    /// Aborts if the `slice_idx` is out of bounds.
     public fun borrow_slice_mut<Element: store>(bv: &mut BigVector, slice_idx: u64): &mut Slice<Element> {
         assert!(slice_idx <= bv.slice_idx, EIndexOutOfBounds);
         assert!(!bv.is_empty(), EIsEmpty);
@@ -155,23 +173,26 @@ module typus::big_vector {
         dynamic_field::borrow_mut(id, slice_idx)
     }
 
+    /// Borrows an element at index `i` from a slice.
+    /// Aborts if the index is out of bounds.
     #[syntax(index)]
-    /// borrow an element at index i from the BigVector
     public fun borrow_from_slice<Element: store>(slice: &Slice<Element>, i: u64): &Element {
         assert!(i < slice.vector.length(), EIndexOutOfBounds);
 
         &slice.vector[i]
     }
 
+    /// Borrows a mutable element at index `i` from a slice.
+    /// Aborts if the index is out of bounds.
     #[syntax(index)]
-    /// borrow a mutable element at index i from the BigVector
     public fun borrow_from_slice_mut<Element: store>(slice: &mut Slice<Element>, i: u64): &mut Element {
         assert!(i < slice.vector.length(), EIndexOutOfBounds);
 
         &mut slice.vector[i]
     }
 
-    /// swap and pop the element at index i with the last element
+    /// Swaps the element at index `i` with the last element and removes it.
+    /// This is more efficient than `remove` as it does not require shifting elements.
     public fun swap_remove<Element: store>(bv: &mut BigVector, i: u64): Element {
         let result = pop_back(bv);
         if (i == bv.length()) {
@@ -183,9 +204,9 @@ module typus::big_vector {
         }
     }
 
-    /// remove the element at index i and shift the rest elements
-    /// abort when reference more thant 1000 slices
-    /// costly function, use wisely
+    /// Removes the element at index `i` and shifts the rest of the elements to the left.
+    /// This is a costly function, especially for large BigVectors. Use with caution.
+    /// Aborts when referencing more than 1000 slices.
     public fun remove<Element: store>(bv: &mut BigVector, i: u64): Element {
         assert!(i < bv.length(), EIndexOutOfBounds);
 
@@ -205,7 +226,8 @@ module typus::big_vector {
         result
     }
 
-    /// drop BigVector, abort if it's not empty
+    /// Destroys an empty BigVector.
+    /// Aborts if the BigVector is not empty.
     public fun destroy_empty(bv: BigVector) {
         let BigVector {
             id,
@@ -218,8 +240,9 @@ module typus::big_vector {
         id.delete();
     }
 
-    /// drop BigVector if element has drop ability
-    /// abort when the BigVector contains more thant 1000 slices
+    /// Destroys a BigVector and its elements.
+    /// The element type must have the `drop` ability.
+    /// Aborts when the BigVector contains more than 1000 slices.
     public fun drop<Element: store + drop>(bv: BigVector) {
         let BigVector {
             mut id,
@@ -236,7 +259,7 @@ module typus::big_vector {
         id.delete();
     }
 
-    /// remove empty slice after element removal
+    /// Removes an empty slice after an element has been removed from it.
     fun trim_slice<Element: store>(bv: &mut BigVector) {
         let slice = borrow_slice_(&bv.id, bv.slice_idx);
         if (slice.vector.is_empty<Element>()) {

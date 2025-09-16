@@ -1,5 +1,9 @@
 // Copyright (c) Typus Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+/// This module implements a `KeyedBigVector`, a data structure that combines the features of a `BigVector`
+/// and a `Table`. It allows for both indexed and keyed access to a large number of elements by storing
+/// them in slices, while maintaining a mapping from keys to indices in a `Table`.
 module typus::keyed_big_vector {
     use std::type_name::{Self, TypeName};
 
@@ -8,53 +12,67 @@ module typus::keyed_big_vector {
 
     // ======== Constants ========
 
+    /// The maximum number of slices allowed in a KeyedBigVector.
     const CMaxSliceAmount: u16 = 1000;
+    /// The maximum size of a slice.
     const CMaxSliceSize: u32 = 262144;
+    /// The key for the dynamic field that stores the key-to-index table.
     const SKeyIndexTable: vector<u8> = b"key_index_table";
 
     // ======== Errors ========
 
+    /// Error for a duplicate key.
     fun duplicate_key(): u64 { abort 0 }
+    /// Error for an out-of-bounds index.
     fun index_out_of_bounds(): u64 { abort 0 }
+    /// Error for an invalid slice size.
     fun invalid_slice_size(): u64 { abort 0 }
+    /// Error when a key is not found.
     fun key_not_found(): u64 { abort 0 }
+    /// Error when the maximum number of slices is reached.
     fun max_slice_amount_reached(): u64 { abort 0 }
+    /// Error when trying to destroy a non-empty KeyedBigVector.
     fun not_empty(): u64 { abort 0 }
 
     // ======== Structs ========
 
+    /// A data structure that allows for both indexed and keyed access to a large number of elements.
     public struct KeyedBigVector has key, store {
-        /// the ID of the KeyedBigVector
+        /// The unique identifier of the KeyedBigVector object.
         id: UID,
-        /// the key type of the KeyedBigVector
+        /// The type name of the keys.
         key_type: TypeName,
-        /// the element type of the KeyedBigVector
+        /// The type name of the values.
         value_type: TypeName,
-        /// the latest index of the Slice in the KeyedBigVector
+        /// The index of the latest slice.
         slice_idx: u16,
-        /// the max size of each Slice in the KeyedBigVector
+        /// The maximum size of each slice.
         slice_size: u32,
-        /// the length of the KeyedBigVector
+        /// The total number of elements in the KeyedBigVector.
         length: u64,
     }
 
+    /// A slice of the KeyedBigVector, containing a vector of elements.
     public struct Slice<K: copy + drop + store, V: store> has store, drop {
-        /// the index of the Slice
+        /// The index of the slice.
         idx: u16,
-        /// the vector which stores elements
+        /// The vector that stores the elements.
         vector: vector<Element<K, V>>,
     }
 
+    /// An element in the KeyedBigVector, containing a key-value pair.
     public struct Element<K: copy + drop + store, V: store> has store, drop {
+        /// The key of the element.
         key: K,
+        /// The value of the element.
         value: V,
     }
 
     // ======== Functions ========
 
-    /// create KeyedBigVector
+    /// Creates a new `KeyedBigVector`.
+    /// The `slice_size` determines the maximum number of elements in each slice.
     public fun new<K: copy + drop + store, V: store>(slice_size: u32, ctx: &mut TxContext): KeyedBigVector {
-        // slice_size * sizeof(Element) should be below the object size limit 256000 bytes.
         assert!(slice_size > 0 && slice_size <= CMaxSliceSize, invalid_slice_size());
         let mut id = object::new(ctx);
         dynamic_field::add(&mut id, SKeyIndexTable.to_string(), table::new<K, u64>(ctx));
@@ -69,42 +87,43 @@ module typus::keyed_big_vector {
         }
     }
 
-    /// return the latest index of the Slice in the KeyedBigVector
+    /// Returns the index of the latest slice in the KeyedBigVector.
     public fun slice_idx(kbv: &KeyedBigVector): u16 {
         kbv.slice_idx
     }
 
-    /// return the max size of each Slice in the KeyedBigVector
+    /// Returns the maximum size of each slice in the KeyedBigVector.
     public fun slice_size(kbv: &KeyedBigVector): u32 {
         kbv.slice_size
     }
 
-    /// return the length of the KeyedBigVector
+    /// Returns the total number of elements in the KeyedBigVector.
     public fun length(kbv: &KeyedBigVector): u64 {
         kbv.length
     }
 
-    /// return true if the KeyedBigVector is empty
+    /// Returns `true` if the KeyedBigVector is empty.
     public fun is_empty(kbv: &KeyedBigVector): bool {
         kbv.length == 0
     }
 
-    /// return true if there is a value associated with the key `key: Key` in the KeyedBigVector
+    /// Returns `true` if there is a value associated with the key `key` in the KeyedBigVector.
     public fun contains<K: copy + drop + store>(kbv: &KeyedBigVector, key: K): bool {
         table::contains<K, u64>(dynamic_field::borrow(&kbv.id, SKeyIndexTable.to_string()), key)
     }
 
-    /// return the index of the Slice
+    /// Returns the index of the slice.
     public fun get_slice_idx<K: copy + drop + store, V: store>(slice: &Slice<K, V>): u16 {
         slice.idx
     }
 
-    /// return the length of the element in the Slice
+    /// Returns the number of elements in the slice.
     public fun get_slice_length<K: copy + drop + store, V: store>(slice: &Slice<K, V>): u64 {
         slice.vector.length()
     }
 
-    /// push a new element at the end of the KeyedBigVector
+    /// Pushes a new element to the end of the KeyedBigVector.
+    /// Aborts if the key already exists or if the maximum number of slices is reached.
     public fun push_back<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K, value: V) {
         assert!(!kbv.contains(key), duplicate_key());
         let element = Element { key, value };
@@ -125,7 +144,8 @@ module typus::keyed_big_vector {
         kbv.length = kbv.length + 1;
     }
 
-    /// pop an element from the end of the KeyedBigVector
+    /// Pops an element from the end of the KeyedBigVector and returns its key and value.
+    /// Aborts if the KeyedBigVector is empty.
     public fun pop_back<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector): (K, V) {
         assert!(!kbv.is_empty(), index_out_of_bounds());
 
@@ -138,7 +158,7 @@ module typus::keyed_big_vector {
         (key, value)
     }
 
-    /// borrow a slice from the KeyedBigVector
+    /// Borrows a slice from the KeyedBigVector at `slice_idx`.
     public fun borrow_slice<K: copy + drop + store, V: store>(kbv: &KeyedBigVector, slice_idx: u16): &Slice<K, V> {
         assert!(slice_idx <= kbv.slice_idx, index_out_of_bounds());
 
@@ -148,7 +168,7 @@ module typus::keyed_big_vector {
         dynamic_field::borrow(id, slice_idx)
     }
 
-    /// borrow a mutable slice from the KeyedBigVector
+    /// Borrows a mutable slice from the KeyedBigVector at `slice_idx`.
     public fun borrow_slice_mut<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, slice_idx: u16): &mut Slice<K, V> {
         assert!(slice_idx <= kbv.slice_idx, index_out_of_bounds());
 
@@ -158,7 +178,7 @@ module typus::keyed_big_vector {
         dynamic_field::borrow_mut(id, slice_idx)
     }
 
-    /// borrow an element at index i from the KeyedBigVector
+    /// Borrows an element at index `i` from the KeyedBigVector.
     public fun borrow<K: copy + drop + store, V: store>(kbv: &KeyedBigVector, i: u64): (K, &V) {
         assert!(i < kbv.length, index_out_of_bounds());
 
@@ -171,7 +191,7 @@ module typus::keyed_big_vector {
         (element.key, &element.value)
     }
 
-    /// borrow a mutable element at index i from the KeyedBigVector
+    /// Borrows a mutable element at index `i` from the KeyedBigVector.
     public fun borrow_mut<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, i: u64): (K, &mut V) {
         assert!(i < kbv.length, index_out_of_bounds());
 
@@ -184,8 +204,8 @@ module typus::keyed_big_vector {
         (element.key, &mut element.value)
     }
 
+    /// Borrows an element by its key from the KeyedBigVector.
     #[syntax(index)]
-    /// borrow an element by key from the KeyedBigVector
     public fun borrow_by_key<K: copy + drop + store, V: store>(kbv: &KeyedBigVector, key: K): &V {
         assert!(kbv.contains(key), key_not_found());
 
@@ -195,8 +215,8 @@ module typus::keyed_big_vector {
         v
     }
 
+    /// Borrows a mutable element by its key from the KeyedBigVector.
     #[syntax(index)]
-    /// borrow a mutable element by key from the KeyedBigVector
     public fun borrow_by_key_mut<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K): &mut V {
         assert!(kbv.contains(key), key_not_found());
 
@@ -206,7 +226,7 @@ module typus::keyed_big_vector {
         v
     }
 
-    /// borrow an element at index i from the KeyedBigVector
+    /// Borrows an element at index `i` from a slice.
     public fun borrow_from_slice<K: copy + drop + store, V: store>(slice: &Slice<K, V>, i: u64): (K, &V) {
         assert!(i < slice.vector.length(), index_out_of_bounds());
 
@@ -215,7 +235,7 @@ module typus::keyed_big_vector {
         (element.key, &element.value)
     }
 
-    /// borrow a mutable element at index i from the KeyedBigVector
+    /// Borrows a mutable element at index `i` from a slice.
     public fun borrow_from_slice_mut<K: copy + drop + store, V: store>(slice: &mut Slice<K, V>, i: u64): (K, &mut V) {
         assert!(i < slice.vector.length(), index_out_of_bounds());
 
@@ -224,7 +244,7 @@ module typus::keyed_big_vector {
         (element.key, &mut element.value)
     }
 
-    /// swap and pop the element at index i with the last element
+    /// Swaps the element at index `i` with the last element and removes it.
     public fun swap_remove<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, i: u64): (K, V) {
         assert!(i < kbv.length, index_out_of_bounds());
 
@@ -244,7 +264,7 @@ module typus::keyed_big_vector {
         }
     }
 
-    /// swap and pop the element at index i with the last element
+    /// Swaps the element with the given key with the last element and removes it.
     public fun swap_remove_by_key<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector, key: K): V {
         assert!(kbv.contains(key), key_not_found());
 
@@ -254,7 +274,8 @@ module typus::keyed_big_vector {
         v
     }
 
-    /// drop KeyedBigVector, abort if it's not empty
+    /// Destroys an empty KeyedBigVector.
+    /// Aborts if the KeyedBigVector is not empty.
     public fun destroy_empty(kbv: KeyedBigVector) {
         let KeyedBigVector {
             id,
@@ -268,7 +289,7 @@ module typus::keyed_big_vector {
         id.delete();
     }
 
-    /// drop KeyedBigVector
+    /// Destroys a KeyedBigVector.
     public fun drop(kbv: KeyedBigVector) {
         let KeyedBigVector {
             id,
@@ -281,7 +302,7 @@ module typus::keyed_big_vector {
         id.delete();
     }
 
-    /// drop KeyedBigVector completely
+    /// Destroys a KeyedBigVector and its elements completely.
     public fun completely_drop<K: copy + drop + store, V: drop + store>(kbv: KeyedBigVector) {
         let KeyedBigVector {
             mut id,
@@ -299,7 +320,7 @@ module typus::keyed_big_vector {
         id.delete();
     }
 
-    /// remove empty slice after element removal
+    /// Removes an empty slice after an element has been removed from it.
     fun trim_slice<K: copy + drop + store, V: store>(kbv: &mut KeyedBigVector) {
         let slice = borrow_slice_(&kbv.id, kbv.slice_idx);
         if (slice.vector.is_empty<Element<K, V>>()) {
@@ -314,6 +335,7 @@ module typus::keyed_big_vector {
         };
     }
 
+    /// A macro for iterating over the elements of a KeyedBigVector with immutable references.
     public macro fun do_ref<$K, $V>($kbv: &KeyedBigVector, $f: |$K, &$V|) {
         let kbv = $kbv;
         let length = kbv.length();
@@ -331,6 +353,7 @@ module typus::keyed_big_vector {
         };
     }
 
+    /// A macro for iterating over the elements of a KeyedBigVector with mutable references.
     public macro fun do_mut<$K, $V>($kbv: &mut KeyedBigVector, $f: |$K, &mut $V|) {
         let kbv = $kbv;
         let length = kbv.length();
