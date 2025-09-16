@@ -724,7 +724,7 @@ module typus::tails_staking {
         bcs_padding: vector<vector<u8>>,
     }
     /// Increases the EXP of a staked Tails NFT.
-    /// BUG: assert if not tails owner
+    /// Safe with ctx.sender as verification
     public fun exp_up(
         version: &Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -733,7 +733,8 @@ module typus::tails_staking {
         amount: u64,
         ctx: &TxContext,
     ) {
-        version.version_check();
+        let user = tx_context::sender(ctx);
+        verify_staking(version, tails_staking_registry, user, tails);
 
         if (!tails_staking_registry.tails.contains(tails)) {
             abort EStakingInfoNotFound
@@ -858,7 +859,7 @@ module typus::tails_staking {
         bcs_padding: vector<vector<u8>>,
     }
     /// Decreases the EXP of a staked Tails NFT, with a fee.
-    /// BUG: assert if not tails owner
+    /// Safe with ctx.sender as verification
     public fun exp_down_with_fee(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
@@ -868,7 +869,8 @@ module typus::tails_staking {
         coin: Coin<SUI>,
         ctx: &TxContext,
     ) {
-        version.version_check();
+        let user = tx_context::sender(ctx);
+        verify_staking(version, tails_staking_registry, user, tails);
 
         assert!(coin.value() == tails_staking_registry.config[IExpDownFee], EInvalidFee);
         version.charge_fee(coin.into_balance());
@@ -1290,6 +1292,51 @@ module typus::tails_staking {
         };
 
         level_counts
+    }
+
+    /// Verifies if a user has a staked Tails NFT of the certain address.
+    public fun verify_staking(
+        version: &Version,
+        tails_staking_registry: &TailsStakingRegistry,
+        user: address,
+        tails: address,
+    ): bool {
+        version.version_check();
+
+        let tails_ids: &vector<address> = &tails_staking_registry.tails_metadata[KTailsIds];
+        let length = big_vector::length(&tails_staking_registry.staking_infos);
+        let slice_size = (big_vector::slice_size(&tails_staking_registry.staking_infos) as u64);
+        let mut slice_idx = 0;
+        let mut slice = big_vector::borrow_slice(&tails_staking_registry.staking_infos, slice_idx);
+        let mut slice_length = big_vector::get_slice_length(slice);
+        let mut i = 0;
+        while (i < length) {
+            let staking_info = big_vector::borrow_from_slice<StakingInfo>(slice, i % slice_size);
+            if (staking_info.user == user) {
+                let mut i = 0;
+                let length = vector::length(&staking_info.tails);
+                while (i < length) {
+                    let tails_number = *vector::borrow(&staking_info.tails, i);
+                    if (*vector::borrow(tails_ids, tails_number - 1) == tails) {
+                        return true
+                    };
+                    i = i + 1;
+                };
+                return false
+            };
+            // jump to next slice
+            if (i + 1 < length && i + 1 == slice_idx * slice_size + slice_length) {
+                slice_idx = big_vector::get_slice_idx(slice) + 1;
+                slice = big_vector::borrow_slice(
+                    &tails_staking_registry.staking_infos,
+                    slice_idx,
+                );
+                slice_length = big_vector::get_slice_length(slice);
+            };
+            i = i + 1;
+        };
+
+        false
     }
 
     /// Verifies if a user has a staked Tails NFT of a certain level or higher.
