@@ -15,6 +15,7 @@ module typus_dov::tds_user_entry {
 
     const E_DEPRECATED_FUNCTION: u64 = 999;
 
+    /// Performs a safety check for user entry functions.
     fun safety_check<D_TOKEN, B_TOKEN>(
         registry: &Registry,
         index: u64,
@@ -24,6 +25,7 @@ module typus_dov::tds_user_entry {
         typus_dov_single::portfolio_vault_token_check<D_TOKEN, B_TOKEN>(registry, index);
     }
 
+    /// [User Function] Allows a user to raise funds for a deposit.
     public fun public_raise_fund<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -98,6 +100,7 @@ module typus_dov::tds_user_entry {
         (receipt, log)
     }
 
+    /// [User Function] Allows a user to reduce their funds from a deposit.
     public fun public_reduce_fund<D_TOKEN, B_TOKEN, I_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -185,6 +188,7 @@ module typus_dov::tds_user_entry {
         (receipt, d_balance, b_balance, i_balance, log)
     }
 
+    /// [User Function] Refreshes a user's deposit snapshot.
     public fun public_refresh_deposit_snapshot<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -245,6 +249,7 @@ module typus_dov::tds_user_entry {
         (receipt, log)
     }
 
+    /// [User Function] Allows a user to place a bid.
     public fun public_bid<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -367,6 +372,7 @@ module typus_dov::tds_user_entry {
         )
     }
 
+    /// [User Function] Transfers a bid receipt to another user.
     #[lint_allow(self_transfer)]
     public(package) entry fun transfer_bid_receipt<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -416,6 +422,7 @@ module typus_dov::tds_user_entry {
         );
     }
 
+    /// [User Function] A public version of `transfer_bid_receipt`.
     public fun public_transfer_bid_receipt<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -457,7 +464,7 @@ module typus_dov::tds_user_entry {
         (remain_receipt, log)
     }
 
-    /// merge_bid_receipt if share = None
+    /// [User Function] Splits a bid receipt. If `share` is `None`, it merges the receipts.
     public fun simple_split_bid_receipt(
         registry: &mut Registry,
         index: u64,
@@ -495,6 +502,7 @@ module typus_dov::tds_user_entry {
         (split_receipt, remain_receipt, vector[amount])
     }
 
+    /// [User Function] Exercises a bid.
     #[allow(unused_type_parameter)]
     public fun exercise<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -543,6 +551,7 @@ module typus_dov::tds_user_entry {
         (balance, log)
     }
 
+    /// [User Function] Claims a rebate.
     public fun rebate<TOKEN>(
         registry: &mut Registry,
         ctx: &mut TxContext,
@@ -581,6 +590,7 @@ module typus_dov::tds_user_entry {
         (balance, log)
     }
 
+    /// [User Function] Merges deposit receipts.
     public fun merge_deposit_receipts(
         registry: &mut Registry,
         index: u64,
@@ -611,6 +621,7 @@ module typus_dov::tds_user_entry {
         (option::destroy_some(receipt), log)
     }
 
+    /// [User Function] Splits a deposit receipt.
     public fun split_deposit_receipt_v2(
         registry: &mut Registry,
         index: u64,

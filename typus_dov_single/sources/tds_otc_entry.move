@@ -11,6 +11,7 @@ module typus_dov::tds_otc_entry {
 
     const KOtcConfigs: vector<u8> = b"otc_configs";
 
+    /// A struct that holds the configuration for an OTC deal.
     public struct OtcConfig has drop, store {
         round: u64,
         size: u64,
@@ -20,6 +21,7 @@ module typus_dov::tds_otc_entry {
         u64_padding: vector<u64>,
     }
 
+    /// [Authorized Function] Adds a new OTC configuration for a user.
     entry fun add_otc_config(
         registry: &mut Registry,
         user: address,
@@ -82,6 +84,7 @@ module typus_dov::tds_otc_entry {
         );
     }
 
+    /// [Authorized Function] Removes an OTC configuration for a user.
     entry fun remove_otc_config(
         registry: &mut Registry,
         user: address,
@@ -116,6 +119,7 @@ module typus_dov::tds_otc_entry {
         );
     }
 
+    /// [User Function] Executes an OTC deal.
     public fun otc<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -182,6 +186,7 @@ module typus_dov::tds_otc_entry {
         );
     }
 
+    /// [View Function] A view function to get a user's OTC configurations.
     public(package) fun get_user_otc_configs(
         registry: &mut Registry,
         user: address,
