@@ -5787,7 +5787,7 @@ module typus_dov::typus_dov_single {
     public fun test_issue_ecosystem_manager_cap(registry: &mut Registry, version: &TypusEcosystemVersion, ctx: &mut TxContext) {
         use typus::ecosystem;
         let manager_cap = ecosystem::issue_manager_cap(version, ctx);
-        dynamic_object_field::add(&mut registry.id, K_TYPUS_ECOSYSTEM, manager_cap);
+        dynamic_field::add(&mut registry.id, K_TYPUS_ECOSYSTEM, manager_cap);
     }
 
     // ======== Errors ========
