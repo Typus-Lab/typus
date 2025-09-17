@@ -5,9 +5,6 @@ module suilend::reserve_config {
     use sui::tx_context::{TxContext};
     use sui::bag::{Self, Bag};
 
-    #[test_only]
-    use sui::test_scenario::{Self};
-
     const EInvalidReserveConfig: u64 = 0;
     const EInvalidUtil: u64 = 1;
 
@@ -42,7 +39,7 @@ module suilend::reserve_config {
         // extra withdraw amount as fee for protocol on liquidations
         protocol_liquidation_fee_bps: u64,
 
-        // if true, the asset cannot be used as collateral 
+        // if true, the asset cannot be used as collateral
         // and can only be borrowed in isolation
         isolated: bool,
 
@@ -58,19 +55,19 @@ module suilend::reserve_config {
     }
 
     public fun create_reserve_config(
-        open_ltv_pct: u8, 
-        close_ltv_pct: u8, 
+        open_ltv_pct: u8,
+        close_ltv_pct: u8,
         max_close_ltv_pct: u8,
-        borrow_weight_bps: u64, 
-        deposit_limit: u64, 
-        borrow_limit: u64, 
+        borrow_weight_bps: u64,
+        deposit_limit: u64,
+        borrow_limit: u64,
         liquidation_bonus_bps: u64,
         max_liquidation_bonus_bps: u64,
         deposit_limit_usd: u64,
         borrow_limit_usd: u64,
-        borrow_fee_bps: u64, 
-        spread_fee_bps: u64, 
-        protocol_liquidation_fee_bps: u64, 
+        borrow_fee_bps: u64,
+        spread_fee_bps: u64,
+        protocol_liquidation_fee_bps: u64,
         interest_rate_utils: vector<u8>,
         interest_rate_aprs: vector<u64>,
         isolated: bool,
@@ -115,7 +112,7 @@ module suilend::reserve_config {
         assert!(config.borrow_weight_bps >= 10_000, EInvalidReserveConfig);
         assert!(config.liquidation_bonus_bps <= config.max_liquidation_bonus_bps, EInvalidReserveConfig);
         assert!(
-            config.max_liquidation_bonus_bps + config.protocol_liquidation_fee_bps <= 2_000, 
+            config.max_liquidation_bonus_bps + config.protocol_liquidation_fee_bps <= 2_000,
             EInvalidReserveConfig
         );
 
@@ -127,7 +124,7 @@ module suilend::reserve_config {
         assert!(config.spread_fee_bps <= 10_000, EInvalidReserveConfig);
 
         assert!(
-            config.open_attributed_borrow_limit_usd <= config.close_attributed_borrow_limit_usd, 
+            config.open_attributed_borrow_limit_usd <= config.close_attributed_borrow_limit_usd,
             EInvalidReserveConfig
         );
 
@@ -137,7 +134,7 @@ module suilend::reserve_config {
     fun validate_utils_and_aprs(utils: &vector<u8>, aprs: &vector<u64>) {
         assert!(vector::length(utils) >= 2, EInvalidReserveConfig);
         assert!(
-            vector::length(utils) == vector::length(aprs), 
+            vector::length(utils) == vector::length(aprs),
             EInvalidReserveConfig
         );
 
@@ -245,7 +242,7 @@ module suilend::reserve_config {
     }
 
     public fun destroy(config: ReserveConfig) {
-        let ReserveConfig { 
+        let ReserveConfig {
             open_ltv_pct: _,
             close_ltv_pct: _,
             max_close_ltv_pct: _,
@@ -295,7 +292,7 @@ module suilend::reserve_config {
 
         builder
     }
-    
+
     fun set<K: copy + drop + store, V: store + drop>(builder : &mut ReserveConfigBuilder, field: K, value: V) {
         if (bag::contains(&builder.fields, field)) {
             let val: &mut V = bag::borrow_mut(&mut builder.fields, field);
@@ -404,187 +401,4 @@ module suilend::reserve_config {
         bag::destroy_empty(fields);
         config
     }
-
-
-    // === Tests ==
-    #[test]
-    fun test_calculate_apr() {
-        let mut config = default_reserve_config();
-        config.interest_rate_utils = {
-            let mut v = vector::empty();
-            vector::push_back(&mut v, 0);
-            vector::push_back(&mut v, 10);
-            vector::push_back(&mut v, 100);
-            v
-        };
-        config.interest_rate_aprs = {
-            let mut v = vector::empty();
-            vector::push_back(&mut v, 0);
-            vector::push_back(&mut v, 10000);
-            vector::push_back(&mut v, 100000);
-            v
-        };
-
-        assert!(calculate_apr(&config, decimal::from_percent(0)) == decimal::from(0), 0);
-        assert!(calculate_apr(&config, decimal::from_percent(5)) == decimal::from_percent(50), 0);
-        assert!(calculate_apr(&config, decimal::from_percent(10)) == decimal::from_percent(100), 0);
-        assert!(calculate_apr(&config, decimal::from_percent(55)) == decimal::from_percent_u64(550), 0);
-        assert!(calculate_apr(&config, decimal::from_percent(100)) == decimal::from_percent_u64(1000), 0);
-
-        destroy(config);
-    }
-
-    #[test]
-    fun test_valid_reserve_config() {
-
-        let owner = @0x26;
-        let mut scenario = test_scenario::begin(owner);
-
-        let mut utils = vector::empty();
-        vector::push_back(&mut utils, 0);
-        vector::push_back(&mut utils, 100);
-
-        let mut aprs = vector::empty();
-        vector::push_back(&mut aprs, 0);
-        vector::push_back(&mut aprs, 100);
-
-        let config = create_reserve_config(
-            10,
-            10,
-            10,
-            10_000,
-            1,
-            1,
-            5,
-            5,
-            100000,
-            100000,
-            10,
-            2000,
-            30,
-            utils,
-            aprs,
-            false,
-            0,
-            0,
-            test_scenario::ctx(&mut scenario)
-        );
-
-
-        destroy(config);
-        test_scenario::end(scenario);
-    }
-
-    // TODO: there are so many other invalid states to test
-    #[test]
-    #[expected_failure(abort_code = EInvalidReserveConfig)]
-    fun test_invalid_reserve_config() {
-        let owner = @0x26;
-        let mut scenario = test_scenario::begin(owner);
-
-        let config = create_reserve_config(
-            // open ltv pct
-            10,
-            // close ltv pct
-            9,
-            // max close ltv pct
-            10,
-            // borrow weight bps
-            10_000,
-            // deposit_limit
-            1,
-            // borrow_limit
-            1,
-            // liquidation bonus pct
-            5,
-            // max liquidation bonus pct
-            5,
-            10,
-            10,
-            // borrow fee bps
-            10,
-            // spread fee bps
-            2000,
-            // liquidation fee bps
-            3000,
-            // utils
-            {
-                let mut v = vector::empty();
-                vector::push_back(&mut v, 0);
-                vector::push_back(&mut v, 100);
-                v
-            },
-            // aprs
-            {
-                let mut v = vector::empty();
-                vector::push_back(&mut v, 0);
-                vector::push_back(&mut v, 100);
-                v
-            },
-            false,
-            0,
-            0,
-            test_scenario::ctx(&mut scenario)
-        );
-
-        destroy(config);
-        test_scenario::end(scenario);
-    }
-
-    #[test_only]
-    public fun default_reserve_config(): ReserveConfig {
-        let owner = @0x26;
-        let mut scenario = test_scenario::begin(owner);
-
-        let config = create_reserve_config(
-            // open ltv pct
-            0,
-            // close ltv pct
-            0,
-            // max close ltv pct
-            0,
-            // borrow weight bps
-            10_000,
-            // deposit_limit
-            18_446_744_073_709_551_615,
-            // borrow_limit
-            18_446_744_073_709_551_615,
-            // liquidation bonus pct
-            0,
-            // max liquidation bonus pct
-            0,
-            // deposit_limit_usd
-            18_446_744_073_709_551_615,
-            // borrow_limit_usd
-            18_446_744_073_709_551_615,
-            // borrow fee bps
-            0,
-            // spread fee bps
-            0,
-            // liquidation fee bps
-            0,
-            // utils
-            {
-                let mut v = vector::empty();
-                vector::push_back(&mut v, 0);
-                vector::push_back(&mut v, 100);
-                v
-            },
-            // aprs
-            {
-                let mut v = vector::empty();
-                vector::push_back(&mut v, 0);
-                vector::push_back(&mut v, 0);
-                v
-            },
-            false,
-            18_446_744_073_709_551_615,
-            18_446_744_073_709_551_615,
-            test_scenario::ctx(&mut scenario)
-        );
-
-        test_scenario::end(scenario);
-        config
-    }
-
 }

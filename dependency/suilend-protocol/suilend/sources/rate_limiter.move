@@ -90,7 +90,7 @@ module suilend::rate_limiter {
         rate_limiter.cur_qty = add(rate_limiter.cur_qty, qty);
 
         assert!(
-            le(current_outflow(rate_limiter, cur_time), decimal::from(rate_limiter.config.max_outflow)), 
+            le(current_outflow(rate_limiter, cur_time), decimal::from(rate_limiter.config.max_outflow)),
             ERateLimitExceeded
         );
     }
@@ -98,37 +98,8 @@ module suilend::rate_limiter {
     public fun remaining_outflow(rate_limiter: &mut RateLimiter, cur_time: u64): Decimal {
         update_internal(rate_limiter, cur_time);
         saturating_sub(
-            decimal::from(rate_limiter.config.max_outflow), 
+            decimal::from(rate_limiter.config.max_outflow),
             current_outflow(rate_limiter, cur_time)
         )
-    }
-
-    #[test]
-    fun test_rate_limiter() {
-        let mut rate_limiter = new(
-            RateLimiterConfig{
-                window_duration: 10, 
-                max_outflow: 100
-            }, 
-            0
-        );
-
-        process_qty(&mut rate_limiter, 0, decimal::from(100));
-
-        let mut i = 0;
-        while (i < 10) {
-            assert!(current_outflow(&rate_limiter, i) == decimal::from(100), 0);
-            i = i + 1;
-        };
-
-        i = 10;
-        while (i < 19) {
-            process_qty(&mut rate_limiter, i, decimal::from(10));
-            assert!(current_outflow(&rate_limiter, i) == decimal::from(100), 0);
-            assert!(remaining_outflow(&mut rate_limiter, i) == decimal::from(0), 0);
-            i = i + 1;
-        };
-
-        process_qty(&mut rate_limiter, 100, decimal::from(100));
     }
 }

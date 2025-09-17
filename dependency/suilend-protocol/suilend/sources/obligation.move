@@ -8,10 +8,10 @@ module suilend::obligation {
     use sui::tx_context::{TxContext};
     use suilend::reserve::{Self, Reserve, config};
     use suilend::reserve_config::{
-        open_ltv, 
-        close_ltv, 
-        borrow_weight, 
-        liquidation_bonus, 
+        open_ltv,
+        close_ltv,
+        borrow_weight,
+        liquidation_bonus,
         protocol_liquidation_fee,
         isolated,
     };
@@ -50,11 +50,11 @@ module suilend::obligation {
         /// value of all deposits in USD
         deposited_value_usd: Decimal,
         /// sum(deposit value * open ltv) for all deposits.
-        /// if weighted_borrowed_value_usd > allowed_borrow_value_usd, 
+        /// if weighted_borrowed_value_usd > allowed_borrow_value_usd,
         /// the obligation is not healthy
         allowed_borrow_value_usd: Decimal,
         /// sum(deposit value * close ltv) for all deposits
-        /// if weighted_borrowed_value_usd > unhealthy_borrow_value_usd, 
+        /// if weighted_borrowed_value_usd > unhealthy_borrow_value_usd,
         /// the obligation is unhealthy and can be liquidated
         unhealthy_borrow_value_usd: Decimal,
         super_unhealthy_borrow_value_usd: Decimal, // unused
@@ -158,7 +158,7 @@ module suilend::obligation {
     }
 
 
-    /// update the obligation's borrowed amounts and health values. this is 
+    /// update the obligation's borrowed amounts and health values. this is
     /// called by the lending market prior to any borrow, withdraw, or liquidate operation.
     public(package) fun refresh<P>(
         obligation: &mut Obligation<P>,
@@ -228,9 +228,9 @@ module suilend::obligation {
 
             let market_value = reserve::market_value(borrow_reserve, borrow.borrowed_amount);
             let market_value_upper_bound = reserve::market_value_upper_bound(
-                borrow_reserve, 
+                borrow_reserve,
                 borrow.borrowed_amount
-            ); 
+            );
 
             borrow.market_value = market_value;
             unweighted_borrowed_value_usd = add(unweighted_borrowed_value_usd, market_value);
@@ -283,7 +283,7 @@ module suilend::obligation {
         let deposit_value = reserve::ctoken_market_value(reserve, ctoken_amount);
 
         // update other health values. note that we don't enforce price freshness here. this is purely
-        // to make offchain accounting easier. any operation that requires price 
+        // to make offchain accounting easier. any operation that requires price
         // freshness (withdraw, borrow, liquidate) will refresh the obligation right before.
         deposit.market_value = add(deposit.market_value, deposit_value);
         obligation.deposited_value_usd = add(obligation.deposited_value_usd, deposit_value);
@@ -334,15 +334,15 @@ module suilend::obligation {
 
         borrow.market_value = add(borrow.market_value, borrow_market_value);
         obligation.unweighted_borrowed_value_usd = add(
-            obligation.unweighted_borrowed_value_usd, 
+            obligation.unweighted_borrowed_value_usd,
             borrow_market_value
         );
         obligation.weighted_borrowed_value_usd = add(
-            obligation.weighted_borrowed_value_usd, 
+            obligation.weighted_borrowed_value_usd,
             mul(borrow_market_value, borrow_weight(config(reserve)))
         );
         obligation.weighted_borrowed_value_upper_bound_usd = add(
-            obligation.weighted_borrowed_value_upper_bound_usd, 
+            obligation.weighted_borrowed_value_upper_bound_usd,
             mul(borrow_market_value_upper_bound, borrow_weight(config(reserve)))
         );
 
@@ -383,7 +383,7 @@ module suilend::obligation {
         borrow.borrowed_amount = sub(borrow.borrowed_amount, repay_amount);
 
         // update other health values. note that we don't enforce price freshness here. this is purely
-        // to make offchain accounting easier. any operation that requires price 
+        // to make offchain accounting easier. any operation that requires price
         // freshness (withdraw, borrow, liquidate) will refresh the obligation right before.
         if (le(interest_diff, repay_amount)) {
             let diff = saturating_sub(repay_amount, interest_diff);
@@ -412,7 +412,7 @@ module suilend::obligation {
             borrow.market_value = add(borrow.market_value, additional_borrow_value);
             obligation.unweighted_borrowed_value_usd = add(
                 obligation.unweighted_borrowed_value_usd,
-                additional_borrow_value 
+                additional_borrow_value
             );
             obligation.weighted_borrowed_value_usd = add(
                 obligation.weighted_borrowed_value_usd,
@@ -433,8 +433,8 @@ module suilend::obligation {
         );
 
         if (eq(borrow.borrowed_amount, decimal::from(0))) {
-            let Borrow { 
-                coin_type: _, 
+            let Borrow {
+                coin_type: _,
                 reserve_array_index: _,
                 borrowed_amount: _,
                 cumulative_borrow_rate: _,
@@ -509,11 +509,11 @@ module suilend::obligation {
         );
 
         let withdraw_value = mul(
-            repay_value, 
+            repay_value,
             add(decimal::from(1), bonus)
         );
 
-        // repay amount, but in decimals. called settle amount to keep logic in line with 
+        // repay amount, but in decimals. called settle amount to keep logic in line with
         // spl-lending
         let final_settle_amount;
         let final_withdraw_amount;
@@ -534,15 +534,15 @@ module suilend::obligation {
         };
 
         repay(
-            obligation, 
-            vector::borrow_mut(reserves, repay_reserve_array_index), 
-            clock, 
+            obligation,
+            vector::borrow_mut(reserves, repay_reserve_array_index),
+            clock,
             final_settle_amount
         );
         withdraw_unchecked(
-            obligation, 
-            vector::borrow_mut(reserves, withdraw_reserve_array_index), 
-            clock, 
+            obligation,
+            vector::borrow_mut(reserves, withdraw_reserve_array_index),
+            clock,
             final_withdraw_amount
         );
 
@@ -559,8 +559,8 @@ module suilend::obligation {
         assert!(is_forgivable(obligation), EObligationIsNotForgivable);
         // not logging here because it logs inside repay instead
         repay<P>(
-            obligation, 
-            reserve, 
+            obligation,
+            reserve,
             clock,
             max_forgive_amount,
         )
@@ -770,7 +770,7 @@ module suilend::obligation {
     }
 
     public(package) fun zero_out_rewards_if_looped<P>(
-        obligation: &mut Obligation<P>, 
+        obligation: &mut Obligation<P>,
         reserves: &mut vector<Reserve<P>>,
         clock: &Clock
     ) {
@@ -803,7 +803,7 @@ module suilend::obligation {
 
             // Check if borrow-deposit reserve match
             let deposit_index = find_deposit_index_by_reserve_array_index(
-                obligation, 
+                obligation,
                 borrow.reserve_array_index
             );
 
@@ -827,7 +827,7 @@ module suilend::obligation {
                     let disabled_reserve_array_index = *vector::borrow(disabled_pairs, i);
 
                     let deposit_index = find_deposit_index_by_reserve_array_index(
-                        obligation, 
+                        obligation,
                         disabled_reserve_array_index
                     );
 
@@ -846,8 +846,8 @@ module suilend::obligation {
     }
 
     fun zero_out_rewards<P>(
-        obligation: &mut Obligation<P>, 
-        reserves: &mut vector<Reserve<P>>, 
+        obligation: &mut Obligation<P>,
+        reserves: &mut vector<Reserve<P>>,
         clock: &Clock
     ) {
         {
@@ -857,7 +857,7 @@ module suilend::obligation {
                 let reserve = vector::borrow_mut(reserves, deposit.reserve_array_index);
 
                 let user_reward_manager = vector::borrow_mut(
-                    &mut obligation.user_reward_managers, 
+                    &mut obligation.user_reward_managers,
                     deposit.user_reward_manager_index
                 );
 
@@ -879,7 +879,7 @@ module suilend::obligation {
                 let reserve = vector::borrow_mut(reserves, borrow.reserve_array_index);
 
                 let user_reward_manager = vector::borrow_mut(
-                    &mut obligation.user_reward_managers, 
+                    &mut obligation.user_reward_managers,
                     borrow.user_reward_manager_index
                 );
 
@@ -893,7 +893,7 @@ module suilend::obligation {
                 i = i + 1;
             };
         };
-    } 
+    }
 
     fun log_obligation_data<P>(obligation: &Obligation<P>) {
         event::emit(ObligationDataEvent {
@@ -937,7 +937,7 @@ module suilend::obligation {
                 };
 
                 borrows
-            
+
             },
             deposited_value_usd: obligation.deposited_value_usd,
             allowed_borrow_value_usd: obligation.allowed_borrow_value_usd,
@@ -996,7 +996,7 @@ module suilend::obligation {
         );
 
         let user_reward_manager = vector::borrow_mut(
-            &mut obligation.user_reward_managers, 
+            &mut obligation.user_reward_managers,
             deposit.user_reward_manager_index
         );
         liquidity_mining::change_user_reward_manager_share(
@@ -1007,7 +1007,7 @@ module suilend::obligation {
         );
 
         if (deposit.deposited_ctoken_amount == 0) {
-            let Deposit { 
+            let Deposit {
                 coin_type: _,
                 reserve_array_index: _,
                 deposited_ctoken_amount: _,
@@ -1104,7 +1104,7 @@ module suilend::obligation {
         assert!(i < vector::length(&obligation.deposits), EDepositNotFound);
 
         vector::borrow(&obligation.deposits, i)
-    }   
+    }
 
     fun find_or_add_borrow<P>(
         obligation: &mut Obligation<P>,
@@ -1196,29 +1196,5 @@ module suilend::obligation {
         let length = vector::length(&obligation.user_reward_managers);
 
         (length - 1, vector::borrow_mut(&mut obligation.user_reward_managers, length - 1))
-    }
-
-    #[test_only]
-    public(package) fun borrows_mut<P>(obligation: &mut Obligation<P>): &mut vector<Borrow> {
-        &mut obligation.borrows
-    }
-
-    #[test_only]
-    public(package) fun create_borrow_for_testing(
-        coin_type: TypeName,
-        reserve_array_index: u64,
-        borrowed_amount: Decimal,
-        cumulative_borrow_rate: Decimal,
-        market_value: Decimal,
-        user_reward_manager_index: u64,
-    ): Borrow {
-        Borrow {
-            coin_type,
-            reserve_array_index,
-            borrowed_amount,
-            cumulative_borrow_rate,
-            market_value,
-            user_reward_manager_index
-        }
     }
 }
