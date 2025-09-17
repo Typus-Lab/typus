@@ -118,7 +118,7 @@ module typus::tgld {
 
 
     #[test_only]
-    public(package) fun test_init(ctx: &mut TxContext) {
+    public fun test_init(ctx: &mut TxContext) {
         init(TGLD {}, ctx);
     }
 }

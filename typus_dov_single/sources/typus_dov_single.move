@@ -5779,7 +5779,7 @@ module typus_dov::typus_dov_single {
     }
 
     #[test_only]
-    public(package) fun test_init(ctx: &mut TxContext) {
+    public fun test_init(ctx: &mut TxContext) {
         init(TYPUS_DOV_SINGLE {}, ctx);
     }
 
