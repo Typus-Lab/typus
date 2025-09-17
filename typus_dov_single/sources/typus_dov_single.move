@@ -5783,6 +5783,13 @@ module typus_dov::typus_dov_single {
         init(TYPUS_DOV_SINGLE {}, ctx);
     }
 
+    #[test_only]
+    public fun test_issue_ecosystem_manager_cap(registry: &mut Registry, version: &TypusEcosystemVersion, ctx: &mut TxContext) {
+        use typus::ecosystem;
+        let manager_cap = ecosystem::issue_manager_cap(version, ctx);
+        dynamic_object_field::add(&mut registry.id, K_TYPUS_ECOSYSTEM, manager_cap);
+    }
+
     // ======== Errors ========
 
     fun auction_already_started(index: u64): u64 { abort index }
