@@ -7,6 +7,7 @@ module typus_dov::tds_fee_pool_entry {
     use typus_framework::authority;
     use typus_framework::balance_pool;
 
+    /// Performs a safety check for authorized functions.
     fun safety_check(
         registry: &Registry,
         ctx: &TxContext,
@@ -15,10 +16,13 @@ module typus_dov::tds_fee_pool_entry {
         typus_dov_single::validate_registry_authority(registry, ctx);
     }
 
+    /// Event emitted when an authorized user is added to the fee pool.
     public struct AddFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
+    /// Adds an authorized user to the fee pool.
+    /// This is an authorized function (via registry authority).
     public(package) entry fun add_fee_pool_authorized_user(
         registry: &mut Registry,
         mut users: vector<address>,
@@ -54,10 +58,13 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when an authorized user is removed from the fee pool.
     public struct RemoveFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
+    /// Removes an authorized user from the fee pool.
+    /// This is an authorized function (via registry authority).
     public(package) entry fun remove_fee_pool_authorized_user(
         registry: &mut Registry,
         mut users: vector<address>,
@@ -93,11 +100,14 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when a fee is taken from the fee pool.
     public struct TakeFeeEvent has copy, drop {
         signer: address,
         token: TypeName,
         amount: u64,
     }
+    /// Takes a fee from the fee pool.
+    /// This is an authorized function (via registry authority).
     public(package) entry fun take_fee<TOKEN>(
         registry: &mut Registry,
         amount: Option<u64>,
@@ -130,12 +140,15 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when a fee is sent from the fee pool.
     public struct SendFeeEvent has copy, drop {
         signer: address,
         token: TypeName,
         amount: u64,
         recipient: address,
     }
+    /// Sends a fee from the fee pool to a specified address.
+    /// This is an authorized function (via registry authority).
     public(package) entry fun send_fee<TOKEN>(
         registry: &mut Registry,
         amount: Option<u64>,
@@ -169,10 +182,13 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when an authorized user is added to a shared fee pool.
     public struct AddSharedFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
+    /// Adds an authorized user to a shared fee pool.
+    /// This is an authorized function (via registry authority).
     public entry fun add_shared_fee_pool_authorized_user(
         registry: &mut Registry,
         key: vector<u8>,
@@ -209,10 +225,13 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when an authorized user is removed from a shared fee pool.
     public struct RemoveSharedFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
+    /// Removes an authorized user from a shared fee pool.
+    /// This is an authorized function (via registry authority).
     public entry fun remove_shared_fee_pool_authorized_user(
         registry: &mut Registry,
         key: vector<u8>,
@@ -249,12 +268,15 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
+    /// Event emitted when a fee is taken from a shared fee pool.
     public struct TakeSharedFeeEvent has copy, drop {
         signer: address,
         key: vector<u8>,
         token: TypeName,
         amount: u64,
     }
+    /// Takes a fee from a shared fee pool.
+    /// This is an authorized function (via registry authority).
     entry fun take_shared_fee<TOKEN>(
         registry: &mut Registry,
         key: vector<u8>,

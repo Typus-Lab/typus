@@ -18,6 +18,7 @@ module typus_dov::tds_witness_entry {
     const E_INVALID_SIGNATURE: u64 = 0;
     const E_EXPIRED_SIGNATURE: u64 = 1;
 
+    /// Performs a safety check for witness-authorized functions.
     fun safety_check<W: drop, D_TOKEN, B_TOKEN>(
         witness: W,
         registry: &Registry,
@@ -28,6 +29,8 @@ module typus_dov::tds_witness_entry {
         typus_dov_single::portfolio_vault_token_check<D_TOKEN, B_TOKEN>(registry, index);
     }
 
+    /// Executes an OTC deal with a witness.
+    /// WARNING: without authority check inside.
     #[allow(implicit_const_copy)]
     public fun otc<W: drop, D_TOKEN, B_TOKEN>(
         witness: W,
@@ -99,7 +102,8 @@ module typus_dov::tds_witness_entry {
 
     const TYPUS_GALAXY_DOV_ALPHALEND_WITNESS: vector<u8> = b"37853e40e10a44aa9ded5a7bf9c3e2d973830f290dfd03cfbfd76213dd1b8627::dov_alphalend::WITNESS";
 
-    // TODO: extend supported witnesses
+    /// A helper function to get the witness string for a given lending protocol.
+    /// TODO: extend supported witnesses
     fun lending_witness(
         index: u64,
         lending_index: u64
@@ -114,15 +118,17 @@ module typus_dov::tds_witness_entry {
         }
     }
 
-    // new defined
+    /// A generic witness struct.
     public struct WITNESS has drop {}
 
+    /// Event emitted when a lending account cap is created.
     public struct CreateLendingAccountCap has copy, drop {
         signer: address,
         index: u64,
         lending_index: u64,
         account_cap_id: address,
     }
+    /// [Authorized Function] Adds a lending account cap to the registry.
     public fun add_lending_account_cap<CAP: key + store>(
         registry: &mut Registry,
         index: u64,
@@ -147,6 +153,7 @@ module typus_dov::tds_witness_entry {
         });
     }
 
+    /// [Authorized Function] Borrows a lending account cap from the registry.
     public fun borrow_lending_account_cap<CAP: key + store>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -169,6 +176,7 @@ module typus_dov::tds_witness_entry {
     }
 
 
+    /// [Authorized Function] Returns a lending account cap to the registry.
     public fun return_lending_account_cap<CAP: key + store>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -187,6 +195,7 @@ module typus_dov::tds_witness_entry {
         typus_dov_single::return_lending_account_cap_(registry, account_cap, lending_cap_hot_potato);
     }
 
+    /// Event emitted when funds are withdrawn for lending.
     public struct DepositLending has copy, drop {
         signer: address,
         index: u64,
@@ -194,6 +203,7 @@ module typus_dov::tds_witness_entry {
         u64_padding: vector<u64>,
     }
 
+    /// [Authorized Function] Withdraws funds from a vault for lending.
     public fun withdraw_for_lending<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -213,6 +223,7 @@ module typus_dov::tds_witness_entry {
         witness_lock::wrap(typus_ecosystem_version, balance, witness)
     }
 
+    /// Event emitted when funds are deposited from lending.
     public struct WithdrawLending has copy, drop {
         signer: address,
         index: u64,
@@ -220,6 +231,7 @@ module typus_dov::tds_witness_entry {
         u64_padding: vector<u64>,
     }
 
+    /// [Authorized Function] Deposits funds from a lending protocol back into the vault.
     public fun deposit_from_lending<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         registry: &mut Registry,

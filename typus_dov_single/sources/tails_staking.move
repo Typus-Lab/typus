@@ -1,3 +1,5 @@
+/// This module is deprecated. All functions within this module are no longer in use and will abort if called.
+/// Use `typus/sources/tails_staking.move` instead.
 module typus_dov::tails_staking {
     use std::string::String;
     use std::type_name::TypeName;
@@ -138,11 +140,15 @@ module typus_dov::tails_staking {
         `for`: ID,
         partner: String,
     }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun remove_nft_extension(
         registry: &mut Registry,
         ctx: &mut TxContext
     ): (ObjectTable<address, Tails>, NftManagerCap, TransferPolicy<Tails>, Coin<SUI>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun remove_nft_table_tails(
         registry: &Registry,
@@ -150,6 +156,8 @@ module typus_dov::tails_staking {
         users: vector<address>,
         ctx: &TxContext
     ): vector<Tails> { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun new_bid<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -159,6 +167,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (TypusBidReceipt, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun new_bid_v2<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -168,6 +178,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (TypusBidReceipt, Coin<B_TOKEN>, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun bid<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
@@ -181,6 +193,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (TypusBidReceipt, Coin<B_TOKEN>, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun deposit<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -191,6 +205,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (vector<Coin<D_TOKEN>>, TypusDepositReceipt, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun withdraw<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -200,6 +216,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (Balance<D_TOKEN>, Option<TypusDepositReceipt>, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun unsubscribe<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -209,6 +227,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (TypusDepositReceipt, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun compound<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -217,6 +237,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (TypusDepositReceipt, vector<u64>) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun reduce_usd_in_deposit(
         registry: &mut Registry,
@@ -225,6 +247,8 @@ module typus_dov::tails_staking {
         clock: &Clock,
         ctx: &mut TxContext,
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun partner_add_exp(
         registry: &mut Registry,
@@ -232,6 +256,8 @@ module typus_dov::tails_staking {
         owner: address,
         exp: u64,
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun nft_exp_up(
         typus_ecosystem_version: &TypusEcosystemVersion,
@@ -240,6 +266,8 @@ module typus_dov::tails_staking {
         amount: u64,
         ctx: &TxContext,
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun stake_nft(
         registry: &mut Registry,
@@ -250,6 +278,8 @@ module typus_dov::tails_staking {
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun switch_nft(
         registry: &mut Registry,
@@ -260,6 +290,8 @@ module typus_dov::tails_staking {
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun unstake_nft(
         registry: &mut Registry,
@@ -267,6 +299,8 @@ module typus_dov::tails_staking {
         kiosk_cap: &KioskOwnerCap,
         ctx: & TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun transfer_nft(
         registry: &mut Registry,
@@ -277,6 +311,8 @@ module typus_dov::tails_staking {
         coin: Coin<SUI>,
         ctx: &mut TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun migrate_nft_extension(
         registry: &mut Registry,
@@ -286,12 +322,16 @@ module typus_dov::tails_staking {
         fee: Coin<SUI>,
         ctx: &mut TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun migrate_typus_ecosystem_tails(
         registry: &mut Registry,
         users: vector<address>,
         ctx: &TxContext,
     ): vector<Tails> { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun consume_exp_coin_unstaked<EXP_COIN>(
         registry: &mut Registry,
@@ -301,17 +341,22 @@ module typus_dov::tails_staking {
         exp_coin: Coin<EXP_COIN>,
         ctx: &mut TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public entry fun consume_exp_coin_staked<EXP_COIN>(
         registry: &mut Registry,
         exp_coin: Coin<EXP_COIN>,
         ctx: & TxContext
     ) { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun has_staked(
         registry: &Registry,
         owner: address,
     ): bool { abort E_DEPRECATED_FUNCTION }
+    /// Deprecated.
+    /// WARNING: mut inputs without authority check inside
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun snapshot(
         typus_ecosystem_version: &TypusEcosystemVersion,

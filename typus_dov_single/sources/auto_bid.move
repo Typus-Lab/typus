@@ -29,34 +29,55 @@ module typus_dov::auto_bid {
     const E_NO_VALID_RECEIPT: u64 = 2;
 
 
+    /// A pool that holds various automated bidding strategies, organized by vault index and signal index.
     public struct StrategyPoolV2 has key, store {
         id: UID,
+        /// A map from vault index to a map of signal indices to a table of strategies.
         strategies: VecMap<u64, VecMap<u64, TableVec<StrategyV2>>>,
+        /// A list of addresses authorized to manage the strategy pool.
         authority: vector<address>
     }
 
+    /// Represents a single automated bidding strategy for a user.
     public struct StrategyV2 has key, store {
         id: UID,
+        /// The index of the vault this strategy is for.
         vault_index: u64,
+        /// The index of the signal this strategy is for.
         signal_index: u64,
+        /// The address of the user who owns this strategy.
         user: address,
         // balance: Balance<B_TOKEN>,
         // profit: Balance<D_TOKEN>,
+        /// The price percentage at which to bid.
         price_percentage: u64,
+        /// The size of each bid.
         size: u64,
+        /// The maximum number of times this strategy can bid.
         max_times: u64,
+        /// A list of specific rounds this strategy should bid in. An empty vector means bid in all rounds.
         target_rounds: vector<u64>,
+        /// A list of bid receipts from successful bids.
         receipts: vector<TypusBidReceipt>,
+        /// Whether the strategy is currently active.
         active: bool,
-        u64_padding: vector<u64>, // [balance, profit, accumulated_cost]
+        /// Padding for additional u64 fields. [balance, profit, accumulated_cost]
+        u64_padding: vector<u64>,
         // log
+        /// The number of times this strategy has bid.
         bid_times: u64,
+        /// The last round this strategy bid in.
         bid_round: u64,
+        /// The timestamp of the last bid.
         bid_ts_ms: u64,
+        /// A list of rounds this strategy has bid in.
         bid_rounds: vector<u64>,
+        /// The accumulated profit from this strategy.
         accumulated_profit: u64,
     }
 
+    /// Creates a new `StrategyPoolV2`.
+    /// WARNING: without authority check inside
     entry fun new_strategy_pool(registry: & Registry, ctx: &mut TxContext) {
         typus_dov_single::version_check(registry);
         typus_dov_single::operation_check(registry);
@@ -76,11 +97,13 @@ module typus_dov::auto_bid {
         transfer::public_share_object(strategy_pool);
     }
 
+    /// Event emitted when a new strategy pool is created.
     public struct NewStrategyPoolEvent has copy, drop {
         id: ID,
         signer: address,
     }
 
+    /// [Authorized Function] Adds a new authority to the `StrategyPoolV2`.
     entry fun add_authority(strategy_pool: &mut StrategyPoolV2, new_authority: address, ctx: & TxContext) {
         // check authority
         vector::contains(&strategy_pool.authority, &tx_context::sender(ctx));
@@ -93,11 +116,13 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// Event emitted when a new authority is added.
     public struct AddAuthorutyEvent has copy, drop {
         new_authority: address,
         signer: address,
     }
 
+    /// [Authorized Function] Creates a new vault within the `StrategyPoolV2`.
     entry fun new_strategy_vault(strategy_pool: &mut StrategyPoolV2, vault_index: u64, ctx: & TxContext) {
         // check authority
         vector::contains(&strategy_pool.authority, &tx_context::sender(ctx));
@@ -112,12 +137,14 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// Event emitted when a new strategy vault is created.
     public struct NewStrategyVaultEvent has copy, drop {
         id: ID,
         vault_index: u64,
         signer: address,
     }
 
+    /// [Authorized Function] Removes a vault from the `StrategyPoolV2`.
     entry fun remove_strategy_vault(strategy_pool: &mut StrategyPoolV2, vault_index: u64, ctx: & TxContext) {
         // check authority
         vector::contains(&strategy_pool.authority, &tx_context::sender(ctx));
@@ -139,12 +166,14 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// Event emitted when a strategy vault is removed.
     public struct RemoveStrategyVaultEvent has copy, drop {
         id: ID,
         vault_index: u64,
         signer: address,
     }
 
+    /// [Authorized Function] Creates a new signal within a vault in the `StrategyPoolV2`.
     entry fun new_strategy_signal(strategy_pool: &mut StrategyPoolV2, vault_index: u64, signal_index: u64, ctx: &mut TxContext) {
         // check authority
         vector::contains(&strategy_pool.authority, &tx_context::sender(ctx));
@@ -161,6 +190,7 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// Event emitted when a new strategy signal is created.
     public struct NewStrategySignalEvent has copy, drop {
         id: ID,
         vault_index: u64,
@@ -168,6 +198,7 @@ module typus_dov::auto_bid {
         signer: address,
     }
 
+    /// Event emitted when a new strategy is created.
     public struct NewStrategyEventV2 has copy, drop {
         vault_index: u64,
         signal_index: u64,
@@ -179,6 +210,7 @@ module typus_dov::auto_bid {
         deposit_amount: u64,
     }
 
+    /// [User Function] Creates a new automated bidding strategy.
     public fun new_strategy<D_TOKEN, B_TOKEN>(
         registry: & Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -245,6 +277,7 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// Event emitted when a strategy is updated.
     public struct UpdateStrategyEvent has copy, drop {
         vault_index: u64,
         signal_index: u64,
@@ -257,6 +290,7 @@ module typus_dov::auto_bid {
         deposit_amount: u64,
     }
 
+    /// [User Function] Updates an existing strategy.
     #[allow(unused_type_parameter)]
     public fun update_strategy<D_TOKEN, B_TOKEN>(
         registry: & Registry,
@@ -326,6 +360,7 @@ module typus_dov::auto_bid {
         emit(event);
     }
 
+    /// A helper function to update the padding field of a strategy.
     fun update_u64_padding<D_TOKEN, B_TOKEN>(strategy: &mut StrategyV2) {
         let ref_balance = dynamic_field::borrow<String, Balance<B_TOKEN>>(& strategy.id, string::utf8(b"balance"));
         let u64_padding_balance = balance::value(ref_balance);
@@ -341,6 +376,7 @@ module typus_dov::auto_bid {
         strategy.u64_padding = vector[u64_padding_balance, u64_padding_profit, accumulated_cost];
     }
 
+    /// Event emitted when a strategy is closed.
     public struct CloseStrategyEventV2 has copy, drop {
         vault_index: u64,
         signal_index: u64,
@@ -357,6 +393,7 @@ module typus_dov::auto_bid {
         accumulated_profit: u64,
     }
 
+    /// [User Function] Closes a strategy and returns the user's funds.
     public fun close_strategy<D_TOKEN, B_TOKEN>(
         registry: & Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -380,6 +417,7 @@ module typus_dov::auto_bid {
         (coin_profit, coin_balance)
     }
 
+    /// The internal logic for closing a strategy.
     fun close_strategy_<D_TOKEN, B_TOKEN>(
         signal: &mut TableVec<StrategyV2>,
         strategy_index: u64,
@@ -439,6 +477,7 @@ module typus_dov::auto_bid {
         (coin_profit, coin_balance, user)
     }
 
+    /// Event emitted when a bid receipt is withdrawn from a strategy.
     public struct WithdrawBidReceiptEvent has copy, drop {
         vault_index: u64,
         signal_index: u64,
@@ -446,6 +485,8 @@ module typus_dov::auto_bid {
         user: address,
     }
 
+    /// [User Function] Withdraws a `TypusBidReceipt` from a strategy.
+    /// Safe with ctx.sender check
     public fun withdraw_bid_receipt(
         registry: &mut Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -498,6 +539,7 @@ module typus_dov::auto_bid {
         receipt
     }
 
+    /// Event emitted when profit is withdrawn from a strategy.
     public struct WithdrawProfitEvent has copy, drop {
         vault_index: u64,
         signal_index: u64,
@@ -506,6 +548,8 @@ module typus_dov::auto_bid {
         profit: u64,
     }
 
+    /// [User Function] Withdraws profits from a strategy.
+    /// Safe with ctx.sender check
     public fun withdraw_profit<D_TOKEN, B_TOKEN>(
         registry: & Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -543,6 +587,7 @@ module typus_dov::auto_bid {
         coin_profit
     }
 
+    /// [Authorized Function] The core logic for placing automated bids based on the defined strategies.
     entry fun new_bid<D_TOKEN, B_TOKEN>(
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -675,6 +720,7 @@ module typus_dov::auto_bid {
         };
     }
 
+    /// [Authorized Function] Exercises the options won from the automated bids.
     entry fun exercise<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -782,6 +828,7 @@ module typus_dov::auto_bid {
         }
     }
 
+    /// [Authorized Function] Exercises a single strategy's options.
     entry fun exercise_single<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -849,6 +896,7 @@ module typus_dov::auto_bid {
         };
     }
 
+    /// [Authorized Function] Closes an entire vault of strategies.
     entry fun close_strategy_vault<D_TOKEN, B_TOKEN>(
         registry: & Registry,
         strategy_pool: &mut StrategyPoolV2,
@@ -882,7 +930,8 @@ module typus_dov::auto_bid {
         vec_map::destroy_empty(vault);
     }
 
-    // WARNING: for dry_run only!
+    /// [View Function Only] A view function to get a user's strategies.
+    /// WARNING: input receipts will be destroyed
     public(package) fun view_user_strategies(
         registry: & Registry,
         strategy_pool: &mut StrategyPoolV2,

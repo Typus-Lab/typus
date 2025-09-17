@@ -17,6 +17,7 @@ module typus_dov::tds_view_function {
     use typus_framework::dutch;
     use typus_framework::vault::{Self, TypusDepositReceipt, TypusBidReceipt};
 
+    /// [View Function Only] Gets the data for one or more vaults, BCS-encoded.
     public(package) fun get_vault_data_bcs(
         registry: &Registry,
         mut indexes: vector<u64>,
@@ -67,6 +68,7 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// [View Function Only] Gets the data for one or more auctions, BCS-encoded.
     public(package) fun get_auction_bcs(
         registry: &Registry,
         mut indexes: vector<u64>,
@@ -109,6 +111,7 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// [View Function Only] Gets the bids for a specific auction, BCS-encoded.
     public(package) fun get_auction_bids_bcs(
         registry: &Registry,
         index: u64,
@@ -153,6 +156,7 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// A struct representing a user's deposit shares.
     public struct DepositShare has drop {
         index: u64,
         active_share: u64,
@@ -162,6 +166,7 @@ module typus_dov::tds_view_function {
         premium_share: u64,
         incentive_share: u64,
     }
+    /// [View Function Only] Gets the deposit shares for a user, BCS-encoded.
     public(package) fun get_deposit_shares_bcs(
         registry: &Registry,
         mut receipts: vector<TypusDepositReceipt>,
@@ -224,6 +229,8 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// [View Function Only] Gets the bids for a user, BCS-encoded.
+    /// WARNING: input receipts will be destroyed
     public(package) fun get_my_bids_bcs(
         registry: &Registry,
         mut receipts: vector<TypusBidReceipt>,
@@ -272,6 +279,7 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// [View Function Only] Gets the refund shares for a user, BCS-encoded.
     public(package) fun get_refund_shares_bcs<TOKEN>(
         registry: &Registry,
         ctx: &TxContext,
@@ -303,6 +311,8 @@ module typus_dov::tds_view_function {
         result
     }
 
+    /// [View Function Only] Gets the withdrawal information from Scallop, BCS-encoded.
+    /// WARNING: the withdraw process may actually happend inside
     public(package) fun get_scallop_withdrawal_bcs<D_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,

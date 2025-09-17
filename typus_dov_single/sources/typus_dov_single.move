@@ -1,3 +1,7 @@
+/// This module implements the core logic for single-asset Deposit Option Vaults (DOVs).
+/// It manages the entire lifecycle of a vault, from creation and deposit to auction, settlement, and fee distribution.
+/// The module integrates with various lending protocols like Scallop, SuiLend, and NAVI to generate yield on deposits.
+/// It also includes features for incentive distribution, OTC trades, and leaderboard integration.
 module typus_dov::typus_dov_single {
     use std::bcs;
     use std::string::{Self, String};
@@ -101,170 +105,299 @@ module typus_dov::typus_dov_single {
 
     // ======== Structs =========
 
+    /// One-time witness for the `typus_dov_single` module, ensuring it's initialized only once.
     public struct TYPUS_DOV_SINGLE has drop {}
 
+    /// A generic witness struct, typically used for authorization checks.
     public struct WITNESS has drop {}
 
+    /// The main registry for all DOVs. It acts as a central hub for managing vaults and configurations.
     public struct Registry has key {
+        /// The unique identifier for the registry.
         id: UID,
+        /// The total number of vaults created.
         num_of_vault: u64,
+        /// The authority that governs the registry and its vaults.
         authority: Authority,
+        /// The pool where fees collected from vault operations are stored.
         fee_pool: BalancePool,
-        portfolio_vault_registry: UID, // 1
-        deposit_vault_registry: UID, // 1
-        auction_registry: UID, // num_of_vault
-        bid_vault_registry: UID, // num_of_vault * round
-        refund_vault_registry: UID, // n tokens
+        /// A UID pointing to a dynamic object field registry for `PortfolioVault`s.
+        portfolio_vault_registry: UID,
+        /// A UID pointing to a dynamic object field registry for `DepositVault`s.
+        deposit_vault_registry: UID,
+        /// A UID pointing to a dynamic object field registry for `Auction`s.
+        auction_registry: UID,
+        /// A UID pointing to a dynamic object field registry for `BidVault`s.
+        bid_vault_registry: UID,
+        /// A UID pointing to a dynamic object field registry for `RefundVault`s.
+        refund_vault_registry: UID,
+        /// A UID pointing to a dynamic object field registry for additional configurations.
         additional_config_registry: UID,
+        /// The version of the registry.
         version: u64,
+        /// A flag to suspend or resume transactions for all vaults.
         transaction_suspended: bool,
     }
 
+    /// A struct that holds the dynamic information and configuration for a single DOV.
     public struct PortfolioVault has key, store {
+        /// The unique identifier for the portfolio vault.
         id: UID,
+        /// The dynamic information of the vault.
         info: Info,
+        /// The configuration of the vault.
         config: Config,
+        /// The authority specific to this vault, controlling sensitive operations.
         authority: Authority,
     }
 
+    /// Holds the dynamic, stateful information for a vault, which changes over its lifecycle.
     public struct Info has copy, drop, store {
+        /// The unique index of the vault within the registry.
         index: u64,
-        option_type: u64, // 0: Call, 1: Put, 2: CallSpread, 3: PutSpread, 4: CappedCall, 5: CappedPut, 6: UsdCappedCall
-        period: u8, // Daily = 0, Weekly = 1, Monthly = 2, Hourly = 3, 10 Minutes: 4
+        /// The type of option strategy (e.g., 0: Call, 1: Put, 2: CallSpread, 3: PutSpread, 4: CappedCall, 5: CappedPut, 6: UsdCappedCall).
+        option_type: u64,
+        /// The period of the vault (e.g., 0: Daily, 1: Weekly, 2: Monthly, 3: Hourly, 4: 10 Minutes).
+        period: u8,
+        /// The timestamp (in ms) when the vault becomes active.
         activation_ts_ms: u64,
+        /// The timestamp (in ms) when the vault expires.
         expiration_ts_ms: u64,
+        /// The `TypeName` of the token users deposit.
         deposit_token: TypeName,
+        /// The `TypeName` of the token used for bidding in auctions.
         bid_token: TypeName,
+        /// The `TypeName` of the base asset for settlement (e.g., BTC).
         settlement_base: TypeName,
+        /// The `TypeName` of the quote asset for settlement (e.g., USDC).
         settlement_quote: TypeName,
+        /// The string representation of the settlement base asset name.
         settlement_base_name: String,
+        /// The string representation of the settlement quote asset name.
         settlement_quote_name: String,
+        /// The number of decimals for the deposit token.
         d_token_decimal: u64,
+        /// The number of decimals for the bid token.
         b_token_decimal: u64,
+        /// The number of decimals for the option token (contract size).
         o_token_decimal: u64,
+        /// The address of the vault's creator.
         creator: address,
+        /// The timestamp (in ms) when the vault was created.
         create_ts_ms: u64,
+        /// The current round number of the vault.
         round: u64,
+        /// The current status of the vault (e.g., 1: Activate, 2: New Auction).
         status: u64,
+        /// Information about the oracle price at the time of activation.
         oracle_info: OracleInfo,
-        delivery_infos: DeliveryInfos, // update after delivery
+        /// Information about deliveries that have occurred in the current round (update after delivery).
+        delivery_infos: DeliveryInfos,
+        /// Information about the vault's settlement, available after expiration.
         settlement_info: Option<SettlementInfo>,
+        /// Padding for storing additional u64-based information.
         u64_padding: vector<u64>,
+        /// Padding for storing additional bcs-serialized information.
         bcs_padding: vector<u8>,
     }
 
+    /// Holds the configurable parameters for a vault, which are generally set at creation and can be updated by the authority.
     public struct Config has copy, drop, store {
+        /// The object ID of the oracle used for pricing.
         oracle_id: address,
+        /// The minimum unit of deposit, in the smallest denomination of the deposit token.
         deposit_lot_size: u64,
+        /// The minimum unit of a bid, in the smallest denomination of the option token.
         bid_lot_size: u64,
+        /// The minimum total deposit size required for a user.
         min_deposit_size: u64,
+        /// The minimum total bid size required for a user.
         min_bid_size: u64,
+        /// The maximum number of deposit entries allowed.
         max_deposit_entry: u64,
+        /// The maximum number of bid entries allowed in an auction.
         max_bid_entry: u64,
+        /// The fee taken on deposits, in basis points.
         deposit_fee_bp: u64,
+        /// The portion of the deposit fee shared, in basis points.
         deposit_fee_share_bp: u64,
+        /// The address of the pool where the shared portion of the deposit fee goes.
         deposit_shared_fee_pool: Option<vector<u8>>,
+        /// The fee taken on bids, in basis points.
         bid_fee_bp: u64,
+        /// The incentive for depositors, in basis points of their deposit.
         deposit_incentive_bp: u64,
+        /// The incentive for bidders, in basis points of their bid value.
         bid_incentive_bp: u64,
+        /// The delay after activation before the auction starts, in milliseconds.
         auction_delay_ts_ms: u64,
+        /// The duration of the auction, in milliseconds.
         auction_duration_ts_ms: u64,
+        /// The delay after auction end before unsold assets are recouped, in milliseconds.
         recoup_delay_ts_ms: u64,
+        /// The maximum total deposit capacity of the vault.
         capacity: u64,
+        /// The leverage applied to the vault's strategy.
         leverage: u64,
+        /// A numerical representation of the vault's risk level.
         risk_level: u64,
-        has_next: bool, // set next round deposit vault has_next
+        /// A flag indicating if the vault should automatically roll into the next round.
+        has_next: bool,
+        /// The configuration for the currently active vault round.
         active_vault_config: VaultConfig,
+        /// The configuration for the next vault round (warm-up period).
         warmup_vault_config: VaultConfig,
+        /// Padding for storing additional u64-based configuration.
         u64_padding: vector<u64>,
+        /// Padding for storing additional bcs-serialized configuration.
         bcs_padding: vector<u8>,
     }
 
+    /// Holds the configuration for a single leg of an options strategy (e.g., a single call or put in a spread).
     public struct PayoffConfig has copy, drop, store {
+        /// The strike price in basis points relative to the oracle price.
         strike_bp: u64,
+        /// The weight of this leg in the overall strategy.
         weight: u64,
+        /// Whether this leg is a long (buyer) or short (seller) position.
         is_buyer: bool,
+        /// The calculated absolute strike price for the round.
         strike: Option<u64>,
+        /// Padding for future u64-based fields.
         u64_padding: vector<u64>,
     }
 
+    /// Holds the configuration for a vault's options strategy, including payoff details and auction parameters.
     public struct VaultConfig has copy, drop, store {
+        /// A vector of `PayoffConfig`s defining the multi-leg strategy.
         payoff_configs: vector<PayoffConfig>,
+        /// The increment for rounding strike prices.
         strike_increment: u64,
+        /// The speed at which the price decays in a Dutch auction.
         decay_speed: u64,
+        /// The starting price for the Dutch auction.
         initial_price: u64,
+        /// The ending price for the Dutch auction.
         final_price: u64,
+        /// Padding for future u64-based fields.
         u64_padding: vector<u64>,
     }
 
+    /// Holds information about the oracle price at a specific point in time.
     public struct OracleInfo has copy, drop, store {
+        /// The price from the oracle.
         price: u64,
+        /// The number of decimals for the price.
         decimal: u64,
     }
 
+    /// Holds aggregated information about all deliveries within a single auction round.
     public struct DeliveryInfos has copy, drop, store {
+        /// The round number these delivery infos pertain to.
         round: u64,
+        /// The maximum size (number of contracts) available for auction in this round.
         max_size: u64,
+        /// The total size that has been delivered so far.
         total_delivery_size: u64,
+        /// The total value bid by regular bidders.
         total_bidder_bid_value: u64,
+        /// The total fees paid by regular bidders.
         total_bidder_fee: u64,
+        /// The total value bid using incentives.
         total_incentive_bid_value: u64,
+        /// The total fees paid on incentive bids.
         total_incentive_fee: u64,
+        /// A vector of individual `DeliveryInfo` structs for each delivery event.
         delivery_info: vector<DeliveryInfo>,
+        /// Padding for future u64-based fields.
         u64_padding: vector<u64>,
     }
 
+    /// Holds information about a single delivery event (e.g., from a Dutch auction or an OTC trade).
     public struct DeliveryInfo has copy, drop, store {
-        auction_type: u64, // 0: dutch, 1: otc
+        /// The type of auction (0: Dutch, 1: OTC).
+        auction_type: u64,
+        /// The price at which the options were delivered.
         delivery_price: u64,
+        /// The number of contracts delivered in this event.
         delivery_size: u64,
+        /// The value of the bid from the regular bidder.
         bidder_bid_value: u64,
+        /// The fee paid by the regular bidder.
         bidder_fee: u64,
+        /// The value of the bid covered by incentives.
         incentive_bid_value: u64,
+        /// The fee paid on the incentive portion of the bid.
         incentive_fee: u64,
+        /// The timestamp (in ms) of the delivery.
         ts_ms: u64,
+        /// Padding for future u64-based fields.
         u64_padding: vector<u64>,
     }
 
+    /// Holds information about the settlement of a vault after expiration.
     public struct SettlementInfo has copy, drop, store {
+        /// The round number that was settled.
         round: u64,
+        /// The oracle price at the time of settlement.
         oracle_price: u64,
+        /// The number of decimals for the oracle price.
         oracle_price_decimal: u64,
+        /// The total balance in the deposit vault before settlement.
         settle_balance: u64,
+        /// The balance that was actually settled and moved to the inactive state.
         settled_balance: u64,
+        /// The final price per share of the vault for this round.
         share_price: u64,
+        /// The number of decimals for the share price.
         share_price_decimal: u64,
+        /// The timestamp (in ms) of the settlement.
         ts_ms: u64,
+        /// Padding for future u64-based fields.
         u64_padding: vector<u64>,
     }
 
+    /// A generic container for attaching additional, often vault-specific, configurations dynamically.
     public struct AdditionalConfig has key, store {
+        /// The unique identifier for this configuration container.
         id: UID,
     }
 
+    /// A struct for holding a user's deposit snapshots over time for points calculation.
     public struct DepositSnapshot has store {
+        /// A vector where each index corresponds to a vault index and the value is the user's deposit amount.
         snapshots: vector<u64>,
+        /// The total deposit amount across all vaults for the user.
         total_deposit: u64,
+        /// The timestamp of the last snapshot update.
         snapshot_ts_ms: u64,
     }
 
     // ======== Init Functions =========
 
+    /// Initializes the `Registry` when the module is first published.
+    /// This function is called only once.
     fun init(otw: TYPUS_DOV_SINGLE, ctx: &mut TxContext) {
         sui::package::claim_and_keep(otw, ctx);
         new_registry_(ctx);
     }
 
+    /// Adjusts the user premium share ratio for a specific vault's deposit token.
+    /// WARNING: no authority check inside.
     entry fun adjust_premium_share_ratio<TOKEN>(registry: &mut Registry, index: u64) {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         vault::adjust_user_share_ratio<TOKEN>(deposit_vault, vault::premium_share_tag());
     }
 
+    /// Adjusts the user incentive share ratio for a specific vault's deposit token.
+    /// WARNING: no authority check inside.
     entry fun adjust_incentive_share_ratio<TOKEN>(registry: &mut Registry, index: u64) {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         vault::adjust_user_share_ratio<TOKEN>(deposit_vault, vault::incentive_share_tag());
     }
 
+    /// Creates the `AdditionalConfig` object for deposit snapshots, enabling points calculation for depositors.
+    /// WARNING: no authority check inside.
     entry fun create_deposit_snapshots_additional_config(
         registry: &mut Registry,
         ctx: &mut TxContext,
@@ -276,6 +409,7 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// [Authorized Function] Sets a flag to enable or disable Typus Gold (TGLD) point integration for the entire registry.
     entry fun set_enable_tgld_flag(
         registry: &mut Registry,
         enable: bool,
@@ -294,6 +428,8 @@ module typus_dov::typus_dov_single {
 
     // ======== Registry Authorized Friend Functions =========
 
+    /// Creates and shares a new `Registry` object.
+    /// This is an authorized function, intended to be called only during module initialization.
     public(package) fun new_registry_(
         ctx: &mut TxContext,
     ) {
@@ -314,6 +450,8 @@ module typus_dov::typus_dov_single {
         transfer::share_object(vault_registry);
     }
 
+    /// Suspends all transactions in the registry.
+    /// WARNING: no authority check inside.
     public(package) fun suspend_transaction_(
         registry: &mut Registry,
     ) {
@@ -321,6 +459,8 @@ module typus_dov::typus_dov_single {
         registry.transaction_suspended = true;
     }
 
+    /// Resumes all transactions in the registry.
+    /// WARNING: no authority check inside.
     public(package) fun resume_transaction_(
         registry: &mut Registry,
     ) {
@@ -328,6 +468,8 @@ module typus_dov::typus_dov_single {
         registry.transaction_suspended = false;
     }
 
+    /// Adds a generic incentive `Coin` to the registry's global incentive pool.
+    /// WARNING: no authority check inside.
     public(package) fun incentivise_<TOKEN>(
         registry: &mut Registry,
         coin: Coin<TOKEN>,
@@ -345,6 +487,8 @@ module typus_dov::typus_dov_single {
         amount
     }
 
+    /// Withdraws a generic incentive `Coin` from the registry's global incentive pool.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_incentive_<TOKEN>(
         registry: &mut Registry,
         amount: Option<u64>,
@@ -371,6 +515,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Adds a fixed amount of incentive `Coin` to a specific vault.
+    /// WARNING: no authority check inside.
     public(package) fun fixed_incentivise_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -399,6 +545,8 @@ module typus_dov::typus_dov_single {
         amount
     }
 
+    /// Withdraws a fixed incentive `Coin` from a specific vault.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_fixed_incentive_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -427,6 +575,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Sets the total available amount of incentives for a specific vault.
+    /// WARNING: no authority check inside.
     public(package) fun set_available_incentive_amount_(
         registry: &mut Registry,
         index: u64,
@@ -439,6 +589,8 @@ module typus_dov::typus_dov_single {
         prev_amount
     }
 
+    /// Sets a flag indicating the current lending protocol being used by a vault for the active round.
+    /// WARNING: no authority check inside.
     public(package) fun set_current_lending_protocol_flag_(
         registry: &mut Registry,
         index: u64,
@@ -448,6 +600,8 @@ module typus_dov::typus_dov_single {
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, lending_protocol);
     }
 
+    /// Sets a flag indicating the lending protocol to be used for the next round.
+    /// WARNING: no authority check inside.
     public(package) fun set_lending_protocol_flag_(
         registry: &mut Registry,
         index: u64,
@@ -457,6 +611,8 @@ module typus_dov::typus_dov_single {
         utils::set_u64_padding_value(&mut portfolio_vault.config.u64_padding, I_CONFIG_NEXT_LENDING_PROTOCOL, lending_protocol);
     }
 
+    /// Associates a SAFU (Secure Asset Fund for Users) vault with the current vault.
+    /// WARNING: no authority check inside.
     public(package) fun set_safu_vault_index_(
         registry: &mut Registry,
         index: u64,
@@ -466,6 +622,8 @@ module typus_dov::typus_dov_single {
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_SAFU_VAULT_INDEX_ADD_ONE_UP, safu_index + 1);
     }
 
+    /// Sets a flag to enable or disable the use of additional lending protocols.
+    /// WARNING: no authority check inside.
     public(package) fun set_enable_additional_lending_flag_(
         registry: &mut Registry,
         index: u64,
@@ -479,6 +637,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Creates a Scallop Spool account for a specific vault to interact with the Scallop protocol.
+    /// WARNING: no authority check inside.
     public(package) fun create_scallop_spool_account_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -498,6 +658,8 @@ module typus_dov::typus_dov_single {
         (object::id_address(spool), spool_account_id)
     }
 
+    /// Deposits assets from a DOV into a Scallop Spool to earn yield.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_scallop_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -538,6 +700,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Withdraws assets and rewards from a Scallop Spool back into the DOV.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_scallop_<D_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -574,6 +738,7 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// [View Function] Retrieves the amount of assets a vault has deposited in a Scallop Spool.
     public(package) fun get_scallop_deposit_amount<TOKEN>(
         registry: &Registry,
         index: u64,
@@ -587,6 +752,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Gets a mutable reference to a vault's Scallop Spool account.
+    /// WARNING: no authority check inside.
     public(package) fun get_mut_scallop_spool_account<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -595,6 +762,8 @@ module typus_dov::typus_dov_single {
         dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)
     }
 
+    /// Deposits assets from a DOV into Scallop's basic lending market.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_scallop_basic_lending_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -625,6 +794,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Withdraws assets from Scallop's basic lending market back into the DOV.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_scallop_basic_lending_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -663,6 +834,7 @@ module typus_dov::typus_dov_single {
         vector::empty()
     }
 
+    /// [View Function] Retrieves the amount of assets a vault has deposited in Scallop's basic lending market.
     public(package) fun get_scallop_basic_lending_deposit_amount<TOKEN>(
         registry: &Registry,
         index: u64,
@@ -677,6 +849,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Creates a SuiLend Obligation Owner Cap for a specific vault to interact with the SuiLend protocol.
+    /// WARNING: no authority check inside.
     public(package) fun create_suilend_obligation_owner_cap_(
         registry: &mut Registry,
         index: u64,
@@ -694,6 +868,8 @@ module typus_dov::typus_dov_single {
         (object::id_address(suilend_lending_market), suilend_obligation_owner_cap_id)
     }
 
+    /// Deposits assets from a DOV into a SuiLend lending market to earn yield.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_suilend_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -731,6 +907,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Withdraws assets and optionally claims rewards from a SuiLend lending market back into the DOV.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_suilend_<D_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -780,6 +958,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Claims rewards from SuiLend for a vault's deposited assets.
+    /// WARNING: no authority check inside.
     public(package) fun reward_suilend_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -811,6 +991,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Creates a NAVI Account Cap for a specific vault to interact with the NAVI protocol.
+    /// WARNING: no authority check inside.
     public(package) fun create_navi_account_cap_(
         registry: &mut Registry,
         index: u64,
@@ -824,6 +1006,8 @@ module typus_dov::typus_dov_single {
         navi_account_cap_id
     }
 
+    /// Deposits assets from a DOV into a NAVI lending pool to earn yield.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_navi_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -869,6 +1053,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Withdraws assets from a NAVI lending pool back into the DOV.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_navi_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -935,6 +1121,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Claims rewards from NAVI for a vault's deposited assets.
+    /// WARNING: no authority check inside.
     public(package) fun reward_navi_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -961,6 +1149,7 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// [View Function] Retrieves the claimable reward parameters from NAVI for a specific vault.
     public fun get_reward_navi_parameters(
         registry: &Registry,
         index: u64,
@@ -981,6 +1170,8 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Deposits collateral into a NAVI lending pool on behalf of a DOV.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_collateral_navi_<TOKEN>(
         registry: &mut Registry,
         collateral_index: u64,
@@ -1027,6 +1218,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Withdraws collateral from a NAVI lending pool.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_collateral_navi_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1087,6 +1280,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Borrows assets from a NAVI lending pool against deposited collateral.
+    /// WARNING: no authority check inside.
     public(package) fun borrow_navi_<TOKEN>(
         registry: &mut Registry,
         collateral_index: u64,
@@ -1149,6 +1344,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Unsubscribes from a NAVI lending position, effectively closing it.
+    /// WARNING: no authority check inside.
     public(package) fun unsubscribe_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         collateral_index: u64,
@@ -1180,6 +1377,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Repays a borrowed amount to a NAVI lending pool.
+    /// WARNING: no authority check inside.
     public(package) fun repay_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         collateral_index: u64,
@@ -1244,6 +1443,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Repays the interest accrued on a NAVI borrow position.
+    /// WARNING: no authority check inside.
     public(package) fun repay_navi_interest_<TOKEN, I_TOKEN>(
         registry: &mut Registry,
         collateral_index: u64,
@@ -1307,6 +1508,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// A pre-processing step for repaying NAVI interest, wrapping the incentive balance in a `HotPotato`.
+    /// This is part of a two-step transaction pattern.
     public(package) fun pre_repay_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
         version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -1338,6 +1541,8 @@ module typus_dov::typus_dov_single {
         (witness_lock::wrap(version, i_balance, C_TYPUS_MOMENTUM_WITNESS.to_string()), log)
     }
 
+    /// A post-processing step for repaying NAVI interest, consuming the `HotPotato` to complete the repayment.
+    /// This is the second part of a two-step transaction pattern.
     public(package) fun post_repay_navi_interest_<TOKEN>(
         version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -1387,7 +1592,7 @@ module typus_dov::typus_dov_single {
         log
     }
 
-    // lending helper functions
+    /// Returns the dynamic field key for a specific lending protocol's account capability object.
     fun lending_cap_key(index: u64, lending_index: u64): vector<u8> {
         if (lending_index == 5) {
             K_ALPHALEND_ACCOUNT_CAP
@@ -1402,6 +1607,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Adds a lending protocol's account capability object to a vault's additional config.
+    /// WARNING: no authority check inside.
     public(package) fun add_lending_account_cap_<CAP: key + store>(
         registry: &mut Registry,
         index: u64,
@@ -1414,13 +1621,19 @@ module typus_dov::typus_dov_single {
         account_cap_id
     }
 
-    // hot potato
+    /// A "hot potato" struct used to temporarily hold information about a borrowed lending account capability.
+    /// This pattern ensures the capability is returned to its original owner.
     public struct LendingCapHotPotato {
+        /// The index of the vault that owns the capability.
         index: u64,
+        /// The index of the lending protocol.
         lending_index: u64,
+        /// The ID of the borrowed account capability object.
         account_cap_id: address,
     }
 
+    /// Borrows a lending account capability from a vault, returning the capability object and a `LendingCapHotPotato`.
+    /// WARNING: no authority check inside.
     public(package) fun borrow_lending_account_cap_<CAP: key + store>(
         registry: &mut Registry,
         index: u64,
@@ -1437,6 +1650,8 @@ module typus_dov::typus_dov_single {
         (account_cap, lending_cap_hot_potato)
     }
 
+    /// Returns a borrowed lending account capability to its vault using the `LendingCapHotPotato`.
+    /// WARNING: no authority check inside.
     public(package) fun return_lending_account_cap_<CAP: key + store>(
         registry: &mut Registry,
         account_cap: CAP,
@@ -1452,7 +1667,8 @@ module typus_dov::typus_dov_single {
         dynamic_field::add(&mut additional_config.id, lending_cap_key(index, lending_index), account_cap);
     }
 
-    // TODO: use these two functions to replace the similar parts in navi and scallop functions
+    /// A generic function to withdraw the entire balance from a deposit vault for depositing into a lending protocol.
+    /// WARNING: no authority check inside.
     public(package) fun withdraw_for_lending_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1469,6 +1685,8 @@ module typus_dov::typus_dov_single {
         (balance, log)
     }
 
+    /// A generic function to deposit principal and rewards from a lending protocol back into a deposit vault.
+    /// WARNING: no authority check inside.
     public(package) fun deposit_from_lending_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1495,6 +1713,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// A generic function to handle rewards earned from a lending protocol.
+    /// WARNING: no authority check inside.
     public(package) fun reward_from_lending_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1516,6 +1736,8 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    /// Adds a specified amount to a user's accumulated TGLD (Typus Gold) points if TGLD integration is enabled.
+    /// WARNING: no authority check inside.
     public(package) fun add_accumulated_tgld_amount(
         id: &UID,
         version: &TypusEcosystemVersion,
@@ -1538,6 +1760,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Adds a score to a user on a specific Typus leaderboard.
+    /// WARNING: no authority check inside.
     public(package) fun add_leaderboard_score(
         id: &UID,
         version: &TypusEcosystemVersion,
@@ -1560,6 +1784,7 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// Retrieves a user's deposit snapshot, serialized into BCS bytes.
     public(package) fun get_deposit_snapshot_bcs(
         id: &UID,
         user: address,
@@ -1587,6 +1812,8 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Updates a user's deposit snapshot for a specific vault and recalculates their deposit points.
+    /// WARNING: no authority check inside.
     public(package) fun update_deposit_snapshot(
         version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -1614,6 +1841,8 @@ module typus_dov::typus_dov_single {
         utils::set_u64_padding_value(&mut deposit_snapshot.snapshots, index, amount);
     }
 
+    /// Calculates and awards deposit points to a user based on their deposit history.
+    /// WARNING: no authority check inside.
     public(package) fun calculate_deposit_point(
         version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -1661,6 +1890,8 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// Updates the deposit points for a list of users.
+    /// WARNING: no authority check inside.
     public(package) fun update_deposit_point(
         version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
@@ -1699,6 +1930,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Calculates the time-weighted deposit amount (EXP) based on the last snapshot.
     public(package) fun calculate_snapshot_exp_amount(
         deposit_snapshot: &DepositSnapshot,
         clock: &Clock,
@@ -1709,6 +1941,8 @@ module typus_dov::typus_dov_single {
         ((deposit_snapshot.total_deposit as u128) * (minutes as u128) / (12000 as u128) as u64)
     }
 
+    /// Adds TAILS experience points to a user's account.
+    /// WARNING: no authority check inside.
     public(package) fun add_user_tails_exp_amount(
         id: &UID,
         version: &TypusEcosystemVersion,
@@ -1725,6 +1959,8 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// Removes TAILS experience points from a user's account.
+    /// WARNING: no authority check inside.
     public(package) fun remove_tails_exp_amount(
         id: &UID,
         version: &TypusEcosystemVersion,
@@ -1741,6 +1977,9 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// Creates a new portfolio vault with a comprehensive set of parameters, including its strategy, tokens, fees, and auction settings.
+    /// This is the primary function for launching a new DOV.
+    /// WARNING: no authority check inside.
     public(package) fun new_portfolio_vault_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         option_type: u64,
@@ -1960,6 +2199,9 @@ module typus_dov::typus_dov_single {
         (index, info, config)
     }
 
+    /// Creates `AdditionalConfig` objects for existing vaults that do not have one.
+    /// This is a utility function to backfill configurations.
+    /// WARNING: no authority check inside.
     entry fun create_additional_configs(registry: &mut Registry, ctx: &mut TxContext) {
         let mut index = 0;
         while (index < registry.num_of_vault) {
@@ -1983,6 +2225,8 @@ module typus_dov::typus_dov_single {
 
     // ======== Authorized Friend Functions =========
 
+    /// Updates the oracle for a specific vault.
+    /// WARNING: no authority check inside.
     public(package) fun update_oracle_(
         registry: &mut Registry,
         index: u64,
@@ -1999,6 +2243,8 @@ module typus_dov::typus_dov_single {
         portfolio_vault.info.settlement_quote_name = string::from_ascii(settlement_quote_name);
     }
 
+    /// Updates the general configuration of a vault. Allows for partial updates.
+    /// WARNING: no authority check inside.
     public(package) fun update_config_(
         registry: &mut Registry,
         index: u64,
@@ -2113,6 +2359,8 @@ module typus_dov::typus_dov_single {
         (previous, portfolio_vault.config)
     }
 
+    /// Updates the configuration for the next ("warm-up") round of a vault.
+    /// WARNING: no authority check inside.
     public(package) fun update_warmup_vault_config_(
         registry: &mut Registry,
         index: u64,
@@ -2136,6 +2384,8 @@ module typus_dov::typus_dov_single {
         (previous, portfolio_vault.config.warmup_vault_config)
     }
 
+    /// Updates the strike prices for a vault's active round based on the current oracle price.
+    /// WARNING: no authority check inside.
     public(package) fun update_strike_(
         registry: &mut Registry,
         index: u64,
@@ -2257,6 +2507,8 @@ module typus_dov::typus_dov_single {
         (oracle_price, oracle_price_decimal, active_vault_config)
     }
 
+    /// Updates the configuration of an ongoing Dutch auction.
+    /// WARNING: no authority check inside.
     public(package) fun update_auction_config_(
         registry: &mut Registry,
         index: u64,
@@ -2291,6 +2543,9 @@ module typus_dov::typus_dov_single {
         );
     }
 
+    /// Activates a vault for a new round. This function sets up the vault's parameters for the upcoming auction,
+    /// including strike prices and maximum auction size, based on the current oracle price and total deposits.
+    /// WARNING: no authority check inside.
     public(package) fun activate_<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -2473,6 +2728,8 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Creates a new Dutch auction for the vault's options.
+    /// WARNING: no authority check inside.
     public(package) fun new_auction_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -2529,15 +2786,8 @@ module typus_dov::typus_dov_single {
         )
     }
 
-    /// delivery function process
-    /// calculate portfolio collateral per unit by calculate_max_loss_per_unit
-    /// calcualte delivery_size (contract size) => dutch::delivery
-    /// store delivery_info for performance fee calculation when settlement
-    /// refund unfilled - regular first (refund to refund_sub_vault)
-    /// refund unfilled - rolling (refund to warmup_sub_vault if d_vault.has_next else refund to refund_sub_vault)
-    /// delivery_premium (save premium & performance_fee balance and add share)
-    /// delivery bidder share into bidder_sub_vault
-    /// set auction as option::none()
+    /// Processes the delivery of options from a Dutch auction, distributing premiums and handling incentives.
+    /// WARNING: no authority check inside.
     public(package) fun delivery_<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -2649,6 +2899,7 @@ module typus_dov::typus_dov_single {
         ]
     }
 
+    /// Internal helper function to handle the distribution of premiums and incentives to the deposit vault.
     fun vault_delivery_<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry_id: &mut UID,
         portfolio_vault: &mut PortfolioVault,
@@ -2764,6 +3015,7 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Internal helper function to calculate the theoretical incentive amount, converting between token types if necessary.
     fun calcualte_incentive_(
         portfolio_vault: &PortfolioVault,
         mut theoretical_incentive_amount: u64,
@@ -2814,6 +3066,7 @@ module typus_dov::typus_dov_single {
         theoretical_incentive_amount
     }
 
+    /// [View Function] Calculate the theoretical incentive amount for a given vault and amount.
     public fun calcualte_incentive(
         registry: &Registry,
         index: u64,
@@ -2823,6 +3076,8 @@ module typus_dov::typus_dov_single {
         calcualte_incentive_(portfolio_vault, theoretical_incentive_amount)
     }
 
+    /// Executes an Over-The-Counter (OTC) trade for a vault.
+    /// WARNING: no authority check inside.
     #[allow(lint(self_transfer))]
     public(package) fun otc_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -2916,6 +3171,8 @@ module typus_dov::typus_dov_single {
         };
     }
 
+    /// Executes an OTC trade specifically for a SAFU (Secure Asset Fund for Users) vault.
+    /// WARNING: no authority check inside.
     public(package) fun public_safu_otc_v2_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3002,6 +3259,8 @@ module typus_dov::typus_dov_single {
         (option::some(receipt), vector[price, delivery_size, bidder_bid_value, bidder_fee])
     }
 
+    /// Executes an OTC airdrop, delivering options to a list of users.
+    /// WARNING: no authority check inside.
     public(package) fun airdrop_otc_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3072,6 +3331,8 @@ module typus_dov::typus_dov_single {
         (vector[price, delivery_size, bidder_bid_value, bidder_fee])
     }
 
+    /// Executes an OTC trade authorized by a witness, allowing for off-chain agreements to be settled on-chain.
+    /// WARNING: no authority check inside.
     public(package) fun witness_otc_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3151,6 +3412,8 @@ module typus_dov::typus_dov_single {
         (option::some(receipt), refund, vector[delivery_price, delivery_size, bidder_bid_value, bidder_fee])
     }
 
+    /// Recoups unsold assets from the auction and returns them to the deposit vault.
+    /// WARNING: no authority check inside.
     public(package) fun recoup_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3184,6 +3447,9 @@ module typus_dov::typus_dov_single {
         (refund_from_active_share, refund_from_deactivating_share)
     }
 
+    /// Settles the vault after expiration. This function calculates the final payoff based on the settlement price,
+    /// determines the final share price for depositors, and handles the distribution of assets to bidders and depositors.
+    /// WARNING: no authority check inside.
     public(package) fun settle_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3325,6 +3591,8 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Skips one or more rounds for a vault, typically used when a vault cannot be activated or settled normally.
+    /// WARNING: no authority check inside.
     public(package) fun skip_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3428,6 +3696,8 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Terminates a vault, preventing it from starting new rounds and allowing users to withdraw their funds.
+    /// WARNING: no authority check inside.
     public(package) fun terminate_<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3440,6 +3710,8 @@ module typus_dov::typus_dov_single {
         vault::terminate<TOKEN>(deposit_vault, ctx);
     }
 
+    /// Closes a vault to new deposits.
+    /// WARNING: no authority check inside.
     public(package) fun close_(
         registry: &mut Registry,
         index: u64,
@@ -3450,6 +3722,8 @@ module typus_dov::typus_dov_single {
         vault::close(deposit_vault);
     }
 
+    /// Resumes a closed vault, allowing new deposits again.
+    /// WARNING: no authority check inside.
     public(package) fun resume_(
         registry: &mut Registry,
         index: u64,
@@ -3460,6 +3734,8 @@ module typus_dov::typus_dov_single {
         vault::resume(deposit_vault);
     }
 
+    /// Permanently drops a vault and its associated objects.
+    /// This is an authorized function and is irreversible.
     public(package) fun drop_<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -3479,10 +3755,12 @@ module typus_dov::typus_dov_single {
 
     // ======== Helper Functions ========
 
+    /// Returns the current version of the module.
     public(package) fun get_version(): u64 {
         C_VERSION
     }
 
+    /// Returns immutable references to all fields of the `Registry`.
     public(package) fun get_registry_inner(
         registry: &Registry
     ): (
@@ -3515,6 +3793,7 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Returns mutable references to all fields of the `Registry`.
     public(package) fun get_mut_registry_inner(
         registry: &mut Registry
     ): (
@@ -3547,6 +3826,7 @@ module typus_dov::typus_dov_single {
         )
     }
 
+    /// Checks if a `PortfolioVault` exists for a given index.
     public(package) fun portfolio_vault_exists(
         id: &UID,
         index: u64,
@@ -3554,6 +3834,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::exists_with_type<u64, PortfolioVault>(id, index)
     }
 
+    /// Checks if an `Auction` exists for a given index.
     public(package) fun auction_exists(
         id: &UID,
         index: u64,
@@ -3561,24 +3842,28 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::exists_with_type<u64, Auction>(id, index)
     }
 
+    /// Checks if a `RefundVault` exists for a given token type.
     public(package) fun refund_vault_exists<TOKEN>(
         id: &UID,
     ): bool {
         dynamic_object_field::exists_with_type<TypeName, RefundVault>(id, type_name::get<TOKEN>())
     }
 
+    /// Returns an immutable reference to the `Authority` of a `PortfolioVault`.
     public(package) fun get_portfolio_vault_authority(
         portfolio_vault: &PortfolioVault,
     ): &Authority {
         &portfolio_vault.authority
     }
 
+    /// Returns a mutable reference to the `Authority` of a `PortfolioVault`.
     public(package) fun get_mut_portfolio_vault_authority(
         portfolio_vault: &mut PortfolioVault,
     ): &mut Authority {
         &mut portfolio_vault.authority
     }
 
+    /// Returns an immutable reference to a `PortfolioVault` by its index.
     public(package) fun get_portfolio_vault(
         id: &UID,
         index: u64,
@@ -3586,6 +3871,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<u64, PortfolioVault>(id, index)
     }
 
+    /// Returns a mutable reference to a `PortfolioVault` by its index.
     public(package) fun get_mut_portfolio_vault(
         id: &mut UID,
         index: u64,
@@ -3593,6 +3879,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<u64, PortfolioVault>(id, index)
     }
 
+    /// Returns an immutable reference to a `DepositVault` by its index.
     public(package) fun get_deposit_vault(
         id: &UID,
         index: u64,
@@ -3600,6 +3887,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<u64, DepositVault>(id, index)
     }
 
+    /// Returns a mutable reference to a `DepositVault` by its index.
     public(package) fun get_mut_deposit_vault(
         id: &mut UID,
         index: u64,
@@ -3607,6 +3895,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<u64, DepositVault>(id, index)
     }
 
+    /// Returns an immutable reference to a `BidVault` by its index.
     public(package) fun get_bid_vault(
         id: &UID,
         index: u64,
@@ -3614,6 +3903,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<u64, BidVault>(id, index)
     }
 
+    /// Returns a mutable reference to a `BidVault` by its index.
     public(package) fun get_mut_bid_vault(
         id: &mut UID,
         index: u64,
@@ -3621,6 +3911,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<u64, BidVault>(id, index)
     }
 
+    /// Returns an immutable reference to an `AdditionalConfig` by its index.
     public(package) fun get_additional_config(
         id: &UID,
         index: u64,
@@ -3628,6 +3919,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<u64, AdditionalConfig>(id, index)
     }
 
+    /// Returns a mutable reference to an `AdditionalConfig` by its index.
     public(package) fun get_mut_additional_config(
         id: &mut UID,
         index: u64,
@@ -3635,6 +3927,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<u64, AdditionalConfig>(id, index)
     }
 
+    /// Returns an immutable reference to an `AdditionalConfig` by a dynamic key.
     public(package) fun get_additional_config_by_key(
         id: &UID,
         key: vector<u8>
@@ -3642,6 +3935,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow(id, key)
     }
 
+    /// Returns a mutable reference to an `AdditionalConfig` by a dynamic key.
     public(package) fun get_mut_additional_config_by_key(
         id: &mut UID,
         key: vector<u8>
@@ -3649,6 +3943,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut(id, key)
     }
 
+    /// Returns an immutable reference to a `BidVault` by its object ID or, if not found, by its index.
     public(package) fun get_bid_vault_by_id_or_index(
         id: &UID,
         vid: &ID,
@@ -3661,6 +3956,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Returns an immutable reference to a `BidVault` by its object ID.
     public(package) fun get_bid_vault_by_id(
         id: &UID,
         vid: &ID,
@@ -3668,6 +3964,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<address, BidVault>(id, object::id_to_address(vid))
     }
 
+    /// Returns a mutable reference to a `BidVault` by its object ID or, if not found, by its index.
     public(package) fun get_mut_bid_vault_by_id_or_index(
         id: &mut UID,
         vid: &ID,
@@ -3680,6 +3977,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Returns a mutable reference to a `BidVault` by its object ID.
     public(package) fun get_mut_bid_vault_by_id(
         id: &mut UID,
         vid: &ID,
@@ -3687,18 +3985,21 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<address, BidVault>(id, object::id_to_address(vid))
     }
 
+    /// Returns an immutable reference to a `RefundVault` for a specific token type.
     public(package) fun get_refund_vault<TOKEN>(
         id: &UID,
     ): &RefundVault {
         dynamic_object_field::borrow<TypeName, RefundVault>(id, type_name::get<TOKEN>())
     }
 
+    /// Returns a mutable reference to a `RefundVault` for a specific token type.
     public(package) fun get_mut_refund_vault<TOKEN>(
         id: &mut UID,
     ): &mut RefundVault {
         dynamic_object_field::borrow_mut<TypeName, RefundVault>(id, type_name::get<TOKEN>())
     }
 
+    /// Returns an immutable reference to an `Auction` by its index.
     public(package) fun get_auction(
         id: &UID,
         index: u64,
@@ -3707,6 +4008,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow<u64, Auction>(id, index)
     }
 
+    /// Returns a mutable reference to an `Auction` by its index.
     public(package) fun get_mut_auction(
         id: &mut UID,
         index: u64,
@@ -3715,6 +4017,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::borrow_mut<u64, Auction>(id, index)
     }
 
+    /// Takes ownership of an `Auction` object from the registry, removing it.
     public(package) fun take_auction(
         id: &mut UID,
         index: u64,
@@ -3723,6 +4026,7 @@ module typus_dov::typus_dov_single {
         dynamic_object_field::remove<u64, Auction>(id, index)
     }
 
+    /// Performs a health check on all vaults, identifying those that are expired but have not yet been settled.
     public(package) fun health_check(
         registry: &Registry,
         clock: &Clock,
@@ -3745,6 +4049,7 @@ module typus_dov::typus_dov_single {
         result
     }
 
+    /// Returns the bid fee in basis points for a specific vault.
     public(package) fun get_bid_fee_bp(
         id: &UID,
         index: u64,
@@ -3754,6 +4059,7 @@ module typus_dov::typus_dov_single {
         portfolio_vault.config.bid_fee_bp
     }
 
+    /// Returns the number of decimals for the option token (contract size) of a specific vault.
     public(package) fun get_size_decimal(
         id: &UID,
         index: u64,
@@ -3763,6 +4069,7 @@ module typus_dov::typus_dov_single {
         portfolio_vault.info.o_token_decimal
     }
 
+    /// Updates the activation and expiration timestamps for a vault to roll it into the next period.
     fun update_portfolio_vault_activation_expiration_time(portfolio_vault: &mut PortfolioVault) {
         portfolio_vault.info.activation_ts_ms = portfolio_vault.info.expiration_ts_ms;
         if (portfolio_vault.info.period == 0) {
@@ -3788,6 +4095,7 @@ module typus_dov::typus_dov_single {
 
     // ======== Calculation Functions ========
 
+    /// Calculates the absolute strike price from a basis point value and rounds it to the nearest strike increment.
     public(package) fun calculate_strike(price: u64, strike_bp: u64, strike_increment: u64): u64 {
         let temp = price * strike_bp / 10000;
         if (temp % strike_increment == 0) {
@@ -3797,10 +4105,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    // Calculate max_auction_size
-    // - total_balance = 1_000_000, collateral_per_unit = 4_545_454, leverage = 100
-    // - max_size = 1_000_000_000 * 1_000_000 / 4_545_454 = 220_000_026
-    // - rounded max_size = 220_000_000
+    /// Calculates the maximum size of an auction based on the total collateral, leverage, and max loss per contract.
     public(package) fun calculate_max_auction_size(
         o_token_decimal: u64,
         leverage: u64,
@@ -3815,7 +4120,7 @@ module typus_dov::typus_dov_single {
             * lot_size
     }
 
-    /// max loss per unit contract in d token
+    /// Calculates the maximum potential loss per option contract for the vault's strategy in terms of the deposit token.
     public(package) fun calculate_max_loss_per_unit(
         index: u64,
         option_type: u64,
@@ -3871,6 +4176,8 @@ module typus_dov::typus_dov_single {
         max_loss
     }
 
+    /// Calculates the total payoff for the entire portfolio (i.e., the depositors' side) based on a given settlement price.
+    /// The result is an `I64` because it can be a loss (negative) for the depositors.
     public(package) fun calculate_portfolio_payoff_by_price(
         index: u64,
         option_type: u64,
@@ -3924,7 +4231,7 @@ module typus_dov::typus_dov_single {
         i64_mul_div(total_payoff_per_contract, contract_size, utils::multiplier(o_token_decimal))
     }
 
-    /// helper functio to calculate I64
+    /// Helper function to multiply and divide an `I64` value, preserving its sign.
     fun i64_mul_div(value: I64, mul: u64, div: u64): I64 {
         let result = (
             (i64::as_u64(&i64::abs(&value)) as u128)
@@ -3939,6 +4246,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Calculates the payoff for a single long option (call or put) at a given price.
     public(package) fun calculate_option_payoff(
         index: u64,
         option_type: u64,
@@ -3974,6 +4282,7 @@ module typus_dov::typus_dov_single {
         long_option_payoff
     }
 
+    /// Calculates the USD value of a given token amount.
     public(package) fun calculate_in_usd<TOKEN>(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -4013,6 +4322,7 @@ module typus_dov::typus_dov_single {
         usd
     }
 
+    /// Calculates the value of a token amount in USD, scaled to 6 decimals.
     public(package) fun calculate_in_usd_with_decimal<TOKEN>(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -4041,6 +4351,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Creates a vector of `PayoffConfig` structs from raw parameters.
     public(package) fun create_payoff_configs(
         index: u64,
         mut strike_bp: vector<u64>,
@@ -4070,6 +4381,7 @@ module typus_dov::typus_dov_single {
         payoff_configs
     }
 
+    /// Calculates the value of the incentive a bidder will receive for a new bid.
     public(package) fun get_new_bid_incentive_balance_value<TOKEN>(
         id: &UID,
         portfolio_vault: &PortfolioVault,
@@ -4118,7 +4430,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    // get `incentive_usage` from `get_new_bid_incentive_balance_value`
+    /// Retrieves a `Balance` object containing the calculated incentive for a new bid.
     public(package) fun get_new_bid_incentive_balance<TOKEN>(
         id: &mut UID,
         portfolio_vault: &mut PortfolioVault,
@@ -4143,6 +4455,7 @@ module typus_dov::typus_dov_single {
         incentive_balance
     }
 
+    /// Retrieves `Balance` objects for various incentive types for an OTC trade.
     public(package) fun get_otc_incentive_balance<TOKEN>(
         id: &mut UID,
         portfolio_vault: &mut PortfolioVault,
@@ -4185,6 +4498,7 @@ module typus_dov::typus_dov_single {
         (incentive_balance, incentive_fee_balance, depositor_incentive_balance)
     }
 
+    /// Helper function to request a specific amount from a generic incentive pool, respecting availability.
     public(package) fun request_incentive<TOKEN>(
         incentive: &mut Balance<TOKEN>,
         mut available_incentive_amount: u64,
@@ -4207,6 +4521,7 @@ module typus_dov::typus_dov_single {
         available_incentive_amount
     }
 
+    /// Calculates the total payoff for a vector of expired bid receipts.
     public fun calculate_payoff_for_expired_bid_receipts<D_TOKEN>(
         registry: &Registry,
         bid_receipts: &vector<TypusBidReceipt>,
@@ -4216,6 +4531,7 @@ module typus_dov::typus_dov_single {
         vault::calculate_exercise_value_for_receipts<D_TOKEN>(bid_vault, bid_receipts)
     }
 
+    /// (Deprecated) Calculates the payoff for an active (unexpired) bid receipt.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun calculate_payoff_for_active_bid_receipt(
         registry: &Registry,
@@ -4224,6 +4540,7 @@ module typus_dov::typus_dov_single {
         clock: &Clock
     ): u64 { abort 0 }
 
+    /// Calculates the payoff for an active (unexpired) bid receipt based on the current oracle price.
     fun calculate_payoff_for_active_bid_receipt_v2(
         registry: &Registry,
         oracle: &Oracle,
@@ -4276,6 +4593,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// Checks if a bid receipt has expired by comparing its vault ID with the current one.
     public fun check_bid_receipt_expired(
         registry: &Registry,
         bid_receipt: &TypusBidReceipt
@@ -4286,6 +4604,7 @@ module typus_dov::typus_dov_single {
         vid != current_vid
     }
 
+    /// (Deprecated) Checks if a bid receipt is in-the-money.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun check_itm<D_TOKEN>(
         registry: &Registry,
@@ -4294,6 +4613,7 @@ module typus_dov::typus_dov_single {
         clock: &Clock
     ): bool { abort 0}
 
+    /// (Deprecated) Gets the intrinsic value of a bid receipt.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun get_bid_receipt_intrinsic_value<D_TOKEN>(
         registry: &Registry,
@@ -4302,6 +4622,7 @@ module typus_dov::typus_dov_single {
         clock: &Clock
     ): u64 { abort 0}
 
+    /// Gets the intrinsic value of a bid receipt, whether it's active or expired.
     public fun get_bid_receipt_intrinsic_value_v2<D_TOKEN>(
         registry: &Registry,
         oracle: &Oracle,
@@ -4330,6 +4651,7 @@ module typus_dov::typus_dov_single {
         }
     }
 
+    /// (Deprecated) Verifies if a bid receipt can be used for a collateral trading order.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun verify_bid_receipt_collateral_trading_order<C_TOKEN, BASE_TOKEN>(
         registry: &Registry,
@@ -4338,7 +4660,8 @@ module typus_dov::typus_dov_single {
         long_order: bool,
         clock: &Clock
     ): vector<u8> { abort 0 }
-    // C_TOKEN = D_TOKEN = collateral token, BASE_TOKEN = base of trading symbol = settlement_base
+    /// Verifies if a bid receipt can be used for a collateral trading order, checking for expiration, ITM status, and token matches.
+    /// C_TOKEN = D_TOKEN = collateral token, BASE_TOKEN = base of trading symbol = settlement_base
     public fun verify_bid_receipt_collateral_trading_order_v2<C_TOKEN, BASE_TOKEN>(
         registry: &Registry,
         oracle: &Oracle,
@@ -4390,6 +4713,7 @@ module typus_dov::typus_dov_single {
         return b"OK"
     }
 
+    /// Returns the `TypeName` of the deposit token for a specific vault.
     public fun get_deposit_token(
         registry: &Registry,
         index: u64
@@ -4398,6 +4722,7 @@ module typus_dov::typus_dov_single {
         portfolio_vault.info.deposit_token
     }
 
+    /// Returns the `TypeName` of the bid token for a specific vault.
     public fun get_bid_token(
         registry: &Registry,
         index: u64
@@ -4408,14 +4733,17 @@ module typus_dov::typus_dov_single {
 
     // ======== Validation Functions =========
 
+    /// Checks if the module version is compatible with the registry version.
     public(package) fun version_check(registry: &Registry) {
         assert!(C_VERSION >= registry.version, invalid_version(0));
     }
 
+    /// Checks if transactions are currently suspended in the registry.
     public(package) fun operation_check(registry: &Registry) {
         assert!(!registry.transaction_suspended, transaction_suspended(0));
     }
 
+    /// Checks if the provided oracle matches the one configured in the vault.
     public(package) fun oracle_check(
         registry: &Registry,
         index: u64,
@@ -4425,6 +4753,7 @@ module typus_dov::typus_dov_single {
         assert!(portfolio_vault.config.oracle_id == object::id_address(oracle), invalid_oracle(index));
     }
 
+    /// Checks if the provided generic token types match the deposit and bid tokens configured in the vault.
     public(package) fun portfolio_vault_token_check<D_TOKEN, B_TOKEN>(
         registry: &Registry,
         index: u64,
@@ -4434,51 +4763,61 @@ module typus_dov::typus_dov_single {
         assert!(type_name::get<B_TOKEN>() == portfolio_vault.info.bid_token, invalid_bid_token(index));
     }
 
+    /// Validates that the caller has the authority and the version of package.
     public(package) fun validate_registry_upgradability(registry: &Registry, ctx: &TxContext) {
         assert!(C_VERSION > registry.version, invalid_version(0));
         authority::verify(&registry.authority, ctx);
     }
 
+    /// Validates that the caller has authority over the main registry.
     public(package) fun validate_registry_authority(registry: &Registry, ctx: &TxContext) {
         authority::verify(&registry.authority, ctx);
     }
 
+    /// Validates that the caller has authority over both the main registry and a specific portfolio vault.
     public(package) fun validate_portfolio_authority(registry: &Registry, index: u64, ctx: &TxContext) {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
         authority::double_verify(&registry.authority, &portfolio_vault.authority, ctx);
     }
 
+    /// Validates that a provided witness is registered as a valid witness in the registry.
     public(package) fun validate_witness<W: drop>(registry: &Registry, _witness: W, index: u64) {
         let witnesses = dynamic_field::borrow(&registry.id, K_WITNESSES.to_string());
         assert!(linked_set::contains(witnesses, type_name::get<W>()), invalid_witness(index));
     }
 
+    /// Validates that a deposit amount conforms to the vault's lot size and minimum size rules.
     public(package) fun validate_deposit_amount(portfolio_vault: &PortfolioVault, amount: u64) {
         assert!(amount >= portfolio_vault.config.deposit_lot_size
             && amount % portfolio_vault.config.deposit_lot_size == 0, lot_size_violation(portfolio_vault.info.index));
         assert!(amount >= portfolio_vault.config.min_deposit_size, min_size_violation(portfolio_vault.info.index));
     }
 
+    /// Validates that a deposit amount is at least the minimum required size.
     public(package) fun validate_min_deposit_size(portfolio_vault: &PortfolioVault, amount: u64) {
         assert!(amount >= portfolio_vault.config.min_deposit_size, min_size_violation(portfolio_vault.info.index));
     }
 
+    /// Validates a bid amount against the vault's rules and checks if the maximum number of bidders has been reached.
     public(package) fun validate_bid(portfolio_vault: &PortfolioVault, auction: &Auction, amount: u64) {
         validate_bid_amount(portfolio_vault, amount);
         assert!(portfolio_vault.config.max_bid_entry == 0
             || dutch::bid_index(auction) < portfolio_vault.config.max_bid_entry, max_bid_entry_reached(portfolio_vault.info.index));
     }
 
+    /// Validates that a bid amount conforms to the vault's lot size and minimum size rules.
     public(package) fun validate_bid_amount(portfolio_vault: &PortfolioVault, amount: u64) {
         assert!(amount >= portfolio_vault.config.bid_lot_size
             && amount % portfolio_vault.config.bid_lot_size == 0, lot_size_violation(portfolio_vault.info.index));
         assert!(amount >= portfolio_vault.config.min_bid_size, min_size_violation(portfolio_vault.info.index));
     }
 
+    /// Validates that an amount is greater than zero.
     public(package) fun validate_amount(index: u64, amount: u64) {
         assert!(amount > 0, zero_value(index));
     }
 
+    /// Validates the price and duration settings for a Dutch auction.
     public(package) fun validate_dutch_auction_settings(
         index: u64,
         initial_price: u64,
@@ -4489,6 +4828,7 @@ module typus_dov::typus_dov_single {
         assert!(auction_duration_ts_ms >= 60_000, invalid_auction_duration_ts_ms(index));
     }
 
+    /// Validates that the current total deposits do not exceed the vault's capacity and entry limits.
     public(package) fun validate_capacity(
         registry: &Registry,
         index: u64
@@ -4511,6 +4851,7 @@ module typus_dov::typus_dov_single {
 
     // ======== Authorized Events =========
 
+    /// Event emitted when a vault is activated for a new round.
     public struct ActivateEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4522,6 +4863,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits an `ActivateEvent`.
     public(package) fun emit_activate_event(
         registry: &Registry,
         index: u64,
@@ -4546,6 +4888,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a new auction is created.
     public struct NewAuctionEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4557,6 +4900,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `NewAuctionEvent`.
     public(package) fun emit_new_auction_event(
         registry: &Registry,
         index: u64,
@@ -4579,6 +4923,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted upon the delivery of options from an auction.
     public struct DeliveryEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4597,6 +4942,7 @@ module typus_dov::typus_dov_single {
         depositor_incentive_value: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `DeliveryEvent`.
     public(package) fun emit_delivery_event(
         registry: &Registry,
         index: u64,
@@ -4644,6 +4990,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a new OTC configuration is added.
     public struct AddOtcConfigEvent has copy, drop {
         signer: address,
         user: address,
@@ -4653,6 +5000,7 @@ module typus_dov::typus_dov_single {
         price: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits an `AddOtcConfigEvent`.
     public(package) fun emit_add_otc_config_event(
         user: address,
         index: u64,
@@ -4673,12 +5021,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when an OTC configuration is removed.
     public struct RemoveOtcConfigEvent has copy, drop {
         signer: address,
         user: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `RemoveOtcConfigEvent`.
     public(package) fun emit_remove_otc_config_event(
         user: address,
         index: u64,
@@ -4692,6 +5042,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when an OTC trade occurs.
     public struct OtcEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4707,6 +5058,7 @@ module typus_dov::typus_dov_single {
         depositor_incentive_value: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits an `OtcEvent`.
     public(package) fun emit_otc_event(
         registry: &Registry,
         index: u64,
@@ -4737,6 +5089,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a witnessed OTC trade occurs.
     public struct WitnessOtcEvent has copy, drop {
         witness: TypeName,
         signer: address,
@@ -4750,6 +5103,7 @@ module typus_dov::typus_dov_single {
         b_token_decimal: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `WitnessOtcEvent`.
     public(package) fun emit_witness_otc_event(
         witness: TypeName,
         registry: &Registry,
@@ -4776,6 +5130,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when unsold assets are recouped after an auction.
     public struct RecoupEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4785,6 +5140,7 @@ module typus_dov::typus_dov_single {
         d_token_decimal: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `RecoupEvent`.
     public(package) fun emit_recoup_event(
         registry: &Registry,
         index: u64,
@@ -4804,6 +5160,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault is settled after expiration.
     public struct SettleEvent has copy, drop {
         signer: address,
         index: u64,
@@ -4817,6 +5174,7 @@ module typus_dov::typus_dov_single {
         share_price: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `SettleEvent`.
     public(package) fun emit_settle_event(
         registry: &Registry,
         index: u64,
@@ -4843,12 +5201,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault round is skipped.
     public struct SkipEvent has copy, drop {
         signer: address,
         index: u64,
         rounds: vector<u64>,
         u64_padding: vector<u64>,
     }
+    /// Emits a `SkipEvent`.
     public(package) fun emit_skip_event(
         index: u64,
         rounds: vector<u64>,
@@ -4862,12 +5222,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault is closed to new deposits.
     public struct CloseEvent has copy, drop {
         signer: address,
         index: u64,
         round: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `CloseEvent`.
     public(package) fun emit_close_event(
         registry: &Registry,
         index: u64,
@@ -4882,12 +5244,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault is resumed.
     public struct ResumeEvent has copy, drop {
         signer: address,
         index: u64,
         round: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `ResumeEvent`.
     public(package) fun emit_resume_event(
         registry: &Registry,
         index: u64,
@@ -4902,12 +5266,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault is terminated.
     public struct TerminateVaultEvent has copy, drop {
         signer: address,
         index: u64,
         round: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `TerminateVaultEvent`.
     public(package) fun emit_termiante_vault_event(
         registry: &Registry,
         index: u64,
@@ -4922,12 +5288,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a vault is dropped.
     public struct DropVaultEvent has copy, drop {
         signer: address,
         index: u64,
         round: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `DropVaultEvent`.
     public(package) fun emit_drop_vault_event(
         registry: &Registry,
         index: u64,
@@ -4942,12 +5310,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when an auction is terminated.
     public struct TerminateAuctionEvent has copy, drop {
         signer: address,
         index: u64,
         round: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `TerminateAuctionEvent`.
     public(package) fun emit_terminate_auction_event(
         registry: &Registry,
         index: u64,
@@ -4964,11 +5334,13 @@ module typus_dov::typus_dov_single {
 
     // ======== User Events =========
 
+    /// Event emitted when funds are raised for a vault (e.g., through borrowing).
     public struct RaiseFundEvent has copy, drop {
         signer: address,
         token: TypeName,
         log: vector<u64>,
     }
+    /// Emits a `RaiseFundEvent`.
     public(package) fun emit_raise_fund_event(
         portfolio_vault: &PortfolioVault,
         balance_value: u64,
@@ -4995,6 +5367,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when funds are reduced from a vault (e.g., through withdrawals or repayments).
     public struct ReduceFundEvent has copy, drop {
         signer: address,
         d_token: TypeName,
@@ -5002,6 +5375,7 @@ module typus_dov::typus_dov_single {
         i_token: TypeName,
         log: vector<u64>,
     }
+    /// Emits a `ReduceFundEvent`.
     public(package) fun emit_reduce_fund_event(
         portfolio_vault: &PortfolioVault,
         d_token: TypeName,
@@ -5041,11 +5415,13 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user's deposit snapshot is refreshed.
     public struct RefreshDepositSnapshotEvent has copy, drop {
         signer: address,
         token: TypeName,
         log: vector<u64>,
     }
+    /// Emits a `RefreshDepositSnapshotEvent`.
     public(package) fun emit_refresh_deposit_snapshot_event(
         portfolio_vault: &PortfolioVault,
         snapshot: u64,
@@ -5064,6 +5440,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user deposits into a vault.
     public struct DepositEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5073,6 +5450,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `DepositEvent`.
     public(package) fun emit_deposit_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5089,6 +5467,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user withdraws from a vault's warm-up period.
     public struct WithdrawEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5098,6 +5477,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `WithdrawEvent`.
     public(package) fun emit_withdraw_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5114,6 +5494,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user unsubscribes from a vault's active period.
     public struct UnsubscribeEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5123,6 +5504,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits an `UnsubscribeEvent`.
     public(package) fun emit_unsubscribe_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5139,6 +5521,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user claims their settled funds.
     public struct ClaimEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5148,6 +5531,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `ClaimEvent`.
     public(package) fun emit_claim_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5164,6 +5548,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user harvests earned premiums.
     public struct HarvestEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5174,6 +5559,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `HarvestEvent`.
     public(package) fun emit_harvest_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5193,6 +5579,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user compounds their earned premiums back into the vault.
     public struct CompoundEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5202,6 +5589,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `CompoundEvent`.
     public(package) fun emit_compound_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5220,6 +5608,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a user redeems earned incentives.
     public struct RedeemEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5228,6 +5617,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `RedeemEvent`.
     public(package) fun emit_redeem_event(
         portfolio_vault: &PortfolioVault,
         token: TypeName,
@@ -5246,6 +5636,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a new bid is placed in an auction.
     public struct NewBidEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5261,6 +5652,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `NewBidEvent`.
     public(package) fun emit_new_bid_event(
         portfolio_vault: &PortfolioVault,
         bid_index: u64,
@@ -5288,6 +5680,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a bid receipt is transferred.
     public struct TransferBidReceiptEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5297,6 +5690,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
+    /// Emits a `TransferBidReceiptEvent`.
     public(package) fun emit_transfer_bid_receipt_event(
         portfolio_vault: &PortfolioVault,
         amount: u64,
@@ -5314,12 +5708,14 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a bidder is refunded for an unfilled bid.
     public struct RefundEvent has copy, drop {
         signer: address,
         token: TypeName,
         amount: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits a `RefundEvent`.
     public(package) fun emit_refund_event(
         token: TypeName,
         amount: u64,
@@ -5333,6 +5729,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Event emitted when a bidder exercises their options.
     public struct ExerciseEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5343,6 +5740,7 @@ module typus_dov::typus_dov_single {
         incentive_amount: u64,
         u64_padding: vector<u64>,
     }
+    /// Emits an `ExerciseEvent`.
     public(package) fun emit_exercise_event(
         index: u64,
         amount: u64,
@@ -5364,14 +5762,17 @@ module typus_dov::typus_dov_single {
         });
     }
 
+    /// Returns the current round number of a portfolio vault.
     public(package) fun get_round(portfolio_vault: &PortfolioVault): u64 {
         portfolio_vault.info.round
     }
 
+    /// Returns the number of decimals for the option token of a portfolio vault.
     public(package) fun get_o_token_decimal(portfolio_vault: &PortfolioVault): u64 {
         portfolio_vault.info.o_token_decimal
     }
 
+    /// Returns the start and duration timestamps for a vault's auction.
     public(package) fun get_auction_ts(portfolio_vault: &PortfolioVault): (u64, u64) {
         let start = portfolio_vault.info.activation_ts_ms + portfolio_vault.config.auction_delay_ts_ms;
         (start, portfolio_vault.config.auction_duration_ts_ms)

@@ -27,6 +27,7 @@ module typus_dov::tds_authorized_entry {
     use typus::ecosystem::Version as TypusEcosystemVersion;
     use typus::witness_lock::HotPotato;
 
+    /// Performs a safety check for authorized functions that do not involve tokens.
     fun safety_check_without_token(
         registry: &Registry,
         index: u64,
@@ -36,6 +37,7 @@ module typus_dov::tds_authorized_entry {
         typus_dov_single::validate_portfolio_authority(registry, index, ctx);
     }
 
+    /// Performs a safety check for authorized functions that involve tokens.
     fun safety_check<D_TOKEN, B_TOKEN>(
         registry: &Registry,
         index: u64,
@@ -47,11 +49,13 @@ module typus_dov::tds_authorized_entry {
     }
 
 
+    /// Event emitted when the current lending protocol flag is set.
     public struct SetCurrentLendingProtocolFlag has copy, drop {
         signer: address,
         index: u64,
         lending_protocol: u64,
     }
+    /// [Authorized Function] Sets the current lending protocol flag.
     entry fun set_current_lending_protocol_flag(
         registry: &mut Registry,
         index: u64,
@@ -76,11 +80,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the SAFU vault index is set.
     public struct SetSafuVaultIndex has copy, drop {
         signer: address,
         index: u64,
         safu_index: u64,
     }
+    /// [Authorized Function] Sets the SAFU vault index.
     entry fun set_safu_vault_index(
         registry: &mut Registry,
         index: u64,
@@ -105,11 +111,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the lending protocol flag is set.
     public struct SetLendingProtocolFlag has copy, drop {
         signer: address,
         index: u64,
         lending_protocol: u64,
     }
+    /// [Authorized Function] Sets the lending protocol flag.
     public entry fun set_lending_protocol_flag(
         registry: &mut Registry,
         index: u64,
@@ -134,11 +142,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when an authorized user is added to a portfolio vault.
     public struct AddPortfolioVaultAuthorizedUserEvent has copy, drop {
         signer: address,
         index: u64,
         users: vector<address>,
     }
+    /// [Authorized Function] Adds an authorized user to a portfolio vault.
     entry fun add_portfolio_vault_authorized_user(
         registry: &mut Registry,
         index: u64,
@@ -176,11 +186,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when an authorized user is removed from a portfolio vault.
     public struct RemovePortfolioVaultAuthorizedUserEvent has copy, drop {
         signer: address,
         index: u64,
         users: vector<address>,
     }
+    /// [Authorized Function] Removes an authorized user from a portfolio vault.
     entry fun remove_portfolio_vault_authorized_user(
         registry: &mut Registry,
         index: u64,
@@ -218,12 +230,14 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the configuration of a portfolio vault is updated.
     public struct UpdateConfigEvent has copy, drop {
         signer: address,
         index: u64,
         previous: Config,
         current: Config,
     }
+    /// [Authorized Function] Updates the configuration of a portfolio vault.
     entry fun update_config(
         registry: &mut Registry,
         index: u64,
@@ -289,6 +303,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// [Authorized Function] Updates the oracle for a portfolio vault.
     entry fun update_oracle(
         registry: &mut Registry,
         index: u64,
@@ -305,6 +320,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// Event emitted when the active vault configuration is updated.
     #[allow(unused_field)]
     public struct UpdateActiveVaultConfigEvent has copy, drop {
         signer: address,
@@ -313,12 +329,14 @@ module typus_dov::tds_authorized_entry {
         current: VaultConfig,
     }
 
+    /// Event emitted when the warmup vault configuration is updated.
     public struct UpdateWarmupVaultConfigEvent has copy, drop {
         signer: address,
         index: u64,
         previous: VaultConfig,
         current: VaultConfig,
     }
+    /// [Authorized Function] Updates the warmup vault configuration.
     public(package) entry fun update_warmup_vault_config(
         registry: &mut Registry,
         index: u64,
@@ -355,6 +373,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the strike price is updated.
     public struct UpdateStrikeEvent has copy, drop {
         signer: address,
         index: u64,
@@ -362,6 +381,7 @@ module typus_dov::tds_authorized_entry {
         oracle_price_decimal: u64,
         vault_config: VaultConfig,
     }
+    /// [Authorized Function] Updates the strike price based on the oracle price.
     public(package) entry fun update_strike(
         registry: &mut Registry,
         index: u64,
@@ -394,6 +414,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the auction configuration is updated.
     public struct UpdateAuctionConfigEvent has copy, drop {
         signer: address,
         index: u64,
@@ -408,6 +429,7 @@ module typus_dov::tds_authorized_entry {
         size_decimal: u64,
         able_to_remove_bid: bool,
     }
+    /// [Authorized Function] Updates the auction configuration.
     public(package) entry fun update_auction_config(
         registry: &mut Registry,
         index: u64,
@@ -460,6 +482,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// [Authorized Function] Activates a vault.
     public entry fun activate<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -498,6 +521,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// [Authorized Function] Creates a new auction.
     public entry fun new_auction<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -529,6 +553,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// [Authorized Function] Delivers the results of an auction.
     public entry fun delivery<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -555,6 +580,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// [Authorized Function] Handles an over-the-counter deal.
     public(package) entry fun otc<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -619,6 +645,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// Deprecated function.
     #[allow(dead_code, unused_variable, unused_type_parameter)]
     public fun safu_otc<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -631,6 +658,7 @@ module typus_dov::tds_authorized_entry {
         abort 0
     }
 
+    /// [Authorized Function] Handles a SAFU over-the-counter deal.
     public fun safu_otc_v2<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -666,6 +694,7 @@ module typus_dov::tds_authorized_entry {
         (receipt, log)
     }
 
+    /// [Authorized Function] Handles an airdrop over-the-counter deal.
     public fun airdrop_otc<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -707,6 +736,7 @@ module typus_dov::tds_authorized_entry {
         log
     }
 
+    /// [Authorized Function] Recoups funds after an auction.
     public entry fun recoup<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -731,6 +761,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// [Authorized Function] Settles a vault.
     public entry fun settle<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -777,6 +808,7 @@ module typus_dov::tds_authorized_entry {
         }
     }
 
+    /// [Authorized Function] Skips a round.
     public(package) entry fun skip<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -806,6 +838,7 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
+    /// [Authorized Function] Closes a vault.
     public(package) entry fun close<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -822,6 +855,7 @@ module typus_dov::tds_authorized_entry {
         typus_dov_single::close_(registry, index);
     }
 
+    /// [Authorized Function] Resumes a vault.
     public(package) entry fun resume<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -839,6 +873,7 @@ module typus_dov::tds_authorized_entry {
     }
 
 
+    /// [Authorized Function] Terminates a vault.
     public(package) entry fun terminate_vault<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -855,6 +890,7 @@ module typus_dov::tds_authorized_entry {
         typus_dov_single::terminate_<D_TOKEN>(registry, index, ctx);
     }
 
+    /// [Authorized Function] Drops a vault.
     public(package) entry fun drop_vault<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -871,6 +907,7 @@ module typus_dov::tds_authorized_entry {
         typus_dov_single::drop_<D_TOKEN, B_TOKEN>(registry, index, ctx);
     }
 
+    /// [Authorized Function] Terminates an auction.
     public(package) entry fun terminate_auction<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -913,12 +950,14 @@ module typus_dov::tds_authorized_entry {
         };
     }
 
+    /// Event emitted when a Scallop spool account is created.
     public struct CreateScallopSpoolAccount has copy, drop {
         signer: address,
         index: u64,
         spool_id: address,
         spool_account_id: address,
     }
+    /// [Authorized Function] Creates a Scallop spool account.
     public(package) entry fun create_scallop_spool_account<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -946,22 +985,26 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when Scallop integration is enabled.
     #[allow(unused_field)]
     public struct EnableScallop has copy, drop {
         signer: address,
         index: u64,
     }
+    /// Event emitted when Scallop integration is disabled.
     #[allow(unused_field)]
     public struct DisableScallop has copy, drop {
         signer: address,
         index: u64,
     }
 
+    /// Event emitted when funds are deposited to Scallop.
     public struct DepositScallop has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Deposits funds to Scallop.
     public(package) entry fun deposit_scallop<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -992,11 +1035,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are withdrawn from Scallop.
     public struct WithdrawScallop has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Withdraws funds from Scallop.
     public(package) entry fun withdraw_scallop<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1029,12 +1074,14 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when fixed incentives are added.
     public struct FixedIncentiviseEvent has copy, drop {
         signer: address,
         token: TypeName,
         amount: u64,
         fixed_incentive_amount: u64,
     }
+    /// [Authorized Function] Adds fixed incentives to a vault.
     public(package) entry fun fixed_incentivise<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1055,11 +1102,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when fixed incentives are withdrawn.
     public struct WithdrawFixedIncentiveEvent has copy, drop {
         signer: address,
         token: TypeName,
         amount: u64,
     }
+    /// [Authorized Function] Withdraws fixed incentives from a vault.
     #[lint_allow(self_transfer)]
     public(package) entry fun withdraw_fixed_incentive<I_TOKEN>(
         registry: &mut Registry,
@@ -1082,22 +1131,26 @@ module typus_dov::tds_authorized_entry {
     }
 
     // ======= scallop basic lending =======
+    /// Event emitted when Scallop basic lending is enabled.
     #[allow(unused_field)]
     public struct EnableScallopBasicLending has copy, drop {
         signer: address,
         index: u64,
     }
+    /// Event emitted when Scallop basic lending is disabled.
     #[allow(unused_field)]
     public struct DisableScallopBasicLending has copy, drop {
         signer: address,
         index: u64,
     }
 
+    /// Event emitted when funds are deposited to Scallop for basic lending.
     public struct DepositScallopBasicLending has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Deposits funds to Scallop for basic lending.
     public entry fun deposit_scallop_basic_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1126,11 +1179,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are withdrawn from Scallop for basic lending.
     public struct WithdrawScallopBasicLending has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Withdraws funds from Scallop for basic lending.
     public entry fun withdraw_scallop_basic_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1160,10 +1215,12 @@ module typus_dov::tds_authorized_entry {
     }
 
     // ======= additional lending =======
+    /// Event emitted when additional lending is enabled.
     public struct EnableAdditionalLending has copy, drop {
         signer: address,
         index: u64,
     }
+    /// [Authorized Function] Enables additional lending for a vault.
     public(package) entry fun enable_additional_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1181,10 +1238,12 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when additional lending is disabled.
     public struct DisableAdditionalLending has copy, drop {
         signer: address,
         index: u64,
     }
+    /// [Authorized Function] Disables additional lending for a vault.
     public(package) entry fun disable_additional_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1202,35 +1261,41 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are deposited to additional lending.
     #[allow(unused_field)]
     public struct DepositAdditionalLending has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// Event emitted when funds are withdrawn from additional lending.
     #[allow(unused_field)]
     public struct WithdrawAdditionalLending has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// Event emitted when Suilend integration is enabled.
     #[allow(unused_field)]
     public struct EnableSuilend has copy, drop {
         signer: address,
         index: u64,
     }
+    /// Event emitted when Suilend integration is disabled.
     #[allow(unused_field)]
     public struct DisableSuilend has copy, drop {
         signer: address,
         index: u64,
     }
 
+    /// Event emitted when a Suilend obligation owner cap is created.
     public struct CreateSuilendObligationOwnerCap has copy, drop {
         signer: address,
         index: u64,
         lending_market_id: address,
         obligation_owner_cap_id: address,
     }
+    /// [Authorized Function] Creates a Suilend obligation owner cap.
     public(package) entry fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1256,11 +1321,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are deposited to Suilend.
     public struct DepositSuilend has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Deposits funds to Suilend.
     public(package) entry fun deposit_suilend<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1289,6 +1356,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// [Authorized Function] Refreshes the reserve price in Suilend.
     public(package) entry fun refresh_suilend_reserve_price(
         lending_market: &mut LendingMarket<MAIN_POOL>,
         reserve_array_index: u64,
@@ -1298,11 +1366,13 @@ module typus_dov::tds_authorized_entry {
         lending_market::refresh_reserve_price(lending_market, reserve_array_index, clock, price_info);
     }
 
+    /// Event emitted when funds are withdrawn from Suilend.
     public struct WithdrawSuilend has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Withdraws funds from Suilend.
     public(package) entry fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1333,11 +1403,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when rewards are claimed from Suilend.
     public struct RewardSuilend has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Claims rewards from Suilend.
     public(package) entry fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1368,11 +1440,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when a Navi account cap is created.
     public struct CreateNaviAccountCap has copy, drop {
         signer: address,
         index: u64,
         account_cap_id: address,
     }
+    /// [Authorized Function] Creates a Navi account cap.
     public(package) entry fun create_navi_account_cap(
         registry: &mut Registry,
         index: u64,
@@ -1392,11 +1466,13 @@ module typus_dov::tds_authorized_entry {
     }
 
 
+    /// Event emitted when funds are deposited to Navi.
     public struct DepositNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Deposits funds to Navi.
     public entry fun deposit_navi<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1431,11 +1507,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are withdrawn from Navi.
     public struct WithdrawNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Withdraws funds from Navi.
     public entry fun withdraw_navi<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1480,11 +1558,13 @@ module typus_dov::tds_authorized_entry {
     }
 
 
+    /// Event emitted when rewards are claimed from Navi.
     public struct RewardNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Pre-claims rewards from Navi. This is the first step in a two-step process.
     public fun pre_reward_navi<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1510,6 +1590,7 @@ module typus_dov::tds_authorized_entry {
             clock,
         )
     }
+    /// [Authorized Function] Post-claims rewards from Navi. This is the second step in a two-step process.
     public fun post_reward_navi<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1532,11 +1613,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when funds are borrowed from Navi.
     public struct BorrowNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Borrows funds from Navi.
     public entry fun borrow_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1585,11 +1668,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when a user unsubscribes from a Navi vault.
     public struct UnsubscribeNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Unsubscribes from a Navi vault.
     public entry fun unsubscribe_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1614,11 +1699,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when a loan from Navi is repaid.
     public struct RepayNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Repays a loan to Navi.
     public entry fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1667,11 +1754,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when the interest on a Navi loan is repaid.
     public struct RepayNaviInterest has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Repays the interest on a loan to Navi.
     entry fun repay_navi_interest<TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1720,11 +1809,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when collateral is deposited to Navi.
     public struct DepositCollateralNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Deposits collateral to Navi.
     public entry fun deposit_collateral_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1761,11 +1852,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted when collateral is withdrawn from Navi.
     public struct WithdrawCollateralNavi has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Withdraws collateral from Navi.
     public entry fun withdraw_collateral_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
@@ -1812,11 +1905,13 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
+    /// Event emitted before repaying Navi interest.
     public struct PreRepayNaviInterest has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Pre-repays Navi interest. This is the first step in a two-step process.
     public fun pre_repay_navi_interest<D_TOKEN, B_TOKEN, I_TOKEN>(
         version: &TypusEcosystemVersion,
         registry: &mut Registry,
@@ -1846,11 +1941,13 @@ module typus_dov::tds_authorized_entry {
     }
 
 
+    /// Event emitted after repaying Navi interest.
     public struct PostRepayNaviInterest has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Post-repays Navi interest. This is the second step in a two-step process.
     public fun post_repay_navi_interest_<TOKEN>(
         version: &TypusEcosystemVersion,
         registry: &mut Registry,
