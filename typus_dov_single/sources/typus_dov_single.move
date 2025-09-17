@@ -5778,6 +5778,11 @@ module typus_dov::typus_dov_single {
         (start, portfolio_vault.config.auction_duration_ts_ms)
     }
 
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(TYPUS_DOV_SINGLE {}, ctx);
+    }
+
     // ======== Errors ========
 
     fun auction_already_started(index: u64): u64 { abort index }
