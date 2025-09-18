@@ -28,21 +28,15 @@ rev = "sui-contract-mainnet"
 override = true
 
 [dependencies.SupraOracle]
-git = "https://github.com/Entropy-Foundation/dora-interface.git"
-subdir = "sui/mainnet/supra_holder"
-rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+local = "../dependency/dora-interface/sui/mainnet/supra_holder"
 override = true
 
 [dependencies.supra_utils]
-git = "https://github.com/Entropy-Foundation/dora-interface.git"
-subdir = "sui/mainnet/supra_utils"
-rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+local = "../dependency/dora-interface/sui/mainnet/supra_utils"
 override = true
 
 [dependencies.supra_validator]
-git = "https://github.com/Entropy-Foundation/dora-interface.git"
-subdir = "sui/mainnet/supra_validator"
-rev = "5fec42547d9d446cc3fdc01754721d5a044462b6"
+local = "../dependency/dora-interface/sui/mainnet/supra_validator"
 override = true
 
 [dependencies.typus_nft]
