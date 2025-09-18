@@ -1,0 +1,77 @@
+module typus_perp::tlp {
+    // use std::type_name;
+    // use std::string::{Self};
+
+    // use sui::coin::{Self, Coin, TreasuryCap};
+    // use sui::dynamic_object_field;
+    // use sui::url;
+
+    // use typus_perp::error;
+    // use typus_perp::admin::{Self, Version};
+    // use typus_perp::treasury_caps::{Self, TreasuryCaps};
+
+    // friend typus_perp::token_interface;
+
+    // const K_TREASURY_CAP: vector<u8> = b"treasury_cap";
+
+    public struct LpRegistry has key{
+        id: UID,
+    }
+
+    public struct TLP has drop {}
+
+    // const Decimals: u8 = 9;
+
+    // fun init(witness: TLP, ctx: &mut TxContext) {
+    //     let (treasury_cap, coin_metadata) = coin::create_currency(
+    //         witness,
+    //         Decimals,
+    //         b"TLP",
+    //         b"Typus Perp LP Token",
+    //         b"Typus Perp LP Token Description", // TODO: update description
+    //         option::some(url::new_unsafe_from_bytes(b"https://raw.githubusercontent.com/Typus-Lab/typus-asset/main/assets/TLP.svg")),
+    //         ctx
+    //     );
+
+    //     let mut registry =  LpRegistry {
+    //         id: object::new(ctx),
+    //     };
+
+    //     dynamic_object_field::add(&mut registry.id, string::utf8(K_TREASURY_CAP), treasury_cap);
+
+    //     transfer::public_freeze_object(coin_metadata);
+    //     transfer::share_object(registry);
+    // }
+
+    // public(package) fun mint<TOKEN>(treasury_cap: &mut TreasuryCap<TOKEN>, value: u64, ctx: &mut TxContext): Coin<TOKEN> {
+    //     assert!(type_name::get<TOKEN>() == type_name::get<TLP>(), error::lp_token_type_mismatched());
+    //     coin::mint(treasury_cap, value, ctx)
+    // }
+
+    // public(package) fun burn<TOKEN>(treasury_cap: &mut TreasuryCap<TOKEN>, coin: Coin<TOKEN>): u64 {
+    //     assert!(type_name::get<TOKEN>() == type_name::get<TLP>(), error::lp_token_type_mismatched());
+    //     coin::burn(treasury_cap, coin)
+    // }
+
+    // public(package) fun total_supply(treasury_cap: &TreasuryCap<TLP>): u64 {
+    //     coin::total_supply(treasury_cap)
+    // }
+
+    // entry fun transfer_treasury_cap(
+    //     version: &Version,
+    //     lp_registry: &mut LpRegistry,
+    //     treasury_caps: &mut TreasuryCaps,
+    //     ctx: &TxContext
+    // ) {
+    //     // safety check
+    //     admin::verify(version, ctx);
+
+    //     let treasury_cap = dynamic_object_field::remove<String, TreasuryCap<TLP>>(&mut lp_registry.id, string::utf8(K_TREASURY_CAP));
+    //     treasury_caps::store_treasury_cap(treasury_caps, treasury_cap);
+    // }
+
+    // #[test_only]
+    // public(package) fun test_init(ctx: &mut TxContext) {
+    //     init(TLP {}, ctx);
+    // }
+}
