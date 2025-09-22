@@ -90,3 +90,60 @@ module typus::utility {
         multiplier
     }
 }
+
+#[test_only]
+module typus::test_utility {
+    use sui::test_scenario;
+    use sui::balance;
+    use sui::coin;
+
+    use typus::utility;
+
+    public struct TestToken has drop {}
+
+    #[test]
+    fun test_transfer_coins() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        utility::transfer_coins<TestToken>(vector[], @0xABCD);
+        utility::transfer_coins<TestToken>(vector[coin::zero(test_scenario::ctx(&mut scenario))], @0xABCD);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_transfer_balance() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        utility::transfer_balance<TestToken>(balance::zero(), @0xABCD, test_scenario::ctx(&mut scenario));
+        utility::transfer_balance<TestToken>(balance::create_for_testing(10), @0xABCD, test_scenario::ctx(&mut scenario));
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_transfer_balance_opt() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        utility::transfer_balance_opt<TestToken>(option::none(), @0xABCD, test_scenario::ctx(&mut scenario));
+        utility::transfer_balance_opt<TestToken>(option::some(balance::zero()), @0xABCD, test_scenario::ctx(&mut scenario));
+        utility::transfer_balance_opt<TestToken>(option::some(balance::create_for_testing(10)), @0xABCD, test_scenario::ctx(&mut scenario));
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_basis_point_value() {
+        assert!(utility::basis_point_value(123, 2000) == 24, 0);
+    }
+
+    #[test]
+    fun test_u64_vector_value() {
+        let mut data = vector[];
+        utility::set_u64_vector_value(&mut data, 1, 30);
+        utility::increase_u64_vector_value(&mut data, 0, 10);
+        utility::decrease_u64_vector_value(&mut data, 1, 10);
+        assert!(utility::get_u64_vector_value(&data, 0) == 10);
+        assert!(utility::get_u64_vector_value(&data, 1) == 20);
+        assert!(utility::get_u64_vector_value(&data, 2) == 0);
+    }
+
+    #[test]
+    fun test_multiplier() {
+        assert!(utility::multiplier(10) == 10000000000, 0);
+    }
+}
