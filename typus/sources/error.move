@@ -7,3 +7,17 @@ module typus::error {
     /// Aborts the transaction with an error code indicating that an account already exists.
     public fun account_already_exists(error_code: u64): u64 { abort error_code }
 }
+
+#[test_only]
+module typus::test_error {
+    use typus::error;
+
+    #[test, expected_failure]
+    fun test_account_not_found() {
+        error::account_not_found(0);
+    }
+    #[test, expected_failure]
+    fun test_account_already_exists() {
+        error::account_already_exists(0);
+    }
+}
