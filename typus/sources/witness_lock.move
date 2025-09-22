@@ -40,7 +40,7 @@ module typus::witness_lock {
 
         let HotPotato { obj, witness } = hot_potato;
         // check witness
-        assert!(type_name::get<W>().into_string().to_string() == witness, invalid_witness());
+        assert!(type_name::with_defining_ids<W>().into_string().to_string() == witness, invalid_witness());
         obj
     }
 

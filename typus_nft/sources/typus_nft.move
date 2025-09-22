@@ -454,7 +454,7 @@ module typus_nft::typus_nft {
     }
 
     /// Returns the experience points required for the given level.
-    // 1_000, 50_000, 250_000, 1_000_000, 5_000_000, 20_000_000
+    /// 1_000, 50_000, 250_000, 1_000_000, 5_000_000, 20_000_000
     fun get_level_exp(level: u64): u64 {
         let exp = if (level == 2) { 1_000 }
             else if (level == 3) { 50_000 }

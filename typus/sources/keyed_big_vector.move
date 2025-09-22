@@ -79,8 +79,8 @@ module typus::keyed_big_vector {
 
         KeyedBigVector {
             id,
-            key_type: type_name::get<K>(),
-            value_type: type_name::get<V>(),
+            key_type: type_name::with_defining_ids<K>(),
+            value_type: type_name::with_defining_ids<V>(),
             slice_idx: 0,
             slice_size,
             length: 0,

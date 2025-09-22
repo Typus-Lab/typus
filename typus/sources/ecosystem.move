@@ -155,7 +155,7 @@ module typus::ecosystem {
 
         assert!(version.authority.contains(&user_address), EAuthorityDoesNotExist);
         version.authority.remove(&user_address);
-        assert!(version.authority.size() > 0, EAuthorityEmpty);
+        assert!(version.authority.length() > 0, EAuthorityEmpty);
     }
 
     // ======== Fee Pool ========
@@ -195,16 +195,16 @@ module typus::ecosystem {
         let mut i = 0;
         while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = version.fee_pool.fee_infos.borrow_mut(i);
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
-                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>())),
+                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
                         ctx,
                     ),
                     @fee_address,
                 );
                 emit(SendFeeEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     log: vector[fee_info.value],
                     bcs_padding: vector[],
                 });
@@ -223,10 +223,10 @@ module typus::ecosystem {
         let mut i = 0;
         while (i < vector::length(&version.fee_pool.fee_infos)) {
             let fee_info = &mut version.fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 fee_info.value = fee_info.value + balance::value(&balance);
                 balance::join(
-                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 return
@@ -236,11 +236,11 @@ module typus::ecosystem {
         vector::push_back(
             &mut version.fee_pool.fee_infos,
             FeeInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance::value(&balance),
             },
         );
-        dynamic_field::add(&mut version.fee_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
     }
 
     #[test_only]

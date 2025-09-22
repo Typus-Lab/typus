@@ -314,7 +314,7 @@ module typus::tails_staking {
 
         let mut level_counts = vector[0, 0, 0, 0, 0, 0, 0];
         let mut total_profit = 0;
-        let profit_asset = type_name::get<TOKEN>();
+        let profit_asset = type_name::with_defining_ids<TOKEN>();
         let (profit_asset_exists, profit_asset_index) = tails_staking_registry.profit_assets.index_of(&profit_asset);
         let tails_levels: &vector<u64> = &tails_staking_registry.tails_metadata[KTailsLevels];
         let length = tails_staking_registry.staking_infos.length();
@@ -367,7 +367,7 @@ module typus::tails_staking {
             level_profits,
             level_counts,
             log: vector[total_profit, spent_profit, amount, ts_ms],
-            bcs_padding: vector[bcs::to_bytes(&type_name::get<N_TOKEN>())],
+            bcs_padding: vector[bcs::to_bytes(&type_name::with_defining_ids<N_TOKEN>())],
         });
     }
 
@@ -387,7 +387,7 @@ module typus::tails_staking {
     ) {
         version.verify(ctx);
 
-        let profit_asset = type_name::get<TOKEN>();
+        let profit_asset = type_name::with_defining_ids<TOKEN>();
         let (profit_asset_exists, profit_asset_index) = tails_staking_registry.profit_assets.index_of(&profit_asset);
         if (!profit_asset_exists) {
             abort EInvalidToken
@@ -487,7 +487,7 @@ module typus::tails_staking {
     ): Balance<TOKEN> {
         version.version_check();
 
-        let profit_asset = type_name::get<TOKEN>();
+        let profit_asset = type_name::with_defining_ids<TOKEN>();
         let (profit_asset_exists, profit_asset_index) = tails_staking_registry.profit_assets.index_of(&profit_asset);
         if (!profit_asset_exists) {
             abort EInvalidToken

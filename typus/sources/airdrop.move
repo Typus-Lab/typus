@@ -84,7 +84,7 @@ module typus::airdrop {
         version.verify(ctx);
         assert!(users.length() == values.length(), EInvalidInput);
 
-        let token = type_name::get<TOKEN>();
+        let token = type_name::with_defining_ids<TOKEN>();
         let mut airdrop_info = if(dynamic_field::exists_(&typus_airdrop_registry.id, key)) {
             dynamic_field::remove(&mut typus_airdrop_registry.id, key)
         } else {
@@ -177,7 +177,7 @@ module typus::airdrop {
         big_vector::drop<Airdrop>(airdrops);
 
         emit(RemoveAirdropEvent {
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             key,
             log: vector[balance.value()],
             bcs_padding: vector[],
@@ -227,7 +227,7 @@ module typus::airdrop {
             if (airdrop.user == user) {
                 let balance = airdrop_info.balance.split(airdrop.value);
                 emit(ClaimAirdropEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     key,
                     user,
                     log: vector[airdrop.value],
@@ -269,7 +269,7 @@ module typus::airdrop {
         if (airdrop.user == user) {
             let balance = airdrop_info.balance.split(airdrop.value);
             emit(ClaimAirdropEvent {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 key,
                 user,
                 log: vector[airdrop.value],

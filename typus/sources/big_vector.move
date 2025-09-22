@@ -59,7 +59,7 @@ module typus::big_vector {
 
         BigVector {
             id: object::new(ctx),
-            element_type: type_name::get<Element>(),
+            element_type: type_name::with_defining_ids<Element>(),
             slice_idx: 0,
             slice_size,
             length: 0,
