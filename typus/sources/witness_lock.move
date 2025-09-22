@@ -2,9 +2,9 @@
 /// that can only be called if a specific witness type is provided. This is a common pattern in Sui Move
 /// for creating authorization mechanisms that are not tied to a specific authority address.
 module typus::witness_lock {
-    use std::type_name::{Self};
-    use std::string::{String};
-    use typus::ecosystem::{Version};
+    use std::type_name;
+    use std::string::String;
+    use typus::ecosystem::Version;
 
     public struct HotPotato<T> {
         obj: T,
@@ -46,4 +46,56 @@ module typus::witness_lock {
 
     /// Aborts with an error code indicating an invalid witness.
     fun invalid_witness(): u64 { abort 0 }
+}
+
+#[test_only]
+module typus::test_witness_lock {
+    use std::type_name;
+    use sui::test_scenario;
+
+    use typus::ecosystem::{Self, Version};
+    use typus::witness_lock;
+
+    public struct TestWitness has drop {}
+    public struct InvalidWitness has drop {}
+
+    #[test]
+    fun test_witness_lock() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(test_scenario::ctx(&mut scenario));
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let hot_potato = witness_lock::wrap(
+            &version,
+            0,
+            type_name::with_defining_ids<TestWitness>().into_string().into_bytes().to_string(),
+        );
+        witness_lock::unwrap<u64, TestWitness>(
+            &version,
+            hot_potato,
+            TestWitness {},
+        );
+        test_scenario::return_shared(version);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure]
+    fun test_witness_lock_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(test_scenario::ctx(&mut scenario));
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let hot_potato = witness_lock::wrap(
+            &version,
+            0,
+            type_name::with_defining_ids<TestWitness>().into_string().into_bytes().to_string(),
+        );
+        witness_lock::unwrap<u64, InvalidWitness>(
+            &version,
+            hot_potato,
+            InvalidWitness {},
+        );
+        test_scenario::return_shared(version);
+        test_scenario::end(scenario);
+    }
 }
