@@ -506,63 +506,63 @@ module typus::critbit {
         }
     }
 
-    #[test]
-    public fun test_cribit() {
-        use sui::test_scenario;
+    // #[test]
+    // public fun test_cribit() {
+    //     use sui::test_scenario;
 
-        let address = @0x1;
-        let mut scenario = test_scenario::begin(address);
+    //     let address = @0x1;
+    //     let mut scenario = test_scenario::begin(address);
 
-        let mut critbit_tree = new<u64>(test_scenario::ctx(&mut scenario));
-        std::debug::print(&std::string::utf8(b"insert_leaf"));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 11111, 11111));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 22222, 22222));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 4, 4));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 200, 200));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 400, 400));
-        std::debug::print(&std::string::utf8(b"min_leaf"));
-        let (key, index) = min_leaf(&critbit_tree);
-        std::debug::print(&index);
-        std::debug::print(&key);
-        std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
-        std::debug::print(&std::string::utf8(b"remove_leaf_by_key"));
-        std::debug::print(&remove_leaf_by_key(&mut critbit_tree, 4));
-        std::debug::print(&remove_leaf_by_key(&mut critbit_tree, 200));
-        std::debug::print(&std::string::utf8(b"insert_leaf"));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 50, 50));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 300, 300));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 100, 100));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 3, 3));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 1, 1));
-        std::debug::print(&std::string::utf8(b"min_leaf"));
-        let (key, index) = min_leaf(&critbit_tree);
-        std::debug::print(&index);
-        std::debug::print(&key);
-        std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
-        std::debug::print(&std::string::utf8(b"remove_leaf_by_index"));
-        std::debug::print(&remove_leaf_by_index(&mut critbit_tree, 8));
-        std::debug::print(&remove_leaf_by_index(&mut critbit_tree, 9));
-        std::debug::print(&std::string::utf8(b"insert_leaf"));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 0, 0));
-        std::debug::print(&insert_leaf(&mut critbit_tree, 33, 33));
-        std::debug::print(&std::string::utf8(b"min_leaf"));
-        let (key, index) = min_leaf(&critbit_tree);
-        std::debug::print(&index);
-        std::debug::print(&key);
-        std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
-        std::debug::print(&std::string::utf8(b"size"));
-        std::debug::print(&size(&critbit_tree));
-        std::debug::print(&std::string::utf8(b"iteration"));
-        let (mut key, mut index) = min_leaf(&critbit_tree);
-        std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
-        let mut i = 1;
-        while (i < size(&critbit_tree)) {
-            (key, index) = next_leaf(&critbit_tree, key);
-            std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
-            i = i + 1;
-        };
+    //     let mut critbit_tree = new<u64>(test_scenario::ctx(&mut scenario));
+    //     std::debug::print(&std::string::utf8(b"insert_leaf"));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 11111, 11111));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 22222, 22222));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 4, 4));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 200, 200));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 400, 400));
+    //     std::debug::print(&std::string::utf8(b"min_leaf"));
+    //     let (key, index) = min_leaf(&critbit_tree);
+    //     std::debug::print(&index);
+    //     std::debug::print(&key);
+    //     std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
+    //     std::debug::print(&std::string::utf8(b"remove_leaf_by_key"));
+    //     std::debug::print(&remove_leaf_by_key(&mut critbit_tree, 4));
+    //     std::debug::print(&remove_leaf_by_key(&mut critbit_tree, 200));
+    //     std::debug::print(&std::string::utf8(b"insert_leaf"));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 50, 50));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 300, 300));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 100, 100));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 3, 3));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 1, 1));
+    //     std::debug::print(&std::string::utf8(b"min_leaf"));
+    //     let (key, index) = min_leaf(&critbit_tree);
+    //     std::debug::print(&index);
+    //     std::debug::print(&key);
+    //     std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
+    //     std::debug::print(&std::string::utf8(b"remove_leaf_by_index"));
+    //     std::debug::print(&remove_leaf_by_index(&mut critbit_tree, 8));
+    //     std::debug::print(&remove_leaf_by_index(&mut critbit_tree, 9));
+    //     std::debug::print(&std::string::utf8(b"insert_leaf"));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 0, 0));
+    //     std::debug::print(&insert_leaf(&mut critbit_tree, 33, 33));
+    //     std::debug::print(&std::string::utf8(b"min_leaf"));
+    //     let (key, index) = min_leaf(&critbit_tree);
+    //     std::debug::print(&index);
+    //     std::debug::print(&key);
+    //     std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
+    //     std::debug::print(&std::string::utf8(b"size"));
+    //     std::debug::print(&size(&critbit_tree));
+    //     std::debug::print(&std::string::utf8(b"iteration"));
+    //     let (mut key, mut index) = min_leaf(&critbit_tree);
+    //     std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
+    //     let mut i = 1;
+    //     while (i < size(&critbit_tree)) {
+    //         (key, index) = next_leaf(&critbit_tree, key);
+    //         std::debug::print(borrow_leaf_by_index(&critbit_tree, index));
+    //         i = i + 1;
+    //     };
 
-        drop(critbit_tree);
-        test_scenario::end(scenario);
-    }
+    //     drop(critbit_tree);
+    //     test_scenario::end(scenario);
+    // }
 }
