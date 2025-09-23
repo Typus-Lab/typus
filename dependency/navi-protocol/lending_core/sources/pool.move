@@ -173,7 +173,7 @@ module lending_core::pool {
     }
 
     #[test_only]
-    public fun test_create_pool<T>(ctx: &mut TxContext, pool_admin_cap: &PoolAdminCap, decimal: u8) {
+    public fun test_create_pool<T>(pool_admin_cap: &PoolAdminCap, decimal: u8, ctx: &mut TxContext) {
         create_pool<T>(pool_admin_cap, decimal, ctx);
     }
 }
