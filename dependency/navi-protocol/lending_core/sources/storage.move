@@ -520,5 +520,10 @@ module lending_core::storage {
     }
 
     // decompiled from Move bytecode v6
+
+    #[test_only]
+    public fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
 }
 

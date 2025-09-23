@@ -549,5 +549,11 @@ module lending_core::incentive_v2 {
     }
 
     // decompiled from Move bytecode v6
+
+    #[test_only]
+    public fun test_create_incentive(owner_cap: &OwnerCap, ctx: &mut TxContext) {
+        create_incentive(owner_cap, ctx);
+    }
 }
+
 

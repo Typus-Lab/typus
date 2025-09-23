@@ -747,5 +747,9 @@ module lending_core::incentive_v3 {
     }
 
     // decompiled from Move bytecode v6
+    #[test_only]
+    public fun test_create_incentive(ctx: &mut TxContext) {
+        create_incentive_v3(ctx);
+    }
 }
 

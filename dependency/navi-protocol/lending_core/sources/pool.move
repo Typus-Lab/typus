@@ -166,5 +166,15 @@ module lending_core::pool {
     }
 
     // decompiled from Move bytecode v6
+
+    #[test_only]
+    public fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
+
+    #[test_only]
+    public fun test_create_pool<T>(ctx: &mut TxContext, pool_admin_cap: &PoolAdminCap, decimal: u8) {
+        create_pool<T>(pool_admin_cap, decimal, ctx);
+    }
 }
 
