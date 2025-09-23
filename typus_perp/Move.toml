@@ -10,16 +10,14 @@ local = "../typus_dov_single"
 [dependencies.typus_oracle]
 local = "../typus_oracle"
 
+[dependencies.Pyth]
+local = "../dependency/pyth"
+override = true
+
 [dependencies.MoveStdlib]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/move-stdlib"
 rev = "mainnet"
-override = true
-
-[dependencies.Pyth]
-git = "https://github.com/pyth-network/pyth-crosschain.git"
-subdir = "target_chains/sui/contracts"
-rev = "sui-contract-mainnet"
 override = true
 
 [dependencies.Sui]
