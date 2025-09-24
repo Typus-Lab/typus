@@ -27,7 +27,7 @@ rev = "main"
 [dependencies.suilend]
 git = "https://github.com/Typus-Lab/suilend.git"
 subdir = "contracts/suilend"
-rev = "devel"
+rev = "no-tests"
 
 [dependencies.lending_core]
 git = "https://github.com/Typus-Lab/navi-protocol-interface.git"
