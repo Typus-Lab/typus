@@ -9,11 +9,6 @@ module typus::big_vector {
 
     use sui::dynamic_field;
 
-    #[test_only]
-    use sui::test_scenario::{Self, Scenario};
-    #[test_only]
-    use sui::bcs;
-
     // ======== Constants ========
 
     /// The maximum size of a slice.
@@ -276,6 +271,13 @@ module typus::big_vector {
             };
         };
     }
+
+
+    #[test_only]
+    use sui::test_scenario::{Self, Scenario};
+    #[test_only]
+    use sui::bcs;
+
     #[test]
     fun test_bv_push_pop_remove() {
         let (scenario, mut bv) = new_scenario();
