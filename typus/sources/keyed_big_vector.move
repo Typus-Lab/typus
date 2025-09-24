@@ -370,6 +370,31 @@ module typus::keyed_big_vector {
             });
         };
     }
+
+    #[test, expected_failure]
+    fun test_duplicate_key() {
+        duplicate_key();
+    }
+    #[test, expected_failure]
+    fun test_index_out_of_bounds() {
+        index_out_of_bounds();
+    }
+    #[test, expected_failure]
+    fun test_invalid_slice_size() {
+        invalid_slice_size();
+    }
+    #[test, expected_failure]
+    fun test_key_not_found() {
+        key_not_found();
+    }
+    #[test, expected_failure]
+    fun test_max_slice_amount_reached() {
+        max_slice_amount_reached();
+    }
+    #[test, expected_failure]
+    fun test_not_empty() {
+        not_empty();
+    }
 }
 
 #[test_only]
@@ -508,7 +533,7 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        kbv.completely_drop<address, u64>();
+        kbv.drop();
         test_scenario::end(scenario);
     }
 
@@ -555,7 +580,21 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        kbv.completely_drop<address, u64>();
+        // [(0xA, 1), (0xD, 4)]]
+        kbv.swap_remove_by_key<address, u64>(@0xE);
+        assert_result(&kbv, bcs::to_bytes(&vector[
+            vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
+            vector[bcs::to_bytes(&@0xD), bcs::to_bytes(&4)],
+        ]));
+
+        assert!(kbv.slice_idx() == 0, 0);
+        let slice = kbv.borrow_slice<address, u64>(0);
+        assert!(slice.get_slice_idx() == 0, 0);
+        assert!(slice.get_slice_length() == 2, 0);
+
+        kbv.pop_back<address, u64>();
+        kbv.pop_back<address, u64>();
+        kbv.destroy_empty();
         test_scenario::end(scenario);
     }
 
