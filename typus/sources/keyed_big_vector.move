@@ -580,7 +580,7 @@ module typus::test_keyed_big_vector {
             vector[bcs::to_bytes(&@0xE), bcs::to_bytes(&5)],
         ]));
 
-        // [(0xA, 1), (0xD, 4)]]
+        // [(0xA, 1), (0xD, 4)]
         kbv.swap_remove_by_key<address, u64>(@0xE);
         assert_result(&kbv, bcs::to_bytes(&vector[
             vector[bcs::to_bytes(&@0xA), bcs::to_bytes(&1)],
