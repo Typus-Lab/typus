@@ -462,7 +462,7 @@ module typus_framework::vault {
         bid_vault: &mut BidVault,
         share_price: u64,
         share_price_decimal: u64,
-        _ctx: &TxContext,
+        _ctx: &mut TxContext,
     ) {
         // safety check
         assert!(share_price > 0, zero_value(deposit_vault.index));
