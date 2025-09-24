@@ -1,22 +1,13 @@
-/// This module provides functions to parse Pyth price feeds.
 module typus_oracle::pyth_parser {
     use sui::clock::Clock;
-    use sui::event::emit;
 
     use pyth::pyth;
-    use pyth::state::{Self, State as PythState};
+    use pyth::state::{State as PythState};
     use pyth::price_info::{Self, PriceInfoObject};
     use pyth::price::{Self, Price};
     use pyth::price_feed;
     use pyth::i64::{Self, I64};
 
-    /// Emits the ID of the price info object for the given price identifier.
-    entry fun get_price_info_object_id(state: &PythState, price_identifier_bytes: vector<u8>) {
-        let id = state::get_price_info_object_id(state, price_identifier_bytes);
-        emit(PythPriceInfoObject{ id });
-    }
-
-    /// Returns the price and decimals for the given price info object.
     public(package) entry fun get_price(
         state: &PythState,
         price_info_object: &PriceInfoObject,
@@ -38,7 +29,6 @@ module typus_oracle::pyth_parser {
         (price, decimal)
     }
 
-    /// Returns the EMA price, decimals, and timestamp for the given price info object.
     public(package) entry fun get_ema_price(
         price_info_object: &PriceInfoObject
     ): (u64, u64, u64) {
@@ -58,12 +48,11 @@ module typus_oracle::pyth_parser {
         (price, decimal, timestamp)
     }
 
-    /// Event emitted when a Pyth price info object is retrieved.
+    #[allow(unused)]
     public struct PythPriceInfoObject has copy, drop {
         id: ID
     }
 
-    /// Event emitted when a Pyth price is retrieved.
     #[allow(unused_field)]
     public struct PythPrice has copy, drop {
         price: u64,
