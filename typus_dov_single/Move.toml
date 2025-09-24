@@ -3,40 +3,6 @@ name = "typus_dov"
 published-at = "0xb8290daeb5204b3527cbc57637df55b12cc28d17ce08eadc910ae4cd8f9a695a"
 edition = "2024.beta"
 
-[dependencies.Sui]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/sui-framework"
-rev = "mainnet"
-override = true
-
-[dependencies.MoveStdlib]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/move-stdlib"
-rev = "mainnet"
-override = true
-
-[dependencies.SuiSystem]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/sui-system"
-rev = "mainnet"
-override = true
-
-[dependencies.Pyth]
-local = "../dependency/pyth"
-override = true
-
-[dependencies.SupraOracle]
-local = "../dependency/dora-interface/sui/mainnet/supra_holder"
-override = true
-
-[dependencies.supra_utils]
-local = "../dependency/dora-interface/sui/mainnet/supra_utils"
-override = true
-
-[dependencies.supra_validator]
-local = "../dependency/dora-interface/sui/mainnet/supra_validator"
-override = true
-
 [dependencies.typus_nft]
 local = "../typus_nft"
 
