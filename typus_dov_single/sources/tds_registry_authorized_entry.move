@@ -177,12 +177,12 @@ module typus_dov::tds_registry_authorized_entry {
             dynamic_field::add(id, K_WITNESSES.to_string(), linked_set::new<TypeName>(ctx));
         };
         let witnesses = dynamic_field::borrow_mut(id, K_WITNESSES.to_string());
-        linked_set::push_back(witnesses, type_name::get<W>());
+        linked_set::push_back(witnesses, type_name::with_defining_ids<W>());
 
         // emit event
         emit(AddWitnessEvent {
                 signer: tx_context::sender(ctx),
-                witness: type_name::get<W>(),
+                witness: type_name::with_defining_ids<W>(),
             }
         );
     }
@@ -215,12 +215,12 @@ module typus_dov::tds_registry_authorized_entry {
             _transaction_suspended,
         ) = typus_dov_single::get_mut_registry_inner(registry);
         let witnesses = dynamic_field::borrow_mut(id, K_WITNESSES.to_string());
-        linked_set::remove(witnesses, type_name::get<W>());
+        linked_set::remove(witnesses, type_name::with_defining_ids<W>());
 
         // emit event
         emit(RemoveWitnessEvent {
                 signer: tx_context::sender(ctx),
-                witness: type_name::get<W>(),
+                witness: type_name::with_defining_ids<W>(),
             }
         );
     }
@@ -306,7 +306,7 @@ module typus_dov::tds_registry_authorized_entry {
         // emit event
         emit(IncentiviseEvent {
             signer: tx_context::sender(ctx),
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             amount,
         });
     }
@@ -360,7 +360,7 @@ module typus_dov::tds_registry_authorized_entry {
         // emit event
         emit(WithdrawIncentiveEvent {
             signer: tx_context::sender(ctx),
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             amount,
         });
     }

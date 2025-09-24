@@ -156,7 +156,7 @@ module typus_framework::utils {
 
     /// Checks if two generic types are the same.
     public fun match_types<X, Y>(): bool {
-        type_name::get<X>() == type_name::get<Y>()
+        type_name::with_defining_ids<X>() == type_name::with_defining_ids<Y>()
     }
 
 

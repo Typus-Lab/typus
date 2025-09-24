@@ -159,9 +159,9 @@ module typus_dov::tds_user_entry {
         let snapshot = typus_dov_single::calculate_in_usd<D_TOKEN>(portfolio_vault, *vector::borrow(&log, 9), false);
         typus_dov_single::emit_reduce_fund_event(
             portfolio_vault,
-            type_name::get<D_TOKEN>(),
-            type_name::get<B_TOKEN>(),
-            type_name::get<I_TOKEN>(),
+            type_name::with_defining_ids<D_TOKEN>(),
+            type_name::with_defining_ids<B_TOKEN>(),
+            type_name::with_defining_ids<I_TOKEN>(),
             warmup_value,
             active_value,
             premium_value,
@@ -542,7 +542,7 @@ module typus_dov::tds_user_entry {
             index,
             amount,
             share,
-            type_name::get<D_TOKEN>(),
+            type_name::with_defining_ids<D_TOKEN>(),
             option::none(),
             0,
             tx_context::sender(ctx),
@@ -582,7 +582,7 @@ module typus_dov::tds_user_entry {
         let amount = *vector::borrow(&log, 0);
         typus_dov_single::validate_amount(0, amount);
         typus_dov_single::emit_refund_event(
-            type_name::get<TOKEN>(),
+            type_name::with_defining_ids<TOKEN>(),
             amount,
             tx_context::sender(ctx),
         );

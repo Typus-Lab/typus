@@ -120,10 +120,10 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 balance_info.value = balance_info.value + balance::value(&balance);
                 balance::join(
-                    dynamic_field::borrow_mut(&mut balance_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 return
@@ -133,11 +133,11 @@ module typus_framework::balance_pool {
         vector::push_back(
             &mut balance_pool.balance_infos,
             BalanceInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance::value(&balance),
             },
         );
-        dynamic_field::add(&mut balance_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
     }
 
     /// Withdraws a specified `amount` of a `TOKEN` from the `BalancePool` and sends it to the sender.
@@ -154,13 +154,13 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 let amount = option::destroy_with_default(amount, balance_info.value);
                 balance_info.value = balance_info.value - amount;
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
                         balance::split(
-                            dynamic_field::borrow_mut(&mut balance_pool.id, type_name::get<TOKEN>()),
+                            dynamic_field::borrow_mut(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                             amount,
                         ),
                         ctx,
@@ -170,7 +170,7 @@ module typus_framework::balance_pool {
                 if (balance_info.value == 0) {
                     balance_pool.balance_infos.swap_remove(i);
                     balance::destroy_zero<TOKEN>(
-                        dynamic_field::remove(&mut balance_pool.id, type_name::get<TOKEN>()),
+                        dynamic_field::remove(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     );
                 };
                 return amount
@@ -195,13 +195,13 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 let amount = option::destroy_with_default(amount, balance_info.value);
                 balance_info.value = balance_info.value - amount;
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
                         balance::split(
-                            dynamic_field::borrow_mut(&mut balance_pool.id, type_name::get<TOKEN>()),
+                            dynamic_field::borrow_mut(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                             amount,
                         ),
                         ctx,
@@ -211,7 +211,7 @@ module typus_framework::balance_pool {
                 if (balance_info.value == 0) {
                     balance_pool.balance_infos.swap_remove(i);
                     balance::destroy_zero<TOKEN>(
-                        dynamic_field::remove(&mut balance_pool.id, type_name::get<TOKEN>()),
+                        dynamic_field::remove(&mut balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     );
                 };
                 return amount
@@ -233,10 +233,10 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&shared_balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut shared_balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 balance_info.value = balance_info.value + balance::value(&balance);
                 balance::join(
-                    dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 return
@@ -246,11 +246,11 @@ module typus_framework::balance_pool {
         vector::push_back(
             &mut shared_balance_pool.balance_infos,
             BalanceInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance::value(&balance),
             },
         );
-        dynamic_field::add(&mut shared_balance_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
     }
 
     /// Withdraws a specified `amount` of a `TOKEN` from a `SharedBalancePool` and sends it to the sender.
@@ -269,13 +269,13 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&shared_balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut shared_balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 let amount = option::destroy_with_default(amount, balance_info.value);
                 balance_info.value = balance_info.value - amount;
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
                         balance::split(
-                            dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::get<TOKEN>()),
+                            dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                             amount,
                         ),
                         ctx,
@@ -285,7 +285,7 @@ module typus_framework::balance_pool {
                 if (balance_info.value == 0) {
                     shared_balance_pool.balance_infos.swap_remove(i);
                     balance::destroy_zero<TOKEN>(
-                        dynamic_field::remove(&mut shared_balance_pool.id, type_name::get<TOKEN>()),
+                        dynamic_field::remove(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     );
                 };
                 return amount
@@ -312,13 +312,13 @@ module typus_framework::balance_pool {
         let mut i = 0;
         while (i < vector::length(&shared_balance_pool.balance_infos)) {
             let balance_info = vector::borrow_mut(&mut shared_balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 let amount = option::destroy_with_default(amount, balance_info.value);
                 balance_info.value = balance_info.value - amount;
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
                         balance::split(
-                            dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::get<TOKEN>()),
+                            dynamic_field::borrow_mut(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                             amount,
                         ),
                         ctx,
@@ -328,7 +328,7 @@ module typus_framework::balance_pool {
                 if (balance_info.value == 0) {
                     shared_balance_pool.balance_infos.swap_remove(i);
                     balance::destroy_zero<TOKEN>(
-                        dynamic_field::remove(&mut shared_balance_pool.id, type_name::get<TOKEN>()),
+                        dynamic_field::remove(&mut shared_balance_pool.id, type_name::with_defining_ids<TOKEN>()),
                     );
                 };
                 return amount
@@ -389,7 +389,7 @@ module typus_framework::balance_pool {
         let mut value = 0;
         while (i < vector::length(&balance_pool.balance_infos)) {
             let balance_info = vector::borrow(&balance_pool.balance_infos, i);
-            if (balance_info.token == type_name::get<TOKEN>()) {
+            if (balance_info.token == type_name::with_defining_ids<TOKEN>()) {
                 value = value + balance_info.value;
                 break
             };

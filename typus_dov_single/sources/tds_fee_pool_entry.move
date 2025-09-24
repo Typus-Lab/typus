@@ -134,7 +134,7 @@ module typus_dov::tds_fee_pool_entry {
         // emit event
         emit(TakeFeeEvent {
                 signer: tx_context::sender(ctx),
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 amount,
             }
         );
@@ -175,7 +175,7 @@ module typus_dov::tds_fee_pool_entry {
         // emit event
         emit(SendFeeEvent {
                 signer: tx_context::sender(ctx),
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 amount,
                 recipient: @fee_address,
             }
@@ -305,7 +305,7 @@ module typus_dov::tds_fee_pool_entry {
         emit(TakeSharedFeeEvent {
                 signer: tx_context::sender(ctx),
                 key,
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 amount,
             }
         );

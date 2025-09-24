@@ -299,7 +299,7 @@ module typus_dov::tds_view_function {
             _transaction_suspended,
         ) = typus_dov_single::get_registry_inner(registry);
 
-        let mut result = bcs::to_bytes(&type_name::get<TOKEN>());
+        let mut result = bcs::to_bytes(&type_name::with_defining_ids<TOKEN>());
         let share = if (typus_dov_single::refund_vault_exists<TOKEN>(refund_vault_registry)) {
             let refund_vault = typus_dov_single::get_refund_vault<TOKEN>(refund_vault_registry);
             vault::get_refund_share(refund_vault, tx_context::sender(ctx))

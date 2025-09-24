@@ -207,18 +207,18 @@ module typus_perp::admin {
         let mut i = 0;
         while (i < vector::length(&version.fee_pool.fee_infos)) {
             let fee_info = vector::borrow_mut(&mut version.fee_pool.fee_infos, i);
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 if (fee_info.value > 0) {
                     transfer::public_transfer(
                         coin::from_balance<TOKEN>(
-                            balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>())),
+                            balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
                             ctx,
                         ),
                         @typus_perp_fee_address,
                     );
                 };
                 emit(SendFeeEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     amount: fee_info.value,
                 });
                 fee_info.value = 0;
@@ -235,14 +235,14 @@ module typus_perp::admin {
         let mut i = 0;
         while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = &mut version.fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 fee_info.value = fee_info.value + amount;
                 balance::join(
-                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 emit(ProtocolFeeEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     amount,
                 });
                 return
@@ -252,13 +252,13 @@ module typus_perp::admin {
         // if not found, add new fee info
         version.fee_pool.fee_infos.push_back(
             FeeInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance.value(),
             },
         );
-        dynamic_field::add(&mut version.fee_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
         emit(ProtocolFeeEvent {
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             amount,
         });
     }
@@ -279,16 +279,16 @@ module typus_perp::admin {
         let mut i = 0;
         while (i < vector::length(&version.liquidator_fee_pool.fee_infos)) {
             let fee_info = vector::borrow_mut(&mut version.liquidator_fee_pool.fee_infos, i);
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
-                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::get<TOKEN>())),
+                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>())),
                         ctx,
                     ),
                     @insurance_fund_address,
                 );
                 emit(SendFeeEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     amount: fee_info.value,
                 });
                 fee_info.value = 0;
@@ -305,14 +305,14 @@ module typus_perp::admin {
         let mut i = 0;
         while (i < version.liquidator_fee_pool.fee_infos.length()) {
             let fee_info = &mut version.liquidator_fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 fee_info.value = fee_info.value + amount;
                 balance::join(
-                    dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 emit(PutInsuranceFundEvent {
-                    token: type_name::get<TOKEN>(),
+                    token: type_name::with_defining_ids<TOKEN>(),
                     amount,
                 });
                 return
@@ -322,13 +322,13 @@ module typus_perp::admin {
         // if not found, add new fee info
         version.liquidator_fee_pool.fee_infos.push_back(
             FeeInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance.value(),
             },
         );
-        dynamic_field::add(&mut version.liquidator_fee_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
         emit(PutInsuranceFundEvent {
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             amount,
         });
     }

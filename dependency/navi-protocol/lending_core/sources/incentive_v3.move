@@ -179,7 +179,7 @@ module lending_core::incentive_v3 {
         let v0 = 0x2::vec_map::get_mut<0x1::ascii::String, AssetPool>(&mut arg2.pools, &arg4);
         assert!(0x2::vec_map::contains<address, Rule>(&v0.rules, &arg5), lending_core::error::rule_not_found());
         let v1 = 0x2::vec_map::get_mut<address, Rule>(&mut v0.rules, &arg5);
-        assert!(v1.reward_coin_type == 0x1::type_name::into_string(0x1::type_name::get<T0>()), lending_core::error::invalid_coin_type());
+        assert!(v1.reward_coin_type == 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), lending_core::error::invalid_coin_type());
         if (!v1.enable) {
             return (v1.global_index, 0x2::balance::zero<T0>())
         };
@@ -216,7 +216,7 @@ module lending_core::incentive_v3 {
         let v5 = RewardClaimed{
             user          : arg6,
             total_claimed : 0x2::balance::value<T0>(&v0),
-            coin_type     : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            coin_type     : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
             rule_ids      : arg5,
             rule_indices  : v1,
         };
@@ -293,7 +293,7 @@ module lending_core::incentive_v3 {
 
     public(package) fun create_pool<T0>(arg0: &mut Incentive, arg1: &lending_core::storage::Storage, arg2: u8, arg3: &mut 0x2::tx_context::TxContext) {
         version_verification(arg0);
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         assert!(v0 == lending_core::storage::get_coin_type(arg1, arg2), lending_core::error::invalid_coin_type());
         assert!(!0x2::vec_map::contains<0x1::ascii::String, AssetPool>(&arg0.pools, &v0), lending_core::error::duplicate_config());
         let v1 = 0x2::object::new(arg3);
@@ -314,7 +314,7 @@ module lending_core::incentive_v3 {
     }
 
     public(package) fun create_reward_fund<T0>(arg0: &mut 0x2::tx_context::TxContext) {
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         let v1 = 0x2::object::new(arg0);
         let v3 = RewardFundCreated{
             sender         : 0x2::tx_context::sender(arg0),
@@ -333,10 +333,10 @@ module lending_core::incentive_v3 {
     public(package) fun create_rule<T0, T1>(arg0: &0x2::clock::Clock, arg1: &mut Incentive, arg2: u8, arg3: &mut 0x2::tx_context::TxContext) {
         version_verification(arg1);
         assert!(arg2 == lending_core::constants::option_type_supply() || arg2 == lending_core::constants::option_type_borrow(), lending_core::error::invalid_option());
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         assert!(0x2::vec_map::contains<0x1::ascii::String, AssetPool>(&arg1.pools, &v0), lending_core::error::pool_not_found());
         let v1 = 0x2::vec_map::get_mut<0x1::ascii::String, AssetPool>(&mut arg1.pools, &v0);
-        let v2 = 0x1::type_name::into_string(0x1::type_name::get<T1>());
+        let v2 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T1>());
         assert!(!contains_rule(v1, arg2, v2), lending_core::error::duplicate_config());
         let v3 = 0x2::object::new(arg3);
         let v4 = 0x2::object::uid_to_address(&v3);
@@ -366,7 +366,7 @@ module lending_core::incentive_v3 {
 
     fun deposit_borrow_fee<T0>(arg0: &mut Incentive, arg1: &mut 0x2::balance::Balance<T0>, arg2: u64) {
         if (arg2 > 0) {
-            let v0 = 0x1::type_name::get<T0>();
+            let v0 = 0x1::type_name::with_defining_ids<T0>();
             if (0x2::bag::contains<0x1::type_name::TypeName>(&arg0.fee_balance, v0)) {
                 0x2::balance::join<T0>(0x2::bag::borrow_mut<0x1::type_name::TypeName, 0x2::balance::Balance<T0>>(&mut arg0.fee_balance, v0), 0x2::balance::split<T0>(arg1, arg2));
             } else {
@@ -488,7 +488,7 @@ module lending_core::incentive_v3 {
     }
 
     fun get_mut_rule<T0>(arg0: &mut Incentive, arg1: address) : &mut Rule {
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         assert!(0x2::vec_map::contains<0x1::ascii::String, AssetPool>(&arg0.pools, &v0), lending_core::error::pool_not_found());
         let v1 = 0x2::vec_map::get_mut<0x1::ascii::String, AssetPool>(&mut arg0.pools, &v0);
         assert!(0x2::vec_map::contains<address, Rule>(&v1.rules, &arg1), lending_core::error::rule_not_found());
@@ -658,7 +658,7 @@ module lending_core::incentive_v3 {
         v1.last_update_at = 0x2::clock::timestamp_ms(arg0);
         let v2 = RewardRateUpdated{
             sender       : 0x2::tx_context::sender(arg6),
-            pool         : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool         : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
             rule_id      : arg3,
             rate         : v0,
             total_supply : arg4,
@@ -670,7 +670,7 @@ module lending_core::incentive_v3 {
 
     public fun update_reward_state_by_asset<T0>(arg0: &0x2::clock::Clock, arg1: &mut Incentive, arg2: &mut lending_core::storage::Storage, arg3: address) {
         version_verification(arg1);
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         if (!0x2::vec_map::contains<0x1::ascii::String, AssetPool>(&arg1.pools, &v0)) {
             return
         };
@@ -722,7 +722,7 @@ module lending_core::incentive_v3 {
 
     public(package) fun withdraw_borrow_fee<T0>(arg0: &mut Incentive, arg1: u64, arg2: &0x2::tx_context::TxContext) : 0x2::balance::Balance<T0> {
         version_verification(arg0);
-        let v0 = 0x1::type_name::get<T0>();
+        let v0 = 0x1::type_name::with_defining_ids<T0>();
         assert!(0x2::bag::contains<0x1::type_name::TypeName>(&arg0.fee_balance, v0), lending_core::error::invalid_coin_type());
         let v1 = 0x2::bag::borrow_mut<0x1::type_name::TypeName, 0x2::balance::Balance<T0>>(&mut arg0.fee_balance, v0);
         let v2 = 0x1::u64::min(arg1, 0x2::balance::value<T0>(v1));

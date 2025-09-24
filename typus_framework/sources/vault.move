@@ -203,8 +203,8 @@ module typus_framework::vault {
         ctx: &mut TxContext,
     ): DepositVault {
         let mut id = object::new(ctx);
-        let deposit_token = type_name::get<D_TOKEN>();
-        let bid_token = type_name::get<B_TOKEN>();
+        let deposit_token = type_name::with_defining_ids<D_TOKEN>();
+        let bid_token = type_name::with_defining_ids<B_TOKEN>();
         dynamic_field::add(&mut id, K_ACTIVE_BALANCE, balance::zero<D_TOKEN>());
         dynamic_field::add(&mut id, K_DEACTIVATING_BALANCE, balance::zero<D_TOKEN>());
         dynamic_field::add(&mut id, K_INACTIVE_BALANCE, balance::zero<D_TOKEN>());
@@ -255,8 +255,8 @@ module typus_framework::vault {
     public fun update_deposit_vault_incentive_token<TOKEN>(
         deposit_vault: &mut DepositVault,
     ) {
-        if (deposit_vault.incentive_token != option::some(type_name::get<TOKEN>())) {
-            option::fill(&mut deposit_vault.incentive_token, type_name::get<TOKEN>());
+        if (deposit_vault.incentive_token != option::some(type_name::with_defining_ids<TOKEN>())) {
+            option::fill(&mut deposit_vault.incentive_token, type_name::with_defining_ids<TOKEN>());
             dynamic_field::add(&mut deposit_vault.id, K_INCENTIVE_BALANCE, balance::zero<TOKEN>());
         };
     }
@@ -328,7 +328,7 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ): u64 {
         // safety check
-        assert!(type_name::get<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
 
         // main logic
         let amount = balance::value(get_deposit_vault_balance<TOKEN>(deposit_vault, T_WARMUP_SHARE));
@@ -384,7 +384,7 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ): (u64, u64) {
         // safety check
-        assert!(type_name::get<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
 
         // main logic
         let has_next = deposit_vault.has_next;
@@ -466,10 +466,10 @@ module typus_framework::vault {
     ) {
         // safety check
         assert!(share_price > 0, zero_value(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == bid_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == bid_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == bid_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == bid_vault.bid_token, invalid_token(deposit_vault.index));
 
         // main logic
         let multiplier = utils::multiplier(share_price_decimal);
@@ -589,7 +589,7 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ) {
         // safety check
-        assert!(type_name::get<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
 
         // main logic
         // merge balance
@@ -684,8 +684,8 @@ module typus_framework::vault {
         ctx: &mut TxContext,
     ): BidVault {
         let mut id = object::new(ctx);
-        let deposit_token = type_name::get<D_TOKEN>();
-        let bid_token = type_name::get<B_TOKEN>();
+        let deposit_token = type_name::with_defining_ids<D_TOKEN>();
+        let bid_token = type_name::with_defining_ids<B_TOKEN>();
         dynamic_field::add(&mut id, K_BID_BALANCE, balance::zero<D_TOKEN>());
         dynamic_field::add(&mut id, K_BID_SHARES, big_vector::new<BidShare>(4500, ctx));
 
@@ -760,7 +760,7 @@ module typus_framework::vault {
         receipts: vector<TypusBidReceipt>,
     ): (Balance<TOKEN>, vector<u64>) {
         // safety check
-        assert!(type_name::get<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
         assert!(option::is_none(&bid_vault.incentive_token), invalid_token(bid_vault.index));
 
         // main logic
@@ -794,7 +794,7 @@ module typus_framework::vault {
         receipts: &vector<TypusBidReceipt>
     ): u64 {
         // safety check
-        assert!(type_name::get<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
         assert!(option::is_none(&bid_vault.incentive_token), invalid_token(bid_vault.index));
         let mut share = 0;
         let mut i = 0;
@@ -817,7 +817,7 @@ module typus_framework::vault {
         receipt: &TypusBidReceipt
     ): u64 {
         // safety check
-        assert!(type_name::get<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
         assert!(option::is_none(&bid_vault.incentive_token), invalid_token(bid_vault.index));
         let (_vid, _index, u64_padding) = get_bid_receipt_info(receipt);
         let share = *vector::borrow(&u64_padding, 0);
@@ -894,10 +894,10 @@ module typus_framework::vault {
         premium_balance: Balance<B_TOKEN>,
     ) {
         // safety check
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
-        assert!(type_name::get<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
 
         // main logic
         let mut premium_balance_value = balance::value(&premium_balance);
@@ -949,10 +949,10 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ) {
         // safety check
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
-        assert!(type_name::get<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
 
         let mut premium_balance_value = balance::value(&premium_balance);
         let mut incentive_balance_value = balance::value(&incentive_balance);
@@ -1016,10 +1016,10 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ) {
         // safety check
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
-        assert!(type_name::get<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
 
         // main logic
         balance::join(
@@ -1075,11 +1075,11 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ) {
         // safety check
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(option::some(type_name::get<I_TOKEN>()) == deposit_vault.incentive_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
-        assert!(type_name::get<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(option::some(type_name::with_defining_ids<I_TOKEN>()) == deposit_vault.incentive_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == bid_vault.deposit_token, invalid_token(bid_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == bid_vault.bid_token, invalid_token(bid_vault.index));
 
         let mut premium_balance_value = balance::value(&premium_balance);
         let mut incentive_balance_value = balance::value(&incentive_balance);
@@ -1141,13 +1141,13 @@ module typus_framework::vault {
         _ctx: &TxContext,
     ) {
         if (option::is_some(&bid_vault.incentive_token)) {
-            assert!(*option::borrow(&bid_vault.incentive_token) == type_name::get<TOKEN>(), invalid_token(bid_vault.index));
+            assert!(*option::borrow(&bid_vault.incentive_token) == type_name::with_defining_ids<TOKEN>(), invalid_token(bid_vault.index));
             balance::join(
                 dynamic_field::borrow_mut(&mut bid_vault.id, K_INCENTIVE_BALANCE),
                 incentive_balance,
             );
         } else {
-            bid_vault.incentive_token = option::some(type_name::get<TOKEN>());
+            bid_vault.incentive_token = option::some(type_name::with_defining_ids<TOKEN>());
             dynamic_field::add(&mut bid_vault.id, K_INCENTIVE_BALANCE, incentive_balance);
         };
     }
@@ -1190,7 +1190,7 @@ module typus_framework::vault {
         ctx: &mut TxContext,
     ): RefundVault {
         let mut id = object::new(ctx);
-        let token = type_name::get<TOKEN>();
+        let token = type_name::with_defining_ids<TOKEN>();
         dynamic_field::add(&mut id, K_REFUND_BALANCE, balance::zero<TOKEN>());
         dynamic_field::add(&mut id, K_REFUND_SHARES, big_vector::new<RefundShare>(4500, ctx));
 
@@ -1213,7 +1213,7 @@ module typus_framework::vault {
         user: address
     ): u64 {
         // safety check
-        assert!(type_name::get<TOKEN>() == refund_vault.token, invalid_token(0));
+        assert!(type_name::with_defining_ids<TOKEN>() == refund_vault.token, invalid_token(0));
 
         // main logic
         let refund_shares: &mut BigVector<RefundShare> = dynamic_field::borrow_mut(&mut refund_vault.id, K_REFUND_SHARES);
@@ -1255,7 +1255,7 @@ module typus_framework::vault {
         user: address
     ) {
         // safety check
-        assert!(type_name::get<TOKEN>() == refund_vault.token, invalid_token(0));
+        assert!(type_name::with_defining_ids<TOKEN>() == refund_vault.token, invalid_token(0));
 
         // main logic
         let amount = balance::value(&balance);
@@ -1303,7 +1303,7 @@ module typus_framework::vault {
         mut shares: vector<u64>,
     ) {
         // safety check
-        assert!(type_name::get<TOKEN>() == refund_vault.token, invalid_token(0));
+        assert!(type_name::with_defining_ids<TOKEN>() == refund_vault.token, invalid_token(0));
 
         // main logic
         let amount = balance::value(&balance);
@@ -1442,7 +1442,7 @@ module typus_framework::vault {
     ): (TypusDepositReceipt, vector<u64>) {
         // safety check
         assert!(deposit_vault.has_next, deposit_disabled(deposit_vault.index));
-        assert!(type_name::get<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
 
         // main logic
         let (
@@ -1539,9 +1539,9 @@ module typus_framework::vault {
         ctx: &mut TxContext,
     ): (Option<TypusDepositReceipt>, Balance<D_TOKEN>, Balance<B_TOKEN>, Balance<I_TOKEN>, vector<u64>) {
         // safety check
-        assert!(type_name::get<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
-        assert!(type_name::get<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
-        assert!(!reduce_from_incentive || option::some(type_name::get<I_TOKEN>()) == deposit_vault.incentive_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == deposit_vault.deposit_token, invalid_token(deposit_vault.index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == deposit_vault.bid_token, invalid_token(deposit_vault.index));
+        assert!(!reduce_from_incentive || option::some(type_name::with_defining_ids<I_TOKEN>()) == deposit_vault.incentive_token, invalid_token(deposit_vault.index));
 
         // main logic
         let (
@@ -1683,7 +1683,7 @@ module typus_framework::vault {
         user: address,
     ): (Option<Balance<TOKEN>>, vector<u64>) {
         // safety check
-        assert!(type_name::get<TOKEN>() == refund_vault.token, invalid_token(0));
+        assert!(type_name::with_defining_ids<TOKEN>() == refund_vault.token, invalid_token(0));
 
         // main logic
         let refund_shares: &mut BigVector<RefundShare> = dynamic_field::borrow_mut(&mut refund_vault.id, K_REFUND_SHARES);
@@ -2998,7 +2998,7 @@ module typus_framework::vault {
             return log
         };
         let (deposit_token, bid_token) = get_deposit_vault_token_types(deposit_vault);
-        let reward_token = type_name::get<R_TOKEN>();
+        let reward_token = type_name::with_defining_ids<R_TOKEN>();
         if (reward_token != deposit_token && reward_token != bid_token) {
             update_deposit_vault_incentive_token<R_TOKEN>(deposit_vault);
         };
@@ -3118,7 +3118,7 @@ module typus_framework::vault {
             return log
         };
         let (deposit_token, bid_token) = get_deposit_vault_token_types(deposit_vault);
-        let reward_token = type_name::get<TOKEN>();
+        let reward_token = type_name::with_defining_ids<TOKEN>();
         if (reward_token != deposit_token && reward_token != bid_token) {
             update_deposit_vault_incentive_token<TOKEN>(deposit_vault);
         };

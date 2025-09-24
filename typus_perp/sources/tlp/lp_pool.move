@@ -191,7 +191,7 @@ module typus_perp::lp_pool {
         let mut pool = LiquidityPool {
             id: object::new(ctx),
             index: registry.num_pool,
-            lp_token_type: type_name::get<LP_TOKEN>(),
+            lp_token_type: type_name::with_defining_ids<LP_TOKEN>(),
             liquidity_tokens: vector::empty(),
             token_pools: vector::empty(),
             pool_info: LiquidityPoolInfo {
@@ -212,7 +212,7 @@ module typus_perp::lp_pool {
         emit(NewLiquidityPoolEvent {
             sender: tx_context::sender(ctx),
             index: registry.num_pool - 1,
-            lp_token_type: type_name::get<LP_TOKEN>(),
+            lp_token_type: type_name::with_defining_ids<LP_TOKEN>(),
             lp_token_decimal,
             u64_padding: vector::empty()
         });
@@ -338,7 +338,7 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         assert!(!vector::contains(&liquidity_pool.liquidity_tokens, &token_type), error::liquidity_token_existed());
         vector::push_back(&mut liquidity_pool.liquidity_tokens, token_type);
 
@@ -455,7 +455,7 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
 
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         assert!(vector::contains(&liquidity_pool.liquidity_tokens, &token_type), error::liquidity_token_not_existed());
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
         let previous_spot_config = token_pool.config.spot_config;
@@ -517,7 +517,7 @@ module typus_perp::lp_pool {
         coin: Coin<TOKEN>, // deposit_amount: u64,
         ctx: &mut TxContext
     ) {
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
 
         // coin to balance
         let balance = coin.into_balance();
@@ -530,7 +530,7 @@ module typus_perp::lp_pool {
 
             // check token type correct
             let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
             // check pool active
             assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
@@ -576,7 +576,7 @@ module typus_perp::lp_pool {
         receipt: ManagerDepositReceiptV2,
         ctx: &mut TxContext
     ) {
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
 
         // destruct receipt
         let ManagerDepositReceiptV2 {
@@ -598,7 +598,7 @@ module typus_perp::lp_pool {
             // check token type correct
             assert!(token_type == receipt_token_type, error::invalid_token_type());
             let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
             // check pool active
             assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
@@ -649,7 +649,7 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
 
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         assert!(vector::contains(&liquidity_pool.liquidity_tokens, &token_type), error::liquidity_token_not_existed());
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
         let previous_margin_config = token_pool.config.margin_config;
@@ -708,7 +708,7 @@ module typus_perp::lp_pool {
         clock: &Clock,
         ctx: &mut TxContext
     ): Coin<LP_TOKEN> {
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         let (price, price_decimal) = oracle.get_price_with_interval_ms(clock, 0);
 
         // coin to balance
@@ -722,7 +722,7 @@ module typus_perp::lp_pool {
 
             // check token type correct
             let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
             // check pool active
             assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
             // check token pool tvl all updated
@@ -897,8 +897,8 @@ module typus_perp::lp_pool {
 
         // coin to balance
         let from_amount = from_coin.value();
-        let f_token_type = type_name::get<F_TOKEN>();
-        let t_token_type = type_name::get<T_TOKEN>();
+        let f_token_type = type_name::with_defining_ids<F_TOKEN>();
+        let t_token_type = type_name::with_defining_ids<T_TOKEN>();
         assert!(f_token_type != t_token_type, error::invalid_token_type());
 
         let f_token_config = get_mut_token_pool(liquidity_pool, &f_token_type).config;
@@ -1042,7 +1042,7 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
         assert!(check_tvl_updated(liquidity_pool, clock), error::tvl_not_yet_updated());
-        assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+        assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
 
         let user = ctx.sender();
         let share = balance.value();
@@ -1105,13 +1105,13 @@ module typus_perp::lp_pool {
 
             // check token type correct
             let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
             // check pool active
             assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
             // check token pool tvl all updated
             assert!(check_tvl_updated(liquidity_pool, clock), error::tvl_not_yet_updated());
 
-            let collateral_token_type = type_name::get<C_TOKEN>();
+            let collateral_token_type = type_name::with_defining_ids<C_TOKEN>();
             let token_pool = get_token_pool(liquidity_pool, &collateral_token_type);
             // check collateral token active
             assert!(token_pool.state.is_active, error::token_pool_inactive());
@@ -1243,14 +1243,14 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(token_pool.state.is_active, error::token_pool_inactive());
         token_pool.state.is_active = false;
 
         emit(SuspendTokenPoolEvent {
             sender: tx_context::sender(ctx),
             index,
-            liquidity_token: type_name::get<TOKEN>(),
+            liquidity_token: type_name::with_defining_ids<TOKEN>(),
             u64_padding: vector::empty()
         });
     }
@@ -1273,14 +1273,14 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(!token_pool.state.is_active, error::token_pool_already_active());
         token_pool.state.is_active = true;
 
         emit(ResumeTokenPoolEvent {
             sender: tx_context::sender(ctx),
             index,
-            liquidity_token: type_name::get<TOKEN>(),
+            liquidity_token: type_name::with_defining_ids<TOKEN>(),
             u64_padding: vector::empty()
         });
     }
@@ -1312,7 +1312,7 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(token_pool.state.is_active, error::token_pool_already_active());
 
         let real_lending_amount = calculate_lending_amount_capped(token_pool, lending_amount);
@@ -1329,7 +1329,7 @@ module typus_perp::lp_pool {
             emit(DepositLendingEvent {
                 index,
                 lending_index: I_LENDING_SCALLOP_BASIC,
-                c_token_type: type_name::get<TOKEN>(),
+                c_token_type: type_name::with_defining_ids<TOKEN>(),
                 deposit_amount: log[0],
                 minted_market_coin_amount: log[1],
                 latest_lending_amount: log[2],
@@ -1359,7 +1359,7 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(token_pool.state.is_active, error::token_pool_already_active());
 
         let real_lending_amount = calculate_lending_amount_capped(token_pool, lending_amount);
@@ -1379,7 +1379,7 @@ module typus_perp::lp_pool {
             emit(DepositLendingEvent {
                 index,
                 lending_index: I_LENDING_NAVI,
-                c_token_type: type_name::get<TOKEN>(),
+                c_token_type: type_name::with_defining_ids<TOKEN>(),
                 deposit_amount: real_lending_amount,
                 minted_market_coin_amount: 0,
                 latest_lending_amount: log[0],
@@ -1423,10 +1423,10 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(token_pool.state.is_active, error::token_pool_already_active());
 
-        let market_coin_type = type_name::get<MarketCoin<TOKEN>>();
+        let market_coin_type = type_name::with_defining_ids<MarketCoin<TOKEN>>();
         let real_withdraw_amount = if (withdraw_amount.is_none()) {
             dynamic_field::borrow<TypeName, Balance<MarketCoin<TOKEN>>>(&liquidity_pool.id, market_coin_type).value()
         } else {
@@ -1446,8 +1446,8 @@ module typus_perp::lp_pool {
             emit(WithdrawLendingEvent {
                 index,
                 lending_index: I_LENDING_SCALLOP_BASIC,
-                c_token_type: type_name::get<TOKEN>(),
-                r_token_type: type_name::get<TOKEN>(),
+                c_token_type: type_name::with_defining_ids<TOKEN>(),
+                r_token_type: type_name::with_defining_ids<TOKEN>(),
                 withdraw_amount: log[0], // market coin amount
                 withdrawn_collateral_amount: log[1], // all balance from lending protocol
                 latest_lending_amount: log[2],
@@ -1485,7 +1485,7 @@ module typus_perp::lp_pool {
 
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         assert!(token_pool.state.is_active, error::token_pool_already_active());
 
         let current_lending_amount = {
@@ -1520,8 +1520,8 @@ module typus_perp::lp_pool {
             emit(WithdrawLendingEvent {
                 index,
                 lending_index: I_LENDING_NAVI,
-                c_token_type: type_name::get<TOKEN>(),
-                r_token_type: type_name::get<TOKEN>(),
+                c_token_type: type_name::with_defining_ids<TOKEN>(),
+                r_token_type: type_name::with_defining_ids<TOKEN>(),
                 withdraw_amount: 0, // market coin amount
                 withdrawn_collateral_amount: current_lending_amount, // all balance from lending protocol
                 latest_lending_amount: log[0],
@@ -1568,8 +1568,8 @@ module typus_perp::lp_pool {
         emit(WithdrawLendingEvent {
             index,
             lending_index: I_LENDING_NAVI,
-            c_token_type: type_name::get<R_TOKEN>(),
-            r_token_type: type_name::get<R_TOKEN>(),
+            c_token_type: type_name::with_defining_ids<R_TOKEN>(),
+            r_token_type: type_name::with_defining_ids<R_TOKEN>(),
             withdraw_amount: 0,
             withdrawn_collateral_amount: 0,
             latest_lending_amount: 0,
@@ -1600,7 +1600,7 @@ module typus_perp::lp_pool {
 
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
     //     assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<C_TOKEN>());
+    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<C_TOKEN>());
     //     assert!(token_pool.state.is_active, error::token_pool_already_active());
     //     assert!(
     //         math::get_u64_vector_value(&token_pool.config.spot_config.enable_lending, I_LENDING_BUCK_FOUNTAIN) == 1,
@@ -1633,9 +1633,9 @@ module typus_perp::lp_pool {
     //         );
     //         emit(DepositLendingEvent {
     //             index,
-    //             c_token_type: type_name::get<C_TOKEN>(),
-    //             s_token_type: type_name::get<SBUCK>(),
-    //             r_token_type: type_name::get<R_TOKEN>(),
+    //             c_token_type: type_name::with_defining_ids<C_TOKEN>(),
+    //             s_token_type: type_name::with_defining_ids<SBUCK>(),
+    //             r_token_type: type_name::with_defining_ids<R_TOKEN>(),
     //             deposit_amount: log[0],
     //             minted_s_token_amount: log[1],
     //             latest_lending_amount: log[2],
@@ -1663,7 +1663,7 @@ module typus_perp::lp_pool {
 
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
     //     assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<C_TOKEN>());
+    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<C_TOKEN>());
     //     assert!(token_pool.state.is_active, error::token_pool_already_active());
     //     assert!(
     //         math::get_u64_vector_value(&token_pool.config.spot_config.enable_lending, I_LENDING_BUCK_FOUNTAIN) == 1,
@@ -1694,9 +1694,9 @@ module typus_perp::lp_pool {
     //         );
     //         emit(WithdrawLendingEvent {
     //             index,
-    //             c_token_type: type_name::get<C_TOKEN>(),
-    //             s_token_type: type_name::get<SBUCK>(),
-    //             r_token_type: type_name::get<R_TOKEN>(),
+    //             c_token_type: type_name::with_defining_ids<C_TOKEN>(),
+    //             s_token_type: type_name::with_defining_ids<SBUCK>(),
+    //             r_token_type: type_name::with_defining_ids<R_TOKEN>(),
     //             withdraw_amount: log[0], // s token amount
     //             withdrawn_collateral_amount: log[1], // all balance from lending protocol
     //             latest_lending_amount: log[2], // should be zero (due to withdrawing all)
@@ -1746,16 +1746,16 @@ module typus_perp::lp_pool {
         // admin::verify(version, ctx);
         // check_token_pool_status<TOKEN>(registry, index, false);
         // let liquidity_pool = get_liquidity_pool(registry, index);
-        // let token_config = get_token_pool(liquidity_pool, &type_name::get<TOKEN>()).config;
+        // let token_config = get_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>()).config;
         // let removed_token_oracle_id = object::id_address(oracle);
         // assert!(removed_token_oracle_id == token_config.oracle_id, error::oracle_mismatched());
         // emit(StartRemoveLiquidityTokenProcessEvent {
         //     index,
-        //     liquidity_token: type_name::get<TOKEN>(),
+        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
         //     u64_padding: vector::empty()
         // });
         // RemoveLiquidityTokenProcess {
-        //     liquidity_token: type_name::get<TOKEN>(),
+        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
         //     removed_positions_base_token: vector::empty(),
         //     removed_orders_base_token: vector::empty(),
         //     removed_token_oracle_id,
@@ -1791,7 +1791,7 @@ module typus_perp::lp_pool {
         // check_token_pool_status<TOKEN>(registry, index, false);
         // check_remove_liquidity_token_process_status(&process, 2);
 
-        // let token_type = type_name::get<TOKEN>();
+        // let token_type = type_name::with_defining_ids<TOKEN>();
         // let liquidity_pool = get_mut_liquidity_pool(registry, index);
         // let pool_amount = dynamic_field::borrow<TypeName, Balance<TOKEN>>(&liquidity_pool.id, token_type).value();
         // let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
@@ -1806,7 +1806,7 @@ module typus_perp::lp_pool {
         //     decimal
         // );
         // let balance = balance::split(
-        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::get<TOKEN>()),
+        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<TOKEN>()),
         //     pool_amount
         // );
         // update_remove_liquidity_token_process_status(&mut process, 3);
@@ -1849,9 +1849,9 @@ module typus_perp::lp_pool {
         // admin::verify(version, ctx);
         // check_remove_liquidity_token_process_status(&process, 3);
 
-        // let token_type = type_name::get<TOKEN>();
+        // let token_type = type_name::with_defining_ids<TOKEN>();
         // let liquidity_pool = get_mut_liquidity_pool(registry, index);
-        // let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        // let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         // assert!(token_pool.state.is_active, error::token_pool_inactive());
 
         // let repaid_token_oracle_id = object::id_address(oracle);
@@ -1879,7 +1879,7 @@ module typus_perp::lp_pool {
         // });
         // process.repaid_usd = process.repaid_usd + repaid_usd;
         // balance::join(
-        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::get<TOKEN>()),
+        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<TOKEN>()),
         //     balance
         // );
         // update_tvl(version, liquidity_pool, token_type, oracle, clock);
@@ -1931,7 +1931,7 @@ module typus_perp::lp_pool {
 
         // emit(CompleteRemoveLiquidityTokenProcessEvent {
         //     index,
-        //     liquidity_token: type_name::get<TOKEN>(),
+        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
         //     removed_usd,
         //     repaid_usd,
         //     u64_padding: vector::empty()
@@ -1952,9 +1952,9 @@ module typus_perp::lp_pool {
         // safety check
         admin::verify(version, ctx);
         check_token_pool_status<TOKEN>(registry, index, false);
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
-        let zero_balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::get<TOKEN>());
+        let zero_balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<TOKEN>());
         zero_balance.destroy_zero();
 
         let (_, i) = liquidity_pool.liquidity_tokens.index_of(&token_type);
@@ -1988,7 +1988,7 @@ module typus_perp::lp_pool {
     ) {
         // safety check
         let liquidity_pool = get_liquidity_pool(registry, index);
-        let token_pool = get_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+        let token_pool = get_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
         if (assert_active) {
             assert!(token_pool.state.is_active, error::token_pool_inactive());
         } else {
@@ -2026,9 +2026,9 @@ module typus_perp::lp_pool {
     //     update_position_token: bool,
     // ) {
     //     if (update_position_token) {
-    //         process.removed_positions_base_token.push_back(type_name::get<TOKEN>());
+    //         process.removed_positions_base_token.push_back(type_name::with_defining_ids<TOKEN>());
     //     } else {
-    //         process.removed_orders_base_token.push_back(type_name::get<TOKEN>());
+    //         process.removed_orders_base_token.push_back(type_name::with_defining_ids<TOKEN>());
     //     };
     // }
     // public(package) fun get_remove_liquidity_token_process_token(
@@ -2084,8 +2084,8 @@ module typus_perp::lp_pool {
         admin::verify(version, ctx);
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let liquidity_token_decimal_a = get_token_pool(liquidity_pool, &type_name::get<A_TOKEN>()).config.liquidity_token_decimal;
-        let liquidity_token_decimal_b = get_token_pool(liquidity_pool, &type_name::get<B_TOKEN>()).config.liquidity_token_decimal;
+        let liquidity_token_decimal_a = get_token_pool(liquidity_pool, &type_name::with_defining_ids<A_TOKEN>()).config.liquidity_token_decimal;
+        let liquidity_token_decimal_b = get_token_pool(liquidity_pool, &type_name::with_defining_ids<B_TOKEN>()).config.liquidity_token_decimal;
 
         let (price_token_a_to_usd, price_a_decimal) = oracle_token_a.get_price_with_interval_ms(clock, 0);
         let (price_token_b_to_usd, _price_b_decimal) = oracle_token_b.get_price_with_interval_ms(clock, 0);
@@ -2093,9 +2093,9 @@ module typus_perp::lp_pool {
         let (balance, from_token_liquidity_amount) = {
             let balance = dynamic_field::borrow_mut<TypeName, Balance<A_TOKEN>>(
                 &mut liquidity_pool.id,
-                type_name::get<A_TOKEN>()
+                type_name::with_defining_ids<A_TOKEN>()
             ).split(rebalance_amount);
-            let token_pool_a = get_mut_token_pool(liquidity_pool, &type_name::get<A_TOKEN>());
+            let token_pool_a = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<A_TOKEN>());
             assert!(token_pool_a.state.is_active, error::token_pool_already_active());
             assert!(object::id_address(oracle_token_a) == token_pool_a.config.oracle_id, error::oracle_mismatched());
             // update liquidity_amount
@@ -2113,31 +2113,31 @@ module typus_perp::lp_pool {
         );
 
         let to_token_liquidity_amount = {
-            let token_pool_b = get_mut_token_pool(liquidity_pool, &type_name::get<B_TOKEN>());
+            let token_pool_b = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<B_TOKEN>());
             assert!(token_pool_b.state.is_active, error::token_pool_already_active());
             assert!(object::id_address(oracle_token_b) == token_pool_b.config.oracle_id, error::oracle_mismatched());
             token_pool_b.state.liquidity_amount
         };
         let rebalance_process = RebalanceProcess {
             index,
-            token_type_a: type_name::get<A_TOKEN>(),
+            token_type_a: type_name::with_defining_ids<A_TOKEN>(),
             token_decimal_a: liquidity_token_decimal_a,
             token_amount_a: rebalance_amount,
             oracle_price_a: price_token_a_to_usd,
             reduced_usd,
-            token_type_b: type_name::get<B_TOKEN>(),
+            token_type_b: type_name::with_defining_ids<B_TOKEN>(),
             token_decimal_b: liquidity_token_decimal_b,
             oracle_price_b: price_token_b_to_usd,
         };
 
         // update tvl
-        update_tvl(version, liquidity_pool, type_name::get<A_TOKEN>(), oracle_token_a, clock);
+        update_tvl(version, liquidity_pool, type_name::with_defining_ids<A_TOKEN>(), oracle_token_a, clock);
         let tvl_usd = liquidity_pool.pool_info.tvl_usd;
 
         emit(RebalanceEvent {
             index,
-            from_token: type_name::get<A_TOKEN>(),
-            to_token: type_name::get<B_TOKEN>(),
+            from_token: type_name::with_defining_ids<A_TOKEN>(),
+            to_token: type_name::with_defining_ids<B_TOKEN>(),
             rebalance_amount,
             from_token_oracle_price: price_token_a_to_usd,
             to_token_oracle_price: price_token_b_to_usd,
@@ -2179,20 +2179,20 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         let rebalance_cost_threshold_bp = math::get_u64_vector_value(&liquidity_pool.u64_padding, I_REBALANCE_COST_THRESHOLD_BP);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        let liquidity_token_decimal_a = get_token_pool(liquidity_pool, &type_name::get<A_TOKEN>()).config.liquidity_token_decimal;
-        let liquidity_token_decimal_b = get_token_pool(liquidity_pool, &type_name::get<B_TOKEN>()).config.liquidity_token_decimal;
+        let liquidity_token_decimal_a = get_token_pool(liquidity_pool, &type_name::with_defining_ids<A_TOKEN>()).config.liquidity_token_decimal;
+        let liquidity_token_decimal_b = get_token_pool(liquidity_pool, &type_name::with_defining_ids<B_TOKEN>()).config.liquidity_token_decimal;
         let (price_token_a_to_usd, _price_a_decimal) = oracle_token_a.get_price_with_interval_ms(clock, 0);
         let (price_token_b_to_usd, price_b_decimal) = oracle_token_b.get_price_with_interval_ms(clock, 0);
 
         let from_token_liquidity_amount = {
-            let token_pool_a = get_mut_token_pool(liquidity_pool, &type_name::get<A_TOKEN>());
+            let token_pool_a = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<A_TOKEN>());
             assert!(token_pool_a.state.is_active, error::token_pool_already_active());
             assert!(object::id_address(oracle_token_a) == token_pool_a.config.oracle_id, error::oracle_mismatched());
             token_pool_a.state.liquidity_amount
         };
 
         let (swapped_back_usd, to_token_liquidity_amount) = {
-            let token_pool_b = get_mut_token_pool(liquidity_pool, &type_name::get<B_TOKEN>());
+            let token_pool_b = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<B_TOKEN>());
             assert!(token_pool_b.state.is_active, error::token_pool_already_active());
             assert!(object::id_address(oracle_token_b) == token_pool_b.config.oracle_id, error::oracle_mismatched());
             let swapped_back_usd = math::amount_to_usd(
@@ -2214,10 +2214,10 @@ module typus_perp::lp_pool {
             } = rebalance_process;
 
             assert!(index == pool_index, error::rebalance_process_field_mismatched());
-            assert!(token_type_a == type_name::get<A_TOKEN>(), error::rebalance_process_field_mismatched());
+            assert!(token_type_a == type_name::with_defining_ids<A_TOKEN>(), error::rebalance_process_field_mismatched());
             assert!(token_decimal_a == liquidity_token_decimal_a, error::rebalance_process_field_mismatched());
             assert!(oracle_price_a == price_token_a_to_usd, error::rebalance_process_field_mismatched());
-            assert!(token_type_b == type_name::get<B_TOKEN>(), error::rebalance_process_field_mismatched());
+            assert!(token_type_b == type_name::with_defining_ids<B_TOKEN>(), error::rebalance_process_field_mismatched());
             assert!(token_decimal_b == liquidity_token_decimal_b, error::rebalance_process_field_mismatched());
             assert!(oracle_price_b == price_token_b_to_usd, error::rebalance_process_field_mismatched());
             assert!(
@@ -2230,16 +2230,16 @@ module typus_perp::lp_pool {
             (swapped_back_usd, token_pool_b.state.liquidity_amount)
         };
 
-        dynamic_field::borrow_mut<TypeName, Balance<B_TOKEN>>(&mut liquidity_pool.id, type_name::get<B_TOKEN>()).join(swapped_back_balance);
+        dynamic_field::borrow_mut<TypeName, Balance<B_TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<B_TOKEN>()).join(swapped_back_balance);
 
         // update tvl
-        update_tvl(version, liquidity_pool, type_name::get<B_TOKEN>(), oracle_token_b, clock);
+        update_tvl(version, liquidity_pool, type_name::with_defining_ids<B_TOKEN>(), oracle_token_b, clock);
         let tvl_usd = liquidity_pool.pool_info.tvl_usd;
 
         emit(CompleteRebalancingEvent {
             index,
-            from_token: type_name::get<A_TOKEN>(),
-            to_token: type_name::get<B_TOKEN>(),
+            from_token: type_name::with_defining_ids<A_TOKEN>(),
+            to_token: type_name::with_defining_ids<B_TOKEN>(),
             from_token_oracle_price: price_token_a_to_usd,
             to_token_oracle_price: price_token_b_to_usd,
             swapped_back_usd,
@@ -2274,7 +2274,7 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-        let liquidity_token = type_name::get<TOKEN>();
+        let liquidity_token = type_name::with_defining_ids<TOKEN>();
 
         let mut log = update_tvl(
             version,
@@ -2379,7 +2379,7 @@ module typus_perp::lp_pool {
 
         update_reserve_amount<C_TOKEN>(liquidity_pool, add_reserve, d_reserve);
 
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
         token_pool.state.liquidity_amount = token_pool.state.liquidity_amount + fee_balance.value();
         balance::join(dynamic_field::borrow_mut(&mut liquidity_pool.id, token_type), fee_balance);
@@ -2392,7 +2392,7 @@ module typus_perp::lp_pool {
     ) {
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
 
         if (add_reserve) {
@@ -2408,7 +2408,7 @@ module typus_perp::lp_pool {
         collateral_oracle_price: u64,
         collateral_oracle_price_decimal: u64,
     ) {
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         let deposit_amount = collateral.value();
         balance::join(
             dynamic_field::borrow_mut(&mut liquidity_pool.id, token_type),
@@ -2442,7 +2442,7 @@ module typus_perp::lp_pool {
         collateral_oracle_price: u64,
         collateral_oracle_price_decimal: u64,
     ): Balance<TOKEN> {
-        let token_type = type_name::get<TOKEN>();
+        let token_type = type_name::with_defining_ids<TOKEN>();
         let balance
             = dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, token_type).split(collateral_amount);
 
@@ -2745,7 +2745,7 @@ module typus_perp::lp_pool {
         deposit_amount: u64,
         ctx: &mut TxContext,
     ): vector<u64> {
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let balance
             = dynamic_field::borrow_mut<TypeName, Balance<C_TOKEN>>(&mut liquidity_pool.id, token_type).split(deposit_amount);
 
@@ -2763,7 +2763,7 @@ module typus_perp::lp_pool {
             ctx,
         );
 
-        let market_coin_type = type_name::get<MarketCoin<C_TOKEN>>();
+        let market_coin_type = type_name::with_defining_ids<MarketCoin<C_TOKEN>>();
         if (dynamic_field::exists_with_type<TypeName, Balance<MarketCoin<C_TOKEN>>>(
             &liquidity_pool.id, market_coin_type
         )) {
@@ -2793,7 +2793,7 @@ module typus_perp::lp_pool {
         withdraw_amount: u64, // market coin amount
         ctx: &mut TxContext,
     ): vector<u64> {
-        let market_coin_type = type_name::get<MarketCoin<C_TOKEN>>();
+        let market_coin_type = type_name::with_defining_ids<MarketCoin<C_TOKEN>>();
         let original_value = dynamic_field::borrow<TypeName, Balance<MarketCoin<C_TOKEN>>>(&liquidity_pool.id, market_coin_type).value();
         let market_coin_balance
             = dynamic_field::borrow_mut<TypeName, Balance<MarketCoin<C_TOKEN>>>(&mut liquidity_pool.id, market_coin_type).split(withdraw_amount);
@@ -2806,7 +2806,7 @@ module typus_perp::lp_pool {
             ctx,
         );
 
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
 
         let (d_lending_amount, profit, protocol_share) = {
             let token_pool = get_token_pool(liquidity_pool, &token_type);
@@ -2851,7 +2851,7 @@ module typus_perp::lp_pool {
         deposit_amount: u64,
         ctx: &mut TxContext,
     ): vector<u64> {
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let balance
             = dynamic_field::borrow_mut<TypeName, Balance<C_TOKEN>>(&mut liquidity_pool.id, token_type).split(deposit_amount);
         if (balance.value() == 0) {
@@ -2937,7 +2937,7 @@ module typus_perp::lp_pool {
             navi_account_cap,
         );
 
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let (d_lending_amount, profit, protocol_share) = {
             let token_pool = get_token_pool(liquidity_pool, &token_type);
             let current_lending_amount = math::get_u64_vector_value(&token_pool.state.current_lending_amount, I_LENDING_NAVI);
@@ -2986,7 +2986,7 @@ module typus_perp::lp_pool {
             rule_ids,
             navi_account_cap,
         );
-        let reward_token_type = type_name::get<R_TOKEN>();
+        let reward_token_type = type_name::with_defining_ids<R_TOKEN>();
 
         let (profit, protocol_share) = if (liquidity_pool.liquidity_tokens.contains(&reward_token_type)) {
             let profit = reward_balance.value();
@@ -3034,7 +3034,7 @@ module typus_perp::lp_pool {
         clock: &Clock,
         ctx: &mut TxContext
     ): Coin<C_TOKEN> {
-        let token_type = type_name::get<C_TOKEN>();
+        let token_type = type_name::with_defining_ids<C_TOKEN>();
         let (price, price_decimal) = oracle.get_price_with_interval_ms(clock, 0);
 
         // coin to balance
@@ -3093,8 +3093,8 @@ module typus_perp::lp_pool {
     //     deposit_amount: u64,
     //     ctx: &mut TxContext,
     // ): vector<u64> {
-    //     let token_type = type_name::get<C_TOKEN>();
-    //     assert!(token_type == type_name::get<BUCK>(), error::unsupported_token_type_for_fountain());
+    //     let token_type = type_name::with_defining_ids<C_TOKEN>();
+    //     assert!(token_type == type_name::with_defining_ids<BUCK>(), error::unsupported_token_type_for_fountain());
     //     let balance
     //         = dynamic_field::borrow_mut<TypeName, Balance<BUCK>>(&mut liquidity_pool.id, token_type).split(deposit_amount);
     //     {
@@ -3118,7 +3118,7 @@ module typus_perp::lp_pool {
     //         ctx,
     //     );
 
-    //     let stake_proof_type = type_name::get<StakeProof<SBUCK, R_TOKEN>>();
+    //     let stake_proof_type = type_name::with_defining_ids<StakeProof<SBUCK, R_TOKEN>>();
     //     if (dynamic_field::exists_with_type<TypeName, vector<StakeProof<SBUCK, R_TOKEN>>>(
     //         &liquidity_pool.id, stake_proof_type
     //     )) {
@@ -3152,10 +3152,10 @@ module typus_perp::lp_pool {
     //     fountain: &mut Fountain<SBUCK, R_TOKEN>,
     //     clock: &Clock,
     // ): vector<u64> {
-    //     let token_type = type_name::get<C_TOKEN>();
-    //     assert!(token_type == type_name::get<BUCK>(), error::unsupported_token_type_for_fountain());
+    //     let token_type = type_name::with_defining_ids<C_TOKEN>();
+    //     assert!(token_type == type_name::with_defining_ids<BUCK>(), error::unsupported_token_type_for_fountain());
 
-    //     let stake_proof_type = type_name::get<StakeProof<SBUCK, R_TOKEN>>();
+    //     let stake_proof_type = type_name::with_defining_ids<StakeProof<SBUCK, R_TOKEN>>();
     //     let stake_proofs = dynamic_field::borrow_mut<TypeName, vector<StakeProof<SBUCK, R_TOKEN>>>(&mut liquidity_pool.id, stake_proof_type);
     //     let mut withdrawn_s_token_amount = 0;
     //     let mut c_token_balance = balance::zero<BUCK>();
@@ -3191,7 +3191,7 @@ module typus_perp::lp_pool {
     //     let collateral_amount = dynamic_field::borrow<TypeName, Balance<C_TOKEN>>(&liquidity_pool.id, token_type).value();
 
     //     // r_token: exists in c token => share, not existed => all charged
-    //     let r_token_type = type_name::get<R_TOKEN>();
+    //     let r_token_type = type_name::with_defining_ids<R_TOKEN>();
     //     let r_token_value = r_token_balance.value();
     //     let (r_token_profit, r_token_protocol_share) = if (liquidity_pool.liquidity_tokens.contains(&r_token_type)) {
     //         let protocol_share = {
@@ -3254,8 +3254,8 @@ module typus_perp::lp_pool {
         let (price_t_token_to_usd, price_t_decimal) = oracle_to_token.get_price_with_interval_ms(clock, 0);
 
         // coin to balance
-        let f_token_type = type_name::get<F_TOKEN>();
-        let t_token_type = type_name::get<T_TOKEN>();
+        let f_token_type = type_name::with_defining_ids<F_TOKEN>();
+        let t_token_type = type_name::with_defining_ids<T_TOKEN>();
         let f_token_config = get_token_pool(liquidity_pool, &f_token_type).config;
         let t_token_config = get_token_pool(liquidity_pool, &t_token_type).config;
         // check oracle correct
@@ -3528,7 +3528,7 @@ module typus_perp::lp_pool {
         user: address,
     ): vector<vector<u8>> {
         let liquidity_pool = get_liquidity_pool(registry, index);
-        assert!(type_name::get<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+        assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
         let pool_deactivating_shares = dynamic_field::borrow<String, Table<address, vector<DeactivatingShares<LP_TOKEN>>>>(
             &liquidity_pool.id, string::utf8(K_DEACTIVATING_SHARES)
         );
@@ -3556,7 +3556,7 @@ module typus_perp::lp_pool {
 
     // #[test_only]
     // public(package) fun test_get_spot_config<TOKEN>(registry: &Registry, index: u64): SpotConfig {
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     let liquidity_pool = get_liquidity_pool(registry, index);
     //     let token_pool = get_token_pool(liquidity_pool, &token_type);
     //     token_pool.config.spot_config
@@ -3564,7 +3564,7 @@ module typus_perp::lp_pool {
 
     // #[test_only]
     // public(package) fun test_get_margin_config<TOKEN>(registry: &Registry, index: u64): MarginConfig {
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     let liquidity_pool = get_liquidity_pool(registry, index);
     //     let token_pool = get_token_pool(liquidity_pool, &token_type);
     //     token_pool.config.margin_config
@@ -3572,7 +3572,7 @@ module typus_perp::lp_pool {
 
     // #[test_only]
     // public(package) fun test_check_target_weight_bp<TOKEN>(registry: &Registry, index: u64, target_weight_bp: u64): bool {
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     let liquidity_pool = get_liquidity_pool(registry, index);
     //     let token_pool = get_token_pool(liquidity_pool, &token_type);
     //     token_pool.config.spot_config.target_weight_bp == target_weight_bp
@@ -3580,7 +3580,7 @@ module typus_perp::lp_pool {
 
     // #[test_only]
     // public(package) fun test_check_basic_borrow_rate<TOKEN>(registry: &Registry, index: u64, basic_borrow_rate: u64): bool {
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     let liquidity_pool = get_liquidity_pool(registry, index);
     //     let token_pool = get_token_pool(liquidity_pool, &token_type);
     //     std::debug::print(&token_pool.config.margin_config.basic_borrow_rate_0);
@@ -3622,7 +3622,7 @@ module typus_perp::lp_pool {
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
     //     assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     if (!vector::contains(&liquidity_pool.liquidity_tokens, &token_type)) {
     //         vector::push_back(&mut liquidity_pool.liquidity_tokens, token_type);
 
@@ -3690,7 +3690,7 @@ module typus_perp::lp_pool {
     //     liquidity_amount: u64,
     // ) {
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
     //     token_pool.state.liquidity_amount = token_pool.state.liquidity_amount + liquidity_amount;
     // }
 
@@ -3712,7 +3712,7 @@ module typus_perp::lp_pool {
     //     liquidity_amount: u64,
     // ) {
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
     //     token_pool.state.liquidity_amount = token_pool.state.liquidity_amount - liquidity_amount;
     // }
 
@@ -3734,7 +3734,7 @@ module typus_perp::lp_pool {
     //     value_in_usd: u64,
     // ) {
     //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::get<TOKEN>());
+    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
     //     token_pool.state.value_in_usd = value_in_usd;
     // }
 
@@ -3886,7 +3886,7 @@ module typus_perp::lp_pool {
 //         let (_deposit_amount_usd, _mint_fee_usd, mint_amount) = lp_pool::calculate_mint_lp(
 //             &registry,
 //             index,
-//             type_name::get<TOKEN>(),
+//             type_name::with_defining_ids<TOKEN>(),
 //             price,
 //             price_decimal,
 //             deposit_amount,
@@ -3897,8 +3897,8 @@ module typus_perp::lp_pool {
 //         lp_pool::test_add_total_share_supply(&mut registry, index, mint_amount);
 //         next_tx(scenario, ADMIN);
 //         let liquidity_value_in_usd = math::amount_to_usd(
-//             lp_pool::get_liquidity_amount(&registry, index, type_name::get<TOKEN>()),
-//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::get<TOKEN>()),
+//             lp_pool::get_liquidity_amount(&registry, index, type_name::with_defining_ids<TOKEN>()),
+//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::with_defining_ids<TOKEN>()),
 //             price,
 //             price_decimal
 //         );
@@ -3920,7 +3920,7 @@ module typus_perp::lp_pool {
 //         let (_burn_amount_usd, _burn_fee_usd, withdraw_token_amount, _burn_fee_token_amount) = lp_pool::calculate_burn_lp(
 //             &registry,
 //             index,
-//             type_name::get<TOKEN>(),
+//             type_name::with_defining_ids<TOKEN>(),
 //             price,
 //             price_decimal,
 //             burn_amount,
@@ -3931,8 +3931,8 @@ module typus_perp::lp_pool {
 //         lp_pool::test_reduce_total_share_supply(&mut registry, index, burn_amount);
 //         next_tx(scenario, ADMIN);
 //         let liquidity_value_in_usd = math::amount_to_usd(
-//             lp_pool::get_liquidity_amount(&registry, index, type_name::get<TOKEN>()),
-//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::get<TOKEN>()),
+//             lp_pool::get_liquidity_amount(&registry, index, type_name::with_defining_ids<TOKEN>()),
+//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::with_defining_ids<TOKEN>()),
 //             price,
 //             price_decimal
 //         );
@@ -3955,7 +3955,7 @@ module typus_perp::lp_pool {
 //         let (deposit_amount_usd, mint_fee_usd, mint_amount) = lp_pool::calculate_mint_lp(
 //             &registry,
 //             index,
-//             type_name::get<TOKEN>(),
+//             type_name::with_defining_ids<TOKEN>(),
 //             price,
 //             price_decimal,
 //             deposit_amount,
@@ -3978,7 +3978,7 @@ module typus_perp::lp_pool {
 //         let (burn_amount_usd, burn_fee_usd, withdraw_token_amount, _burn_fee_token_amount) = lp_pool::calculate_burn_lp(
 //             &registry,
 //             index,
-//             type_name::get<TOKEN>(),
+//             type_name::with_defining_ids<TOKEN>(),
 //             price,
 //             price_decimal,
 //             burn_amount,

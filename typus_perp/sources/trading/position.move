@@ -125,7 +125,7 @@ module typus_perp::position {
             order_id,
             linked_position_id,
             user: tx_context::sender(ctx),
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             collateral_token_decimal,
             symbol,
             leverage_mbp,
@@ -201,7 +201,7 @@ module typus_perp::position {
             order_id,
             linked_position_id: option::some(linked_position_id),
             user,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             collateral_token_decimal,
             symbol,
             leverage_mbp: 10000000,
@@ -411,7 +411,7 @@ module typus_perp::position {
             u64_padding: _,
         } = order;
 
-        assert!(collateral_token == type_name::get<C_TOKEN>(), error::wrong_collateral_type());
+        assert!(collateral_token == type_name::with_defining_ids<C_TOKEN>(), error::wrong_collateral_type());
         let actual_order_size = if (option::is_some(&original_position)) {
             let position_size = original_position.borrow().size;
             let position_side = original_position.borrow().is_long;
@@ -1218,7 +1218,7 @@ module typus_perp::position {
             order_id,
             linked_position_id,
             user,
-            collateral_token: type_name::get<TypusBidReceipt>(),
+            collateral_token: type_name::with_defining_ids<TypusBidReceipt>(),
             collateral_token_decimal: deposit_token_decimal,
             symbol,
             leverage_mbp,
@@ -1265,7 +1265,7 @@ module typus_perp::position {
             oracle_price_when_placing: _,
             u64_padding: _,
         } = order;
-        assert!(collateral_token == type_name::get<TypusBidReceipt>(), error::wrong_collateral_type());
+        assert!(collateral_token == type_name::with_defining_ids<TypusBidReceipt>(), error::wrong_collateral_type());
         let bid_receipts = if (dynamic_field::exists_<String>(&id, string::utf8(K_COLLATERAL))) {
             dynamic_field::remove<String, vector<TypusBidReceipt>>(&mut id, string::utf8(K_COLLATERAL))
         } else {
@@ -1378,7 +1378,7 @@ module typus_perp::position {
             u64_padding: _,
         } = order;
 
-        assert!(collateral_token == type_name::get<TypusBidReceipt>(), error::wrong_collateral_type());
+        assert!(collateral_token == type_name::with_defining_ids<TypusBidReceipt>(), error::wrong_collateral_type());
 
         let deposit_token = dynamic_field::remove<String, TypeName>(&mut id, string::utf8(K_DEPOSIT_TOKEN));
         let portfolio_index = dynamic_field::remove<String, u64>(&mut id, string::utf8(K_PORTFOLIO_INDEX));
@@ -1510,7 +1510,7 @@ module typus_perp::position {
                 unrealized_rebate: rebate,
                 option_collateral_info: option::some(OptionCollateralInfo {
                     index: portfolio_index,
-                    bid_token: type_name::get<B_TOKEN>(),
+                    bid_token: type_name::with_defining_ids<B_TOKEN>(),
                     bid_receipts_bcs,
                 }),
                 u64_padding: vector::empty(),
@@ -2514,7 +2514,7 @@ module typus_perp::position {
 //         let clock = new_clock(scenario);
 //         let collateral = mint_test_coin<C_TOKEN>(scenario, collateral_amount);
 //         let balance = coin::into_balance(collateral);
-//         let symbol = symbol::create(type_name::get<BASE_TOKEN>(), type_name::get<QUOTE_TOKEN>());
+//         let symbol = symbol::create(type_name::with_defining_ids<BASE_TOKEN>(), type_name::with_defining_ids<QUOTE_TOKEN>());
 //         let order = position::create_order<C_TOKEN>(
 //             &version,
 //             // order parameters

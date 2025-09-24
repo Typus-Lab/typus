@@ -113,7 +113,7 @@ module typus_perp::user_account {
         user_account: &mut UserAccount,
         balance: Balance<C_TOKEN>,
     ) {
-        let token_name = type_name::get<C_TOKEN>();
+        let token_name = type_name::with_defining_ids<C_TOKEN>();
         if (user_account.symbols.contains(&token_name)) {
             let mut_balance: &mut Balance<C_TOKEN> = dynamic_field::borrow_mut(&mut user_account.id, token_name);
             mut_balance.join(balance);
@@ -128,7 +128,7 @@ module typus_perp::user_account {
         mut amount: Option<u64>,
         user_account_cap: &UserAccountCap,
     ): Balance<C_TOKEN> {
-        let token_name = type_name::get<C_TOKEN>();
+        let token_name = type_name::with_defining_ids<C_TOKEN>();
         assert!(user_account.symbols.contains(&token_name), error::no_balance());
 
         // check user_account_cap

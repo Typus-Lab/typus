@@ -73,7 +73,7 @@ module lending_core::incentive {
             0x1::vector::push_back<u8>(&mut arg0.assets, arg2);
         };
         let v1 = 0x2::table::borrow_mut<u8, PoolInfo>(&mut arg0.pools, arg2);
-        0x1::vector::push_back<0x1::ascii::String>(&mut v1.coin_types, 0x1::type_name::into_string(0x1::type_name::get<T0>()));
+        0x1::vector::push_back<0x1::ascii::String>(&mut v1.coin_types, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()));
         0x1::vector::push_back<u64>(&mut v1.start_times, arg3);
         0x1::vector::push_back<u64>(&mut v1.end_times, arg4);
         0x1::vector::push_back<u256>(&mut v1.total_supplys, arg6 as u256);

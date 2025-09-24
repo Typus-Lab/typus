@@ -181,8 +181,8 @@ module typus_perp::trading {
         let market = Markets {
             id: object::new(ctx),
             index: registry.num_market,
-            lp_token_type: type_name::get<LP_TOKEN>(),
-            quote_token_type: type_name::get<QUOTE_TOKEN>(),
+            lp_token_type: type_name::with_defining_ids<LP_TOKEN>(),
+            quote_token_type: type_name::with_defining_ids<QUOTE_TOKEN>(),
             is_active: true,
             protocol_fee_share_bp,
             symbols: vector::empty(),
@@ -238,7 +238,7 @@ module typus_perp::trading {
         admin::verify(version, ctx);
 
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(!vector::contains(&market.symbols, &base_token), error::trading_symbol_existed());
 
         assert!(
@@ -375,7 +375,7 @@ module typus_perp::trading {
         admin::verify(version, ctx);
 
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
 
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
@@ -503,7 +503,7 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
 
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         symbol_market.market_info.is_active = false;
@@ -532,7 +532,7 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
 
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         symbol_market.market_info.is_active = true;
@@ -554,7 +554,7 @@ module typus_perp::trading {
         admin::verify(version, ctx);
 
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let mut symbol_market = object_table::remove<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(!symbol_market.market_info.is_active, error::active_trading_symbol());
@@ -705,7 +705,7 @@ module typus_perp::trading {
         if (!reduce_only) { lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true); };
         if (reduce_only) { assert!(linked_position_id.is_some(), error::position_id_needed_with_reduce_only_order()); };
 
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -722,7 +722,7 @@ module typus_perp::trading {
 
         let collateral = collateral.into_balance();
         let collateral_amount = balance::value(&collateral);
-        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::get<C_TOKEN>());
+        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::with_defining_ids<C_TOKEN>());
         let collateral_usd = amount_to_usd(
             collateral_amount,
             liquidity_token_decimal,
@@ -751,7 +751,7 @@ module typus_perp::trading {
         );
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let mut reserve_amount
             = usd_to_amount(order_size_usd, liquidity_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
@@ -877,7 +877,7 @@ module typus_perp::trading {
             user,
             market_index,
             pool_index,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             base_token,
             order_id,
             linked_position_id,
@@ -970,7 +970,7 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow_mut(market_index);
 
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
 
@@ -1002,7 +1002,7 @@ module typus_perp::trading {
             order_id,
             trigger_price,
             base_token,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             released_collateral_amount: balance::value(&collateral),
             u64_padding: vector::empty()
         });
@@ -1051,7 +1051,7 @@ module typus_perp::trading {
     //         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
     //         lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true);
 
-    //         let base_token = type_name::get<BASE_TOKEN>();
+    //         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
     //         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
     //         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
     //         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -1225,8 +1225,8 @@ module typus_perp::trading {
             admin::version_check(version);
             let market = registry.markets.borrow_mut(market_index);
             assert!(market.is_active, error::markets_inactive());
-            let collateral_token = type_name::get<C_TOKEN>();
-            let base_token = type_name::get<BASE_TOKEN>();
+            let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+            let base_token = type_name::with_defining_ids<BASE_TOKEN>();
             assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
             let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
             assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -1265,8 +1265,8 @@ module typus_perp::trading {
 
         // 2. execute releasing collateral
         let market = registry.markets.borrow_mut(market_index);
-        let collateral_token = type_name::get<C_TOKEN>();
-        let base_token = type_name::get<BASE_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
@@ -1370,8 +1370,8 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
 
-        let collateral_token = type_name::get<C_TOKEN>();
-        let base_token = type_name::get<BASE_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -1383,7 +1383,7 @@ module typus_perp::trading {
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
         check_position_user_matched(mut_position, user);
@@ -1484,8 +1484,8 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
 
-        let collateral_token = type_name::get<C_TOKEN>();
-        let base_token = type_name::get<BASE_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -1497,7 +1497,7 @@ module typus_perp::trading {
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
         check_position_user_matched(mut_position, user);
@@ -1597,12 +1597,12 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         assert!(symbol_market.market_info.is_active, error::trading_symbol_inactive());
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, collateral_token);
         {
             let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
@@ -1719,7 +1719,7 @@ module typus_perp::trading {
 
         let deposit_token = typus_dov_single::get_deposit_token(dov_registry, dov_index);
         let bid_token = typus_dov_single::get_bid_token(dov_registry, dov_index);
-        assert!(bid_token == type_name::get<B_TOKEN>(), error::bid_token_mismatched());
+        assert!(bid_token == type_name::with_defining_ids<B_TOKEN>(), error::bid_token_mismatched());
 
         let order_id = symbol_market.market_info.next_order_id;
 
@@ -1782,7 +1782,7 @@ module typus_perp::trading {
             market_index,
             pool_index,
             dov_index,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             base_token,
             order_id,
             collateral_in_deposit_token: collateral_amount,
@@ -1850,15 +1850,15 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         if (order_size.is_some()) {
             assert!(*order_size.borrow() % symbol_market.market_config.lot_size == 0, error::invalid_order_size());
         };
-        let collateral_token = type_name::get<C_TOKEN>();
-        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::get<C_TOKEN>());
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::with_defining_ids<C_TOKEN>());
         {
             let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
             liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
@@ -1873,7 +1873,7 @@ module typus_perp::trading {
         };
         assert!(mut_position.is_option_collateral_position(), error::not_option_collateral_position());
         let (dov_index, bid_token) = mut_position.get_position_option_collateral_info();
-        assert!(bid_token == type_name::get<B_TOKEN>(), error::bid_token_mismatched());
+        assert!(bid_token == type_name::with_defining_ids<B_TOKEN>(), error::bid_token_mismatched());
 
         let position_is_long = mut_position.get_position_side();
         let position_size = mut_position.get_position_size();
@@ -1892,7 +1892,7 @@ module typus_perp::trading {
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
         position::update_position_borrow_rate_and_funding_rate(
             mut_position,
             collateral_oracle_price,
@@ -2005,7 +2005,7 @@ module typus_perp::trading {
             market_index,
             pool_index,
             dov_index,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             base_token,
             order_id,
             collateral_in_deposit_token: exercise_value,
@@ -2082,9 +2082,9 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         {
             let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
             liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
@@ -2126,7 +2126,7 @@ module typus_perp::trading {
 
             let order_filled = position::check_order_filled(&order, trading_pair_oracle_price);
             let token_collateral_order_matched
-                = position::get_order_collateral_token(&order) == type_name::get<C_TOKEN>();
+                = position::get_order_collateral_token(&order) == type_name::with_defining_ids<C_TOKEN>();
             let reserve_enough = check_reserve_enough<C_TOKEN>(
                 symbol_market,
                 liquidity_pool,
@@ -2152,7 +2152,7 @@ module typus_perp::trading {
             if (reserve_enough && token_collateral_order_matched && order_filled && !exceed_max_open_interest) {
                 // skip orders not reduce only when token pool inactive
                 if ((
-                    !liquidity_pool.get_token_pool(&type_name::get<C_TOKEN>()).token_pool_is_active()
+                    !liquidity_pool.get_token_pool(&type_name::with_defining_ids<C_TOKEN>()).token_pool_is_active()
                     || !symbol_market.market_info.is_active)
                     && !order.get_order_reduce_only()
                 ) {
@@ -2204,7 +2204,7 @@ module typus_perp::trading {
 
         if (operation_count > 0) {
             emit(MatchTradingOrderEvent {
-                collateral_token: type_name::get<C_TOKEN>(),
+                collateral_token: type_name::with_defining_ids<C_TOKEN>(),
                 base_token,
                 matched_order_ids,
                 u64_padding: vector::empty()
@@ -2244,9 +2244,9 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         let symbol_market = object_table::borrow<TypeName, SymbolMarket>(&market.symbol_markets, base_token);
 
@@ -2314,7 +2314,7 @@ module typus_perp::trading {
         if (operation_count > 0) {
             emit(ManagerCancelOrdersEvent {
                 reason: string::utf8(b"exceed_max_open_interest"),
-                collateral_token: type_name::get<C_TOKEN>(),
+                collateral_token: type_name::with_defining_ids<C_TOKEN>(),
                 base_token,
                 order_type_tag,
                 order_ids,
@@ -2339,7 +2339,7 @@ module typus_perp::trading {
         admin::verify(version, ctx);
 
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
 
@@ -2394,15 +2394,15 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
 
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         {
             let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
             liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         };
-        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::get<C_TOKEN>());
+        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::with_defining_ids<C_TOKEN>());
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
 
@@ -2413,7 +2413,7 @@ module typus_perp::trading {
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         position::update_position_borrow_rate_and_funding_rate(
             mut_position,
@@ -2545,12 +2545,12 @@ module typus_perp::trading {
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.is_active, error::markets_inactive());
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
 
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         {
             let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
             liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
@@ -2674,8 +2674,8 @@ module typus_perp::trading {
     //     emit(ManagerUpdateProcessStatusAfterPositionEvent {
     //         market_index,
     //         pool_index,
-    //         liquidity_token: type_name::get<C_TOKEN>(),
-    //         trading_base_token: type_name::get<BASE_TOKEN>(),
+    //         liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
+    //         trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
     //     });
     //     if (result.length() == 0) {
     //         lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, true);
@@ -2749,8 +2749,8 @@ module typus_perp::trading {
     //     emit(ManagerUpdateProcessStatusAfterOrderEvent {
     //         market_index,
     //         pool_index,
-    //         liquidity_token: type_name::get<C_TOKEN>(),
-    //         trading_base_token: type_name::get<BASE_TOKEN>(),
+    //         liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
+    //         trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
     //     });
 
     //     if (length == 0) {
@@ -2808,11 +2808,11 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow(market_index);
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
 
         let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
 
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
@@ -2821,7 +2821,7 @@ module typus_perp::trading {
         let symbol_market = object_table::borrow<TypeName, SymbolMarket>(&market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         let user_positions = &symbol_market.user_positions;
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         let mut result = vector::empty();
         // iter to find position
@@ -2944,13 +2944,13 @@ module typus_perp::trading {
 
         let market = registry.markets.borrow_mut(market_index);
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
 
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
 
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
@@ -2976,7 +2976,7 @@ module typus_perp::trading {
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
-            lp_pool::get_token_pool_state(liquidity_pool, type_name::get<C_TOKEN>())[1],
+            lp_pool::get_token_pool_state(liquidity_pool, type_name::with_defining_ids<C_TOKEN>())[1],
             symbol_market.market_info.size_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
@@ -3003,7 +3003,7 @@ module typus_perp::trading {
 
         let liquidated = if (is_option_position) {
             let (_, bid_token) = mut_position.get_position_option_collateral_info();
-            assert!(bid_token == type_name::get<B_TOKEN>(), error::bid_token_mismatched());
+            assert!(bid_token == type_name::with_defining_ids<B_TOKEN>(), error::bid_token_mismatched());
             position::check_option_collateral_position_liquidated<C_TOKEN>(
                 dov_registry,
                 typus_oracle_trading_symbol,
@@ -3095,7 +3095,7 @@ module typus_perp::trading {
                         returned_bid_receipts,
                         position_id,
                         user,
-                        vector[type_name::get<C_TOKEN>(), type_name::get<B_TOKEN>()],
+                        vector[type_name::with_defining_ids<C_TOKEN>(), type_name::with_defining_ids<B_TOKEN>()],
                         false,
                         unrealized_loss,
                         unrealized_trading_fee,
@@ -3111,7 +3111,7 @@ module typus_perp::trading {
 
                 emit(LiquidateEvent {
                     user,
-                    collateral_token: type_name::get<C_TOKEN>(),
+                    collateral_token: type_name::with_defining_ids<C_TOKEN>(),
                     base_token,
                     position_id,
                     collateral_price: collateral_oracle_price,
@@ -3143,7 +3143,7 @@ module typus_perp::trading {
 
                 emit(LiquidateEvent {
                     user,
-                    collateral_token: type_name::get<C_TOKEN>(),
+                    collateral_token: type_name::with_defining_ids<C_TOKEN>(),
                     base_token,
                     position_id,
                     collateral_price: collateral_oracle_price,
@@ -3186,8 +3186,8 @@ module typus_perp::trading {
         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::get<C_TOKEN>();
-        let bid_token = type_name::get<B_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let bid_token = type_name::with_defining_ids<B_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
 
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
@@ -3344,7 +3344,7 @@ module typus_perp::trading {
         admin::verify(version, ctx);
 
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
@@ -3598,7 +3598,7 @@ module typus_perp::trading {
     //     admin::version_check(version);
 
     //     let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     let token_rebates = referrals.rebates.borrow_mut(token_type);
 
     //     let rebate_balance = dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(
@@ -3647,7 +3647,7 @@ module typus_perp::trading {
             (option::none(), option::none())
         };
 
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
 
         let order_size = order.get_order_size();
@@ -3659,7 +3659,7 @@ module typus_perp::trading {
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
-            lp_pool::get_token_pool_state(liquidity_pool, type_name::get<C_TOKEN>())[1],
+            lp_pool::get_token_pool_state(liquidity_pool, type_name::with_defining_ids<C_TOKEN>())[1],
             symbol_market.market_info.size_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
@@ -3832,7 +3832,7 @@ module typus_perp::trading {
         let reduce_only = position::get_order_reduce_only(&order);
         let (original_position, original_reserve) = get_linked_position(symbol_market, linked_position_id, user);
 
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         // let (fee_rebate_bp, fee_reduction_bp) = if (referrals.referrals.contains(user)) {
         //     let referral_info = referrals.referrals.borrow(user);
@@ -4142,7 +4142,7 @@ module typus_perp::trading {
             market_index,
             order_id,
             trigger_price,
-            collateral_token: type_name::get<C_TOKEN>(),
+            collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             base_token,
             released_collateral_amount,
             u64_padding: vector::empty()
@@ -4413,7 +4413,7 @@ module typus_perp::trading {
         if (position::get_order_reduce_only(order)) {
             true
         } else {
-            let collateral_token = type_name::get<C_TOKEN>();
+            let collateral_token = type_name::with_defining_ids<C_TOKEN>();
             let order_size = position::get_order_size(order);
 
             let token_pool_state = lp_pool::get_token_pool_state(liquidity_pool, collateral_token);
@@ -4626,7 +4626,7 @@ module typus_perp::trading {
         let mut result = vector::empty<vector<u8>>();
 
         let market = registry.markets.borrow(market_index);
-        let base_token = type_name::get<TOKEN>();
+        let base_token = type_name::with_defining_ids<TOKEN>();
         let symbol_market = market.symbol_markets.borrow(base_token);
         let user_positions = &symbol_market.user_positions;
         let length = user_positions.length();
@@ -4669,7 +4669,7 @@ module typus_perp::trading {
         let mut active_orders = vector::empty<vector<u8>>();
 
         let market = registry.markets.borrow(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         let symbol_market = market.symbol_markets.borrow(base_token);
 
         let active_orders_vec_map = get_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
@@ -4696,11 +4696,11 @@ module typus_perp::trading {
         order_type_tag: u8,
     ): vector<vector<u8>> {
         admin::version_check(version);
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let mut active_orders = vector::empty<vector<u8>>();
 
         let market = registry.markets.borrow(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         let symbol_market = market.symbol_markets.borrow(base_token);
 
         let active_orders_vec_map = get_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
@@ -4735,7 +4735,7 @@ module typus_perp::trading {
     ): u64 {
         admin::version_check(version);
         let market = registry.markets.borrow(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         let symbol_market = market.symbol_markets.borrow(base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         let position: &Position = &symbol_market.user_positions[position_id];
@@ -4744,7 +4744,7 @@ module typus_perp::trading {
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
 
         let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::get<C_TOKEN>();
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
@@ -4786,7 +4786,7 @@ module typus_perp::trading {
     ): (u64, bool, u64, bool, u64, bool, u64, u64, u64) {
         admin::version_check(version);
         let market = registry.markets.borrow_mut(market_index);
-        let base_token = type_name::get<BASE_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         let symbol_market = market.symbol_markets.borrow_mut(base_token);
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
 
@@ -4794,13 +4794,13 @@ module typus_perp::trading {
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
 
         let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::get<C_TOKEN>());
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
         let is_option_position = mut_position.is_option_collateral_position();
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
-            lp_pool::get_token_pool_state(liquidity_pool, type_name::get<C_TOKEN>())[1],
+            lp_pool::get_token_pool_state(liquidity_pool, type_name::with_defining_ids<C_TOKEN>())[1],
             symbol_market.market_info.size_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
@@ -4855,7 +4855,7 @@ module typus_perp::trading {
         );
 
         let (is_cost, position_unrealized_cost) = position::calculate_unrealized_cost(mut_position);
-        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::get<C_TOKEN>());
+        let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::with_defining_ids<C_TOKEN>());
         let unrealized_cost_in_usd = amount_to_usd(
             position_unrealized_cost,
             liquidity_token_decimal,
@@ -4950,7 +4950,7 @@ module typus_perp::trading {
     //     to_user: address,
     //     ctx: &mut TxContext
     // ) {
-    //     let token_type = type_name::get<TOKEN>();
+    //     let token_type = type_name::with_defining_ids<TOKEN>();
     //     if (!referrals.rebates.contains(token_type)) {
     //         referrals.rebates.add(token_type, table::new(ctx));
     //     };
@@ -5075,7 +5075,7 @@ module typus_perp::trading {
     public(package) fun trading_symbol_exists<BASE_TOKEN>(
         market: &Markets
     ): bool {
-        market.symbol_markets.contains(type_name::get<BASE_TOKEN>())
+        market.symbol_markets.contains(type_name::with_defining_ids<BASE_TOKEN>())
     }
 
     fun deprecated() { abort 0 }
@@ -5308,7 +5308,7 @@ module typus_perp::trading {
     // ) {
     //     let oracle_id = object::id_address(registry); // create a fake id
     //     let market = registry.markets.borrow_mut(market_index);
-    //     let base_token = type_name::get<BASE_TOKEN>();
+    //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
     //     assert!(!vector::contains(&market.symbols, &base_token), error::trading_symbol_existed());
 
     //     // add into market.symbols

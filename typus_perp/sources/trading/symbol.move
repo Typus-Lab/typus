@@ -8,8 +8,8 @@ module typus_perp::symbol {
 
     // public(package) fun new<BASE_TOKEN, QUOTE_TOKEN>(): Symbol {
     //     Symbol {
-    //         base_token: type_name::get<BASE_TOKEN>(),
-    //         quote_token: type_name::get<QUOTE_TOKEN>(),
+    //         base_token: type_name::with_defining_ids<BASE_TOKEN>(),
+    //         quote_token: type_name::with_defining_ids<QUOTE_TOKEN>(),
     //     }
     // }
 

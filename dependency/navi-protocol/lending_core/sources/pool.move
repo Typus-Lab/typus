@@ -74,7 +74,7 @@ module lending_core::pool {
         let v0 = PoolDeposit{
             sender : 0x2::tx_context::sender(arg2),
             amount : 0x2::coin::value<T0>(&arg1),
-            pool   : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool   : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
         };
         0x2::event::emit<PoolDeposit>(v0);
         0x2::balance::join<T0>(&mut arg0.balance, 0x2::coin::into_balance<T0>(arg1));
@@ -84,7 +84,7 @@ module lending_core::pool {
         let v0 = PoolDeposit{
             sender : arg2,
             amount : 0x2::balance::value<T0>(&arg1),
-            pool   : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool   : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
         };
         0x2::event::emit<PoolDeposit>(v0);
         0x2::balance::join<T0>(&mut arg0.balance, arg1);
@@ -124,7 +124,7 @@ module lending_core::pool {
             sender    : 0x2::tx_context::sender(arg3),
             recipient : arg2,
             amount    : arg1,
-            pool      : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool      : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
         };
         0x2::event::emit<PoolWithdraw>(v0);
         0x2::transfer::public_transfer<0x2::coin::Coin<T0>>(0x2::coin::from_balance<T0>(0x2::balance::split<T0>(&mut arg0.balance, arg1), arg3), arg2);
@@ -138,7 +138,7 @@ module lending_core::pool {
             sender    : arg2,
             recipient : arg2,
             amount    : arg1,
-            pool      : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool      : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
         };
         0x2::event::emit<PoolWithdraw>(v0);
         0x2::balance::split<T0>(&mut arg0.balance, arg1)
@@ -153,7 +153,7 @@ module lending_core::pool {
             amount    : arg2,
             before    : v0,
             after     : 0x2::balance::value<T0>(&arg1.balance),
-            pool      : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            pool      : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
             poolId    : 0x2::object::uid_to_address(&arg1.id),
         };
         0x2::event::emit<PoolWithdrawReserve>(v1);

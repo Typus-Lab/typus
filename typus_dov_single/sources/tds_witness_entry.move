@@ -87,7 +87,7 @@ module typus_dov::tds_witness_entry {
             ctx,
         );
         typus_dov_single::emit_witness_otc_event(
-            type_name::get<W>(),
+            type_name::with_defining_ids<W>(),
             registry,
             index,
             log[0],

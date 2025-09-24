@@ -197,7 +197,7 @@ module liquid_staking::liquid_staking {
         let uid = object::new(ctx);
 
         emit_event(CreateEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             liquid_staking_info_id: uid.to_inner()
         });
 
@@ -239,7 +239,7 @@ module liquid_staking::liquid_staking {
         assert!(lst_mint_amount > 0, EZeroLstMinted);
 
         emit_event(MintEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             sui_amount_in,
             lst_amount_out: lst_mint_amount,
             fee_amount: mint_fee_amount
@@ -299,7 +299,7 @@ module liquid_staking::liquid_staking {
         self.fees.join(sui.split(redeem_fee_amount as u64));
 
         emit_event(RedeemEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             lst_amount_in: lst.value(),
             sui_amount_out: sui.value(),
             fee_amount: redeem_fee_amount
@@ -375,7 +375,7 @@ module liquid_staking::liquid_staking {
         let staked_sui_amount = staked_sui.staked_sui_amount();
 
         emit_event(IncreaseValidatorStakeEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             staking_pool_id: staked_sui.pool_id(),
             amount: staked_sui.staked_sui_amount()
         });
@@ -406,7 +406,7 @@ module liquid_staking::liquid_staking {
         );
 
         emit_event(DecreaseValidatorStakeEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             staking_pool_id: self.storage.validators()[validator_index].staking_pool_id(),
             amount: sui_amount
         });
@@ -429,7 +429,7 @@ module liquid_staking::liquid_staking {
         fees.join(spread_fees);
 
         emit_event(CollectFeesEvent {
-            typename: type_name::get<P>(),
+            typename: type_name::with_defining_ids<P>(),
             amount: fees.value()
         });
 
@@ -475,7 +475,7 @@ module liquid_staking::liquid_staking {
             self.accrued_spread_fees = self.accrued_spread_fees + spread_fee;
 
             emit_event(EpochChangedEvent {
-                typename: type_name::get<P>(),
+                typename: type_name::with_defining_ids<P>(),
                 old_sui_supply: old_total_supply,
                 new_sui_supply: new_total_supply,
                 lst_supply: self.total_lst_supply(),

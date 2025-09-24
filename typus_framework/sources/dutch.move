@@ -110,7 +110,7 @@ module typus_framework::dutch {
         Auction {
             id,
             index,
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             start_ts_ms,
             end_ts_ms,
             size,
@@ -147,7 +147,7 @@ module typus_framework::dutch {
         assert!(ts_ms <= auction.end_ts_ms, auction_closed());
         assert!(size > 0, zero_size());
         assert!(auction.total_bid_size + size <= auction.size, max_size_reached());
-        assert!(auction.token == type_name::get<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
 
         // main logic
         let refund_index = vault::register_refund<TOKEN>(refund_vault, bidder);
@@ -195,7 +195,7 @@ module typus_framework::dutch {
         emit(NewBid {
             signer: bidder,
             index: auction.index,
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             bid_index: index,
             price,
             size,
@@ -274,7 +274,7 @@ module typus_framework::dutch {
         let ts_ms = clock::timestamp_ms(clock);
         assert!(ts_ms >= auction.start_ts_ms, auction_not_yet_started());
         assert!(ts_ms <= auction.end_ts_ms, auction_closed());
-        assert!(auction.token == type_name::get<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
 
         // main logic
         let bidder = tx_context::sender(ctx);
@@ -324,7 +324,7 @@ module typus_framework::dutch {
         emit(RemoveBid {
             signer: bidder,
             index: auction.index,
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             bid_index: index,
             price,
             size,
@@ -353,7 +353,7 @@ module typus_framework::dutch {
         // safety check
         assert!(clock::timestamp_ms(clock) >= auction.start_ts_ms, auction_not_yet_started());
         assert!(early || clock::timestamp_ms(clock) >= auction.end_ts_ms, auction_not_yet_ended());
-        assert!(auction.token == type_name::get<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
 
         // main logic
         let Auction {
@@ -462,7 +462,7 @@ module typus_framework::dutch {
         emit(Delivery {
             signer: tx_context::sender(ctx),
             index,
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             price,
             size: total_bid_size,
             bidder_bid_value: total_bidder_bid_value,
@@ -496,7 +496,7 @@ module typus_framework::dutch {
         // safety check
         assert!(clock::timestamp_ms(clock) >= auction.start_ts_ms, auction_not_yet_started());
         assert!(early || clock::timestamp_ms(clock) >= auction.end_ts_ms, auction_not_yet_ended());
-        assert!(auction.token == type_name::get<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
 
         // main logic
         let Auction {
@@ -594,7 +594,7 @@ module typus_framework::dutch {
         emit(Delivery {
             signer: tx_context::sender(ctx),
             index,
-            token: type_name::get<TOKEN>(),
+            token: type_name::with_defining_ids<TOKEN>(),
             price,
             size: total_bid_size,
             bidder_bid_value: total_bidder_bid_value,
@@ -694,7 +694,7 @@ module typus_framework::dutch {
         ctx: &TxContext,
     ): Balance<TOKEN> {
         // safety check
-        assert!(auction.token == type_name::get<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
 
         // main logic
         let Auction {

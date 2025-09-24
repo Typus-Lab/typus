@@ -373,7 +373,7 @@ module oracle::config {
         let mut v0 = 0;
         while (v0 < 0x1::vector::length<address>(&arg0.vec_feeds)) {
             let v1 = 0x2::table::borrow<address, PriceFeed>(&arg0.feeds, *0x1::vector::borrow<address>(&arg0.vec_feeds, v0));
-            if (v1.coin_type == 0x1::type_name::into_string(0x1::type_name::get<T0>())) {
+            if (v1.coin_type == 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>())) {
                 return true
             };
             if (v1.oracle_id == arg1) {
@@ -438,7 +438,7 @@ module oracle::config {
             maximum_effective_price         : arg7,
             minimum_effective_price         : arg8,
             oracle_id                       : arg1,
-            coin_type                       : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            coin_type                       : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
             primary                         : oracle::oracle_provider::new_empty_provider(),
             secondary                       : oracle::oracle_provider::new_empty_provider(),
             oracle_provider_configs         : 0x2::table::new<oracle::oracle_provider::OracleProvider, oracle::oracle_provider::OracleProviderConfig>(arg10),

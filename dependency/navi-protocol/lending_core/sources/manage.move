@@ -10,7 +10,7 @@ module lending_core::manage {
     public fun create_flash_loan_asset<T0>(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::flash_loan::Config, arg2: &lending_core::storage::Storage, arg3: &lending_core::pool::Pool<T0>, arg4: u8, arg5: u64, arg6: u64, arg7: u64, arg8: u64, arg9: &mut 0x2::tx_context::TxContext) {
         assert!(arg4 < lending_core::storage::get_reserves_count(arg2), lending_core::error::reserve_not_found());
         let v0 = lending_core::storage::get_coin_type(arg2, arg4);
-        assert!(0x1::type_name::into_string(0x1::type_name::get<T0>()) == v0, lending_core::error::invalid_coin_type());
+        assert!(0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()) == v0, lending_core::error::invalid_coin_type());
         lending_core::flash_loan::create_asset(arg1, arg4, v0, 0x2::object::uid_to_address(lending_core::pool::uid<T0>(arg3)), arg5, arg6, arg7, arg8, arg9);
     }
 
@@ -50,19 +50,19 @@ module lending_core::manage {
     }
 
     public fun set_flash_loan_asset_max<T0>(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::flash_loan::Config, arg2: u64) {
-        lending_core::flash_loan::set_asset_max(arg1, 0x1::type_name::into_string(0x1::type_name::get<T0>()), arg2);
+        lending_core::flash_loan::set_asset_max(arg1, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), arg2);
     }
 
     public fun set_flash_loan_asset_min<T0>(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::flash_loan::Config, arg2: u64) {
-        lending_core::flash_loan::set_asset_min(arg1, 0x1::type_name::into_string(0x1::type_name::get<T0>()), arg2);
+        lending_core::flash_loan::set_asset_min(arg1, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), arg2);
     }
 
     public fun set_flash_loan_asset_rate_to_supplier<T0>(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::flash_loan::Config, arg2: u64) {
-        lending_core::flash_loan::set_asset_rate_to_supplier(arg1, 0x1::type_name::into_string(0x1::type_name::get<T0>()), arg2);
+        lending_core::flash_loan::set_asset_rate_to_supplier(arg1, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), arg2);
     }
 
     public fun set_flash_loan_asset_rate_to_treasury<T0>(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::flash_loan::Config, arg2: u64) {
-        lending_core::flash_loan::set_asset_rate_to_treasury(arg1, 0x1::type_name::into_string(0x1::type_name::get<T0>()), arg2);
+        lending_core::flash_loan::set_asset_rate_to_treasury(arg1, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), arg2);
     }
 
     public fun set_incentive_v3_borrow_fee_rate(arg0: &lending_core::storage::StorageAdminCap, arg1: &mut lending_core::incentive_v3::Incentive, arg2: u64, arg3: &mut 0x2::tx_context::TxContext) {

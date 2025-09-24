@@ -475,13 +475,13 @@ module typus_dov::typus_dov_single {
         coin: Coin<TOKEN>,
     ): u64 {
         let amount = coin::value(&coin);
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&registry.id, type_name::get<TOKEN>())) {
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&registry.id, type_name::with_defining_ids<TOKEN>())) {
             balance::join(
-                dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>()),
+                dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>()),
                 coin::into_balance(coin),
             );
         } else {
-            dynamic_field::add(&mut registry.id, type_name::get<TOKEN>(), coin::into_balance(coin));
+            dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), coin::into_balance(coin));
         };
 
         amount
@@ -494,10 +494,10 @@ module typus_dov::typus_dov_single {
         amount: Option<u64>,
         ctx: &mut TxContext,
     ): Coin<TOKEN> {
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&registry.id, type_name::get<TOKEN>())) {
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&registry.id, type_name::with_defining_ids<TOKEN>())) {
             let withdraw_balance = if (option::is_some(&amount)) {
                 let amount = option::borrow(&amount);
-                let incentive_balance = dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>());
+                let incentive_balance = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
                 let withdraw_amount = if (*amount > balance::value(incentive_balance)) {
                     balance::value(incentive_balance)
                 } else {
@@ -505,7 +505,7 @@ module typus_dov::typus_dov_single {
                 };
                 balance::split(incentive_balance, withdraw_amount)
             } else {
-                let incentive_balance = dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>());
+                let incentive_balance = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
                 let value = balance::value(incentive_balance);
                 balance::split(incentive_balance, value)
             };
@@ -527,15 +527,15 @@ module typus_dov::typus_dov_single {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         vault::update_deposit_vault_incentive_token<TOKEN>(deposit_vault);
         let amount = coin::value(&coin);
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&portfolio_vault.id, type_name::get<TOKEN>())) {
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&portfolio_vault.id, type_name::with_defining_ids<TOKEN>())) {
             balance::join(
-                dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::get<TOKEN>()),
+                dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::with_defining_ids<TOKEN>()),
                 coin::into_balance(coin),
             );
         } else {
-            dynamic_field::add(&mut portfolio_vault.id, type_name::get<TOKEN>(), coin::into_balance(coin));
+            dynamic_field::add(&mut portfolio_vault.id, type_name::with_defining_ids<TOKEN>(), coin::into_balance(coin));
         };
-        let max_incentive_balance = balance::value<TOKEN>(dynamic_field::borrow(&portfolio_vault.id, type_name::get<TOKEN>()));
+        let max_incentive_balance = balance::value<TOKEN>(dynamic_field::borrow(&portfolio_vault.id, type_name::with_defining_ids<TOKEN>()));
         utils::set_u64_padding_value(
             &mut portfolio_vault.config.u64_padding,
             I_CONFIG_FIXED_INCENTIVE_AMOUNT,
@@ -554,10 +554,10 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): Coin<TOKEN> {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&portfolio_vault.id, type_name::get<TOKEN>())) {
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(&portfolio_vault.id, type_name::with_defining_ids<TOKEN>())) {
             let withdraw_balance = if (option::is_some(&amount)) {
                 let amount = option::borrow(&amount);
-                let incentive_balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::get<TOKEN>());
+                let incentive_balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::with_defining_ids<TOKEN>());
                 let withdraw_amount = if (*amount > balance::value(incentive_balance)) {
                     balance::value(incentive_balance)
                 } else {
@@ -565,7 +565,7 @@ module typus_dov::typus_dov_single {
                 };
                 balance::split(incentive_balance, withdraw_amount)
             } else {
-                let incentive_balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::get<TOKEN>());
+                let incentive_balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::with_defining_ids<TOKEN>());
                 let value = balance::value(incentive_balance);
                 balance::split(incentive_balance, value)
             };
@@ -712,7 +712,7 @@ module typus_dov::typus_dov_single {
         clock: &Clock,
         ctx: &mut TxContext,
     ): vector<u64> {
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::get<D_TOKEN>());
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<D_TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
         assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 1, scallop_disabled(index));
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
@@ -804,10 +804,10 @@ module typus_dov::typus_dov_single {
         clock: &Clock,
         ctx: &mut TxContext,
     ): vector<u64> {
-        if (!dynamic_field::exists_(&registry.id, type_name::get<TOKEN>())) {
-            dynamic_field::add(&mut registry.id, type_name::get<TOKEN>(), balance::zero<TOKEN>());
+        if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
+            dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
         };
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>());
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
         assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 2, scallop_basic_lending_disabled(index));
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
@@ -918,7 +918,7 @@ module typus_dov::typus_dov_single {
         clock: &Clock,
         ctx: &mut TxContext,
     ): vector<u64> {
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::get<D_TOKEN>());
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<D_TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
         assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 3, suilend_disabled(index));
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
@@ -1070,10 +1070,10 @@ module typus_dov::typus_dov_single {
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
     ): vector<u64> {
-        if (!dynamic_field::exists_(&registry.id, type_name::get<TOKEN>())) {
-            dynamic_field::add(&mut registry.id, type_name::get<TOKEN>(), balance::zero<TOKEN>());
+        if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
+            dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
         };
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>());
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
         assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
@@ -1195,8 +1195,8 @@ module typus_dov::typus_dov_single {
             balance::destroy_zero(balance);
             return vector::empty()
         };
-        if (!dynamic_field::exists_(&additional_config.id, type_name::get<TOKEN>())) {
-            dynamic_field::add(&mut additional_config.id, type_name::get<TOKEN>(), 0);
+        if (!dynamic_field::exists_(&additional_config.id, type_name::with_defining_ids<TOKEN>())) {
+            dynamic_field::add(&mut additional_config.id, type_name::with_defining_ids<TOKEN>(), 0);
         };
         let balance_value = balance.value();
         let mut log = vector[balance_value];
@@ -1211,7 +1211,7 @@ module typus_dov::typus_dov_single {
             incentive_v3,
             navi_account_cap,
         );
-        let extra_amount: &mut u64 = dynamic_field::borrow_mut(&mut additional_config.id, type_name::get<TOKEN>());
+        let extra_amount: &mut u64 = dynamic_field::borrow_mut(&mut additional_config.id, type_name::with_defining_ids<TOKEN>());
         *extra_amount = *extra_amount + balance_value;
         vector::push_back(&mut log, portfolio_vault.info.round);
 
@@ -1248,9 +1248,9 @@ module typus_dov::typus_dov_single {
             feed_address,
         );
         let amount = if (amount.is_none()) {
-            dynamic_field::remove(&mut additional_config.id, type_name::get<TOKEN>())
+            dynamic_field::remove(&mut additional_config.id, type_name::with_defining_ids<TOKEN>())
         } else {
-            let extra_amount: &mut u64 = dynamic_field::borrow_mut(&mut additional_config.id, type_name::get<TOKEN>());
+            let extra_amount: &mut u64 = dynamic_field::borrow_mut(&mut additional_config.id, type_name::with_defining_ids<TOKEN>());
             let amount = amount.destroy_some();
             let amount = if (amount > *extra_amount) {
                 *extra_amount
@@ -1694,7 +1694,7 @@ module typus_dov::typus_dov_single {
         d_balance: Balance<TOKEN>,
         r_balance: Balance<TOKEN>,
     ): vector<u64> {
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::get<TOKEN>());
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
         assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == lending_index, navi_disabled(index));
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
@@ -2063,8 +2063,8 @@ module typus_dov::typus_dov_single {
             period,
             activation_ts_ms,
             expiration_ts_ms,
-            deposit_token: type_name::get<D_TOKEN>(),
-            bid_token: type_name::get<B_TOKEN>(),
+            deposit_token: type_name::with_defining_ids<D_TOKEN>(),
+            bid_token: type_name::with_defining_ids<B_TOKEN>(),
             settlement_base,
             settlement_quote,
             settlement_base_name: string::from_ascii(settlement_base_name),
@@ -2184,11 +2184,11 @@ module typus_dov::typus_dov_single {
         );
         if (!dynamic_object_field::exists_with_type<TypeName, RefundVault>(
             &registry.refund_vault_registry,
-            type_name::get<B_TOKEN>(),
+            type_name::with_defining_ids<B_TOKEN>(),
         )) {
             dynamic_object_field::add(
                 &mut registry.refund_vault_registry,
-                type_name::get<B_TOKEN>(),
+                type_name::with_defining_ids<B_TOKEN>(),
                 vault::new_refund_vault<B_TOKEN>(
                     ctx,
                 ),
@@ -2869,7 +2869,7 @@ module typus_dov::typus_dov_single {
                 I_CONFIG_AVAILABLE_INCENTIVE_AMOUNT,
                 available_incentive_amount + balance::value(&incentive_refund)
             );
-            let balance = dynamic_field::borrow_mut(&mut registry.id, type_name::get<B_TOKEN>());
+            let balance = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<B_TOKEN>());
             balance::join(balance, incentive_refund);
         } else {
             balance::destroy_zero(incentive_refund)
@@ -2911,9 +2911,9 @@ module typus_dov::typus_dov_single {
         // main logic
         let bp_incentive_amount = if (
             portfolio_vault.config.deposit_incentive_bp > 0
-            && dynamic_field::exists_with_type<TypeName, Balance<B_TOKEN>>(registry_id, type_name::get<B_TOKEN>())
+            && dynamic_field::exists_with_type<TypeName, Balance<B_TOKEN>>(registry_id, type_name::with_defining_ids<B_TOKEN>())
         ) {
-            let incentive: &mut Balance<B_TOKEN> = dynamic_field::borrow_mut(registry_id, type_name::get<B_TOKEN>());
+            let incentive: &mut Balance<B_TOKEN> = dynamic_field::borrow_mut(registry_id, type_name::with_defining_ids<B_TOKEN>());
             let incentive_pool_amount = balance::value(incentive);
             let available_incentive_amount
                 = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_AVAILABLE_INCENTIVE_AMOUNT);
@@ -2963,11 +2963,11 @@ module typus_dov::typus_dov_single {
             if (utils::match_types<B_TOKEN, I_TOKEN>()) {
                 let mut depositor_incentive = balance::zero();
                 if (bp_incentive_amount > 0) {
-                    let balance = dynamic_field::borrow_mut(registry_id, type_name::get<B_TOKEN>());
+                    let balance = dynamic_field::borrow_mut(registry_id, type_name::with_defining_ids<B_TOKEN>());
                     balance::join(&mut depositor_incentive, balance::split(balance, bp_incentive_amount));
                 };
                 if (fixed_incentive_amount > 0) {
-                    let balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::get<B_TOKEN>());
+                    let balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::with_defining_ids<B_TOKEN>());
                     balance::join(&mut depositor_incentive, balance::split(balance, fixed_incentive_amount));
                     utils::set_u64_padding_value(
                         &mut portfolio_vault.config.u64_padding,
@@ -2984,11 +2984,11 @@ module typus_dov::typus_dov_single {
                 );
             } else {
                 if (bp_incentive_amount > 0) {
-                    let balance = dynamic_field::borrow_mut(registry_id, type_name::get<B_TOKEN>());
+                    let balance = dynamic_field::borrow_mut(registry_id, type_name::with_defining_ids<B_TOKEN>());
                     balance::join(&mut premium_balance, balance::split(balance, bp_incentive_amount));
                 };
                 let depositor_incentive = if (fixed_incentive_amount > 0) {
-                    let balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::get<I_TOKEN>());
+                    let balance = dynamic_field::borrow_mut(&mut portfolio_vault.id, type_name::with_defining_ids<I_TOKEN>());
                     let depositor_incentive = balance::split(balance, fixed_incentive_amount);
                     utils::set_u64_padding_value(
                         &mut portfolio_vault.config.u64_padding,
@@ -3846,7 +3846,7 @@ module typus_dov::typus_dov_single {
     public(package) fun refund_vault_exists<TOKEN>(
         id: &UID,
     ): bool {
-        dynamic_object_field::exists_with_type<TypeName, RefundVault>(id, type_name::get<TOKEN>())
+        dynamic_object_field::exists_with_type<TypeName, RefundVault>(id, type_name::with_defining_ids<TOKEN>())
     }
 
     /// Returns an immutable reference to the `Authority` of a `PortfolioVault`.
@@ -3989,14 +3989,14 @@ module typus_dov::typus_dov_single {
     public(package) fun get_refund_vault<TOKEN>(
         id: &UID,
     ): &RefundVault {
-        dynamic_object_field::borrow<TypeName, RefundVault>(id, type_name::get<TOKEN>())
+        dynamic_object_field::borrow<TypeName, RefundVault>(id, type_name::with_defining_ids<TOKEN>())
     }
 
     /// Returns a mutable reference to a `RefundVault` for a specific token type.
     public(package) fun get_mut_refund_vault<TOKEN>(
         id: &mut UID,
     ): &mut RefundVault {
-        dynamic_object_field::borrow_mut<TypeName, RefundVault>(id, type_name::get<TOKEN>())
+        dynamic_object_field::borrow_mut<TypeName, RefundVault>(id, type_name::with_defining_ids<TOKEN>())
     }
 
     /// Returns an immutable reference to an `Auction` by its index.
@@ -4288,9 +4288,9 @@ module typus_dov::typus_dov_single {
         amount: u64,
         round_up: bool,
     ): u64 {
-        let token_decimal = if (type_name::get<TOKEN>() == portfolio_vault.info.deposit_token) {
+        let token_decimal = if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.deposit_token) {
             portfolio_vault.info.d_token_decimal
-        } else if (type_name::get<TOKEN>() == portfolio_vault.info.bid_token) {
+        } else if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.bid_token) {
             portfolio_vault.info.b_token_decimal
         } else {
             abort invalid_token(portfolio_vault.info.index)
@@ -4299,8 +4299,8 @@ module typus_dov::typus_dov_single {
         let price_decimal = portfolio_vault.info.oracle_info.decimal;
 
         let usd = if (
-            type_name::get<TOKEN>() != portfolio_vault.info.settlement_base
-                && type_name::get<TOKEN>() != type_name::get<SUI>()
+            type_name::with_defining_ids<TOKEN>() != portfolio_vault.info.settlement_base
+                && type_name::with_defining_ids<TOKEN>() != type_name::with_defining_ids<SUI>()
         ) {
             // USDC, BUCK = 1 ??
             let m = utils::multiplier(token_decimal);
@@ -4327,17 +4327,17 @@ module typus_dov::typus_dov_single {
         portfolio_vault: &PortfolioVault,
         amount: u64,
     ): u64 {
-        let token_decimal = if (type_name::get<TOKEN>() == portfolio_vault.info.deposit_token) {
+        let token_decimal = if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.deposit_token) {
             portfolio_vault.info.d_token_decimal
-        } else if (type_name::get<TOKEN>() == portfolio_vault.info.bid_token) {
+        } else if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.bid_token) {
             portfolio_vault.info.b_token_decimal
         } else {
             abort invalid_token(portfolio_vault.info.index)
         };
 
         if (
-            type_name::get<TOKEN>() != portfolio_vault.info.settlement_base
-                && type_name::get<TOKEN>() != type_name::get<SUI>()
+            type_name::with_defining_ids<TOKEN>() != portfolio_vault.info.settlement_base
+                && type_name::with_defining_ids<TOKEN>() != type_name::with_defining_ids<SUI>()
         ) {
             ((amount as u128)
                 * (utils::multiplier(6) as u128)
@@ -4400,7 +4400,7 @@ module typus_dov::typus_dov_single {
             let incentive_value = (((bid_value + fee) as u128)
                 * (portfolio_vault.config.bid_incentive_bp as u128)
                 / (10000 as u128) as u64);
-            let incentive: &Balance<TOKEN> = dynamic_field::borrow(id, type_name::get<TOKEN>());
+            let incentive: &Balance<TOKEN> = dynamic_field::borrow(id, type_name::with_defining_ids<TOKEN>());
             let available_incentive_amount =
                 utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_AVAILABLE_INCENTIVE_AMOUNT);
             // conditions to split incentive fund
@@ -4438,8 +4438,8 @@ module typus_dov::typus_dov_single {
     ): Balance<TOKEN> {
         let mut incentive_balance = balance::zero();
 
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(id, type_name::get<TOKEN>())) {
-            let incentive: &mut Balance<TOKEN> = dynamic_field::borrow_mut(id, type_name::get<TOKEN>());
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(id, type_name::with_defining_ids<TOKEN>())) {
+            let incentive: &mut Balance<TOKEN> = dynamic_field::borrow_mut(id, type_name::with_defining_ids<TOKEN>());
             balance::join(&mut incentive_balance, balance::split(incentive, incentive_usage));
 
             let available_incentive_amount =
@@ -4466,8 +4466,8 @@ module typus_dov::typus_dov_single {
         let mut incentive_balance = balance::zero();
         let mut incentive_fee_balance = balance::zero();
         let mut depositor_incentive_balance = balance::zero();
-        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(id, type_name::get<TOKEN>())) {
-            let incentive: &mut Balance<TOKEN> = dynamic_field::borrow_mut(id, type_name::get<TOKEN>());
+        if (dynamic_field::exists_with_type<TypeName, Balance<TOKEN>>(id, type_name::with_defining_ids<TOKEN>())) {
+            let incentive: &mut Balance<TOKEN> = dynamic_field::borrow_mut(id, type_name::with_defining_ids<TOKEN>());
             let available_incentive_amount =
                 utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_AVAILABLE_INCENTIVE_AMOUNT);
             let available_incentive_amount = request_incentive(
@@ -4695,7 +4695,7 @@ module typus_dov::typus_dov_single {
             return b"E_BID_RECEIPT_NOT_ITM"
         };
 
-        if (type_name::get<BASE_TOKEN>() != portfolio_vault.info.settlement_base) {
+        if (type_name::with_defining_ids<BASE_TOKEN>() != portfolio_vault.info.settlement_base) {
             return b"E_BASE_TOKEN_MISMATCHED"
         };
 
@@ -4707,7 +4707,7 @@ module typus_dov::typus_dov_single {
             return b"E_INVALID_ORDER_SIDE"
         };
 
-        if (type_name::get<C_TOKEN>() != portfolio_vault.info.deposit_token) {
+        if (type_name::with_defining_ids<C_TOKEN>() != portfolio_vault.info.deposit_token) {
             return b"E_COLLATERAL_TOKEN_TYPE_MISMATCHED"
         };
         return b"OK"
@@ -4759,8 +4759,8 @@ module typus_dov::typus_dov_single {
         index: u64,
     ) {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        assert!(type_name::get<D_TOKEN>() == portfolio_vault.info.deposit_token, invalid_deposit_token(index));
-        assert!(type_name::get<B_TOKEN>() == portfolio_vault.info.bid_token, invalid_bid_token(index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == portfolio_vault.info.deposit_token, invalid_deposit_token(index));
+        assert!(type_name::with_defining_ids<B_TOKEN>() == portfolio_vault.info.bid_token, invalid_bid_token(index));
     }
 
     /// Validates that the caller has the authority and the version of package.
@@ -4783,7 +4783,7 @@ module typus_dov::typus_dov_single {
     /// Validates that a provided witness is registered as a valid witness in the registry.
     public(package) fun validate_witness<W: drop>(registry: &Registry, _witness: W, index: u64) {
         let witnesses = dynamic_field::borrow(&registry.id, K_WITNESSES.to_string());
-        assert!(linked_set::contains(witnesses, type_name::get<W>()), invalid_witness(index));
+        assert!(linked_set::contains(witnesses, type_name::with_defining_ids<W>()), invalid_witness(index));
     }
 
     /// Validates that a deposit amount conforms to the vault's lot size and minimum size rules.

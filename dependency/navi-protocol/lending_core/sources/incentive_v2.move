@@ -222,18 +222,18 @@ module lending_core::incentive_v2 {
             id        : v0,
             oracle_id : arg2,
             balance   : 0x2::balance::zero<T0>(),
-            coin_type : 0x1::type_name::get<T0>(),
+            coin_type : 0x1::type_name::with_defining_ids<T0>(),
         };
         0x2::transfer::share_object<IncentiveFundsPool<T0>>(v1);
         let v2 = IncentiveFundsPoolInfo{
             id        : 0x2::object::new(arg4),
             oracle_id : arg2,
-            coin_type : 0x1::type_name::get<T0>(),
+            coin_type : 0x1::type_name::with_defining_ids<T0>(),
         };
         0x2::table::add<address, IncentiveFundsPoolInfo>(&mut arg1.funds, v0_address, v2);
         let v3 = CreateFundsPool{
             sender    : 0x2::tx_context::sender(arg4),
-            coin_type : 0x1::type_name::get<T0>(),
+            coin_type : 0x1::type_name::with_defining_ids<T0>(),
             oracle_id : arg2,
             force     : arg3,
         };

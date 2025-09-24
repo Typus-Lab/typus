@@ -943,7 +943,7 @@ module typus_dov::tds_authorized_entry {
             ctx,
         );
         if (balance::value(&incentive_refund) > 0) {
-            let balance = dynamic_field::borrow_mut(id, type_name::get<B_TOKEN>());
+            let balance = dynamic_field::borrow_mut(id, type_name::with_defining_ids<B_TOKEN>());
             balance::join(balance, incentive_refund);
         } else {
             balance::destroy_zero(incentive_refund)
@@ -1096,7 +1096,7 @@ module typus_dov::tds_authorized_entry {
         // emit event
         emit(FixedIncentiviseEvent {
             signer: tx_context::sender(ctx),
-            token: type_name::get<I_TOKEN>(),
+            token: type_name::with_defining_ids<I_TOKEN>(),
             amount,
             fixed_incentive_amount,
         });
@@ -1125,7 +1125,7 @@ module typus_dov::tds_authorized_entry {
         // emit event
         emit(WithdrawFixedIncentiveEvent {
             signer: tx_context::sender(ctx),
-            token: type_name::get<I_TOKEN>(),
+            token: type_name::with_defining_ids<I_TOKEN>(),
             amount,
         });
     }

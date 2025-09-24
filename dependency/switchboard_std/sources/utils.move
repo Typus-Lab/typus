@@ -72,7 +72,7 @@ module switchboard_std::utils {
     }
 
     public fun type_of<T>(): vector<u8> {
-        ascii::into_bytes(type_name::into_string(type_name::get<T>()))
+        ascii::into_bytes(type_name::into_string(type_name::with_defining_ids<T>()))
     }
 
     // get mr_enclave and report body

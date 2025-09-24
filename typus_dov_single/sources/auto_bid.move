@@ -805,7 +805,7 @@ module typus_dov::auto_bid {
                     balance::join(b, balance);
                     strategy.accumulated_profit = strategy.accumulated_profit + amount;
 
-                    typus_dov_single::emit_exercise_event(vault_index, amount, share, type_name::get<D_TOKEN>(), option::none(), 0, strategy.user);
+                    typus_dov_single::emit_exercise_event(vault_index, amount, share, type_name::with_defining_ids<D_TOKEN>(), option::none(), 0, strategy.user);
                     // update after exercise
                     update_u64_padding<D_TOKEN, B_TOKEN>(strategy);
                     let accumulated_cost = vector::borrow_mut(&mut strategy.u64_padding, 2);
@@ -874,7 +874,7 @@ module typus_dov::auto_bid {
                     balance::join(b, balance);
                     strategy.accumulated_profit = strategy.accumulated_profit + amount;
 
-                    typus_dov_single::emit_exercise_event(vault_index, amount, share, type_name::get<D_TOKEN>(), option::none(), 0, strategy.user);
+                    typus_dov_single::emit_exercise_event(vault_index, amount, share, type_name::with_defining_ids<D_TOKEN>(), option::none(), 0, strategy.user);
                     // update after exercise
                     update_u64_padding<D_TOKEN, B_TOKEN>(strategy);
                     let accumulated_cost = vector::borrow_mut(&mut strategy.u64_padding, 2);

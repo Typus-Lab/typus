@@ -300,7 +300,7 @@ module lending_core::storage {
         let v5 = ReserveData{
             id                    : arg3.reserves_count,
             oracle_id             : arg4,
-            coin_type             : 0x1::type_name::into_string(0x1::type_name::get<T0>()),
+            coin_type             : 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()),
             is_isolated           : arg5,
             supply_cap_ceiling    : arg6,
             borrow_cap_ceiling    : arg7,
@@ -352,7 +352,7 @@ module lending_core::storage {
     public fun reserve_validation<T0>(arg0: &Storage) {
         let mut v0 = 0;
         while (v0 < arg0.reserves_count) {
-            assert!(0x2::table::borrow<u8, ReserveData>(&arg0.reserves, v0).coin_type != 0x1::type_name::into_string(0x1::type_name::get<T0>()), lending_core::error::duplicate_reserve());
+            assert!(0x2::table::borrow<u8, ReserveData>(&arg0.reserves, v0).coin_type != 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), lending_core::error::duplicate_reserve());
             v0 = v0 + 1;
         };
     }
@@ -496,7 +496,7 @@ module lending_core::storage {
     }
 
     public fun withdraw_treasury<T0>(arg0: &StorageAdminCap, arg1: &lending_core::pool::PoolAdminCap, arg2: &mut Storage, arg3: u8, arg4: &mut lending_core::pool::Pool<T0>, arg5: u64, arg6: address, arg7: &mut 0x2::tx_context::TxContext) {
-        assert!(get_coin_type(arg2, arg3) == 0x1::type_name::into_string(0x1::type_name::get<T0>()), lending_core::error::invalid_coin_type());
+        assert!(get_coin_type(arg2, arg3) == 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()), lending_core::error::invalid_coin_type());
         let (v0, _) = get_index(arg2, arg3);
         let v2 = 0x2::table::borrow_mut<u8, ReserveData>(&mut arg2.reserves, arg3);
         let v3 = v2.treasury_balance;

@@ -94,7 +94,7 @@ module lending_core::flash_loan {
     }
 
     public fun get_asset<T0>(arg0: &Config) : (address, u8, vector<u8>, address, u64, u64, u64, u64) {
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         assert!(0x2::table::contains<vector<u8>, address>(&arg0.support_assets, *0x1::ascii::as_bytes(&v0)), lending_core::error::reserve_not_found());
         let v1 = 0x2::table::borrow<address, AssetConfig>(&arg0.assets, *0x2::table::borrow<vector<u8>, address>(&arg0.support_assets, *0x1::ascii::as_bytes(&v0)));
         (0x2::object::uid_to_address(&v1.id), v1.asset_id, *0x1::ascii::as_bytes(&v1.coin_type), v1.pool_id, v1.rate_to_supplier, v1.rate_to_treasury, v1.max, v1.min)
@@ -119,7 +119,7 @@ module lending_core::flash_loan {
 
     public(package) fun loan<T0>(arg0: &Config, arg1: &mut lending_core::pool::Pool<T0>, arg2: address, arg3: u64) : (0x2::balance::Balance<T0>, Receipt<T0>) {
         version_verification(arg0);
-        let v0 = 0x1::type_name::into_string(0x1::type_name::get<T0>());
+        let v0 = 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>());
         assert!(0x2::table::contains<vector<u8>, address>(&arg0.support_assets, *0x1::ascii::as_bytes(&v0)), lending_core::error::reserve_not_found());
         let v1 = 0x2::table::borrow<vector<u8>, address>(&arg0.support_assets, *0x1::ascii::as_bytes(&v0));
         let v2 = 0x2::table::borrow<address, AssetConfig>(&arg0.assets, *v1);
@@ -159,7 +159,7 @@ module lending_core::flash_loan {
         assert!(v0 == arg4, lending_core::error::invalid_user());
         assert!(v3 == 0x2::object::uid_to_address(lending_core::pool::uid<T0>(arg2)), lending_core::error::invalid_pool());
         lending_core::logic::update_state_of_all(arg0, arg1);
-        let v6 = get_storage_asset_id_from_coin_type(arg1, 0x1::type_name::into_string(0x1::type_name::get<T0>()));
+        let v6 = get_storage_asset_id_from_coin_type(arg1, 0x1::type_name::into_string(0x1::type_name::with_defining_ids<T0>()));
         let (v7, _) = lending_core::storage::get_index(arg1, v6);
         lending_core::logic::cumulate_to_supply_index(arg1, v6, lending_core::ray_math::ray_div(lending_core::pool::normal_amount<T0>(arg2, v4) as u256, v7));
         lending_core::logic::update_interest_rate(arg1, v6);

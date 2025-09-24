@@ -129,7 +129,7 @@ module typus_stake_pool::stake_pool {
         // assert!(unlock_countdown_ts_ms > 0, E_ZERO_UNLOCK_COUNTDOWN);
 
         let mut id = object::new(ctx);
-        let stake_token = type_name::get<LP_TOKEN>();
+        let stake_token = type_name::with_defining_ids<LP_TOKEN>();
 
         // field for LP_TOKEN balance
         dynamic_field::add(&mut id, string::utf8(K_STAKED_TLP), balance::zero<LP_TOKEN>());
@@ -177,8 +177,8 @@ module typus_stake_pool::stake_pool {
         admin::verify(version, ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        assert!(type_name::get<TOKEN>() == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
-        let balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(&mut stake_pool.id, type_name::get<TOKEN>());
+        assert!(type_name::with_defining_ids<TOKEN>() == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
+        let balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(&mut stake_pool.id, type_name::with_defining_ids<TOKEN>());
         dynamic_field::add(&mut stake_pool.id, string::utf8(K_STAKED_TLP), balance);
     }
 
@@ -204,7 +204,7 @@ module typus_stake_pool::stake_pool {
         admin::verify(version, ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
 
         // check incentive token not existed
         let incentive_tokens = get_incentive_tokens(stake_pool);
@@ -257,7 +257,7 @@ module typus_stake_pool::stake_pool {
         admin::verify(version, ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive = get_mut_incentive(stake_pool, &incentive_token);
         incentive.info.active = false;
 
@@ -285,7 +285,7 @@ module typus_stake_pool::stake_pool {
         admin::verify(version, ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive = get_mut_incentive(stake_pool, &incentive_token);
         incentive.info.active = true;
 
@@ -313,7 +313,7 @@ module typus_stake_pool::stake_pool {
         // safety check
         admin::verify(version, ctx);
 
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
 
         // check incentive token not existed
@@ -397,7 +397,7 @@ module typus_stake_pool::stake_pool {
         allocate_incentive(version, registry, index, clock);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive = get_mut_incentive(stake_pool, &incentive_token);
 
         let previous_incentive_config = incentive.config;
@@ -482,7 +482,7 @@ module typus_stake_pool::stake_pool {
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
         // check incentive token not existed
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive_tokens = get_incentive_tokens(stake_pool);
         assert!(vector::contains(&incentive_tokens, &incentive_token), E_INCENTIVE_TOKEN_NOT_EXISTED);
 
@@ -524,7 +524,7 @@ module typus_stake_pool::stake_pool {
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
         // check incentive token not existed
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive_tokens = get_incentive_tokens(stake_pool);
         assert!(vector::contains(&incentive_tokens, &incentive_token), E_INCENTIVE_TOKEN_NOT_EXISTED);
 
@@ -574,7 +574,7 @@ module typus_stake_pool::stake_pool {
 
         let user = tx_context::sender(ctx);
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let token_type = type_name::get<LP_TOKEN>();
+        let token_type = type_name::with_defining_ids<LP_TOKEN>();
         assert!(token_type == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
 
         // join balance
@@ -744,7 +744,7 @@ module typus_stake_pool::stake_pool {
         allocate_incentive(version, registry, index, clock);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let token_type = type_name::get<LP_TOKEN>();
+        let token_type = type_name::with_defining_ids<LP_TOKEN>();
         assert!(token_type == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
 
         let current_ts_ms = clock::timestamp_ms(clock);
@@ -808,7 +808,7 @@ module typus_stake_pool::stake_pool {
         allocate_incentive(version, registry, index, clock);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let token_type = type_name::get<LP_TOKEN>();
+        let token_type = type_name::with_defining_ids<LP_TOKEN>();
         assert!(token_type == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
 
         let current_ts_ms = clock::timestamp_ms(clock);
@@ -896,7 +896,7 @@ module typus_stake_pool::stake_pool {
         let user = tx_context::sender(ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        let incentive_token = type_name::get<I_TOKEN>();
+        let incentive_token = type_name::with_defining_ids<I_TOKEN>();
         let incentive_tokens = get_incentive_tokens(stake_pool);
         assert!(vector::contains(&incentive_tokens, &incentive_token), E_INCENTIVE_TOKEN_NOT_EXISTED);
 
@@ -1201,7 +1201,7 @@ module typus_stake_pool::stake_pool {
     //     ctx: &TxContext
     // ): (vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
     //     let stake_pool = get_stake_pool(&registry.id, index);
-    //     let incentive_token_type = type_name::get<I_TOKEN>();
+    //     let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
     //     let all_lp_user_shares
     //         = dynamic_field::borrow<String, Table<address, vector<LpUserShare>>>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
     //     let user_shares = table::borrow(all_lp_user_shares, tx_context::sender(ctx));
@@ -1233,7 +1233,7 @@ module typus_stake_pool::stake_pool {
     //     ctx: &TxContext
     // ): (u64, u64, u64, u64, u64, u64) {
     //     let stake_pool = get_stake_pool(&registry.id, index);
-    //     let incentive_token_type = type_name::get<I_TOKEN>();
+    //     let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
     //     let all_lp_user_shares
     //         = dynamic_field::borrow<String, Table<address, vector<LpUserShare>>>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
     //     let user_shares = table::borrow(all_lp_user_shares, tx_context::sender(ctx));
@@ -1456,7 +1456,7 @@ module typus_stake_pool::stake_pool {
 //         let (user_share_id, _, _, _, last_incentive_price_index, _)
 //             = stake_pool::test_get_lp_user_share_info<I_TOKEN>(&registry, index, ctx(scenario));
 //         // get stake pool get_last_incentive_price_index
-//         let incentive_token = type_name::get<I_TOKEN>();
+//         let incentive_token = type_name::with_defining_ids<I_TOKEN>();
 //         let incentive_price_indices
 //             = stake_pool::get_last_incentive_price_index(stake_pool::test_get_stake_pool(&registry, index));
 //         let incentive_price_index = incentive_price_indices.get(&incentive_token);
@@ -1497,7 +1497,7 @@ module typus_stake_pool::stake_pool {
 //         let harvest_balance_value = harvest_balance.value();
 //         let (_user_share_id, _, _, _, last_incentive_price_index, _)
 //             = stake_pool::test_get_single_lp_user_share_info<I_TOKEN>(&registry, index, user_share_id, ctx(scenario));
-//         let incentive_token = type_name::get<I_TOKEN>();
+//         let incentive_token = type_name::with_defining_ids<I_TOKEN>();
 //         let incentive_price_indices
 //             = stake_pool::get_last_incentive_price_index(stake_pool::test_get_stake_pool(&registry, index));
 //         let incentive_price_index = incentive_price_indices.get(&incentive_token);

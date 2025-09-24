@@ -175,7 +175,7 @@ module suilend::reserve {
             id: object::new(ctx),
             lending_market_id,
             array_index,
-            coin_type: type_name::get<T>(),
+            coin_type: type_name::with_defining_ids<T>(),
             config: cell::new(config),
             mint_decimals,
             price_identifier,
@@ -738,7 +738,7 @@ module suilend::reserve {
         ctx: &mut TxContext
     ) {
         assert!(!dynamic_field::exists_(&reserve.id, StakerKey {}), EStakerAlreadyInitialized);
-        assert!(type_name::get<S>() == type_name::get<SPRUNGSUI>(), EWrongType);
+        assert!(type_name::with_defining_ids<S>() == type_name::with_defining_ids<SPRUNGSUI>(), EWrongType);
 
         let staker = staker::create_staker(treasury_cap, ctx);
         dynamic_field::add(&mut reserve.id, StakerKey {}, staker);
@@ -788,7 +788,7 @@ module suilend::reserve {
         system_state: &mut SuiSystemState,
         ctx: &mut TxContext
     ) {
-        assert!(reserve.coin_type == type_name::get<SUI>(), EWrongType);
+        assert!(reserve.coin_type == type_name::with_defining_ids<SUI>(), EWrongType);
         if (!dynamic_field::exists_(&reserve.id, StakerKey {})) {
             return
         };

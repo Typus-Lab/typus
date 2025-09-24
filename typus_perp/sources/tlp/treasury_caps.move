@@ -14,15 +14,15 @@ module typus_perp::treasury_caps {
     // }
 
     public(package) fun get_mut_treasury_cap<TOKEN>(treasury_caps: &mut TreasuryCaps): &mut TreasuryCap<TOKEN> {
-        dynamic_object_field::borrow_mut(&mut treasury_caps.id, type_name::get<TOKEN>())
+        dynamic_object_field::borrow_mut(&mut treasury_caps.id, type_name::with_defining_ids<TOKEN>())
     }
 
     // public(package) fun store_treasury_cap<TOKEN>(treasury_caps: &mut TreasuryCaps, treasury_cap: TreasuryCap<TOKEN>) {
-    //     dynamic_object_field::add(&mut treasury_caps.id, type_name::get<TOKEN>(), treasury_cap);
+    //     dynamic_object_field::add(&mut treasury_caps.id, type_name::with_defining_ids<TOKEN>(), treasury_cap);
     // }
 
     // public(package) fun remove_treasury_cap<TOKEN>(treasury_caps: &mut TreasuryCaps): TreasuryCap<TOKEN> {
-    //     dynamic_object_field::remove<TypeName, TreasuryCap<TOKEN>>(&mut treasury_caps.id, type_name::get<TOKEN>())
+    //     dynamic_object_field::remove<TypeName, TreasuryCap<TOKEN>>(&mut treasury_caps.id, type_name::with_defining_ids<TOKEN>())
     // }
 
     // #[test_only]

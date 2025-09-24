@@ -125,7 +125,7 @@ module suilend::liquidity_mining {
         let pool_reward = PoolReward {
             id: object::new(ctx),
             pool_reward_manager_id: object::id(pool_reward_manager),
-            coin_type: type_name::get<T>(),
+            coin_type: type_name::with_defining_ids<T>(),
             start_time_ms,
             end_time_ms,
             total_rewards: balance::value(&rewards),
@@ -378,7 +378,7 @@ module suilend::liquidity_mining {
         update_user_reward_manager(pool_reward_manager, user_reward_manager, clock, false);
 
         let pool_reward = option::borrow_mut(vector::borrow_mut(&mut pool_reward_manager.pool_rewards, reward_index));
-        assert!(pool_reward.coin_type == type_name::get<T>(), EInvalidType);
+        assert!(pool_reward.coin_type == type_name::with_defining_ids<T>(), EInvalidType);
 
         let optional_reward = vector::borrow_mut(&mut user_reward_manager.rewards, reward_index);
         let reward = option::borrow_mut(optional_reward);
