@@ -49,7 +49,7 @@ module typus::tgld {
 
     /// Initializes the `TGLD` token, creating the `TreasuryCap`, `CoinMetadata`, and `TokenPolicy`.
     /// It also creates and shares the `TgldRegistry`. This function is called only once during deployment.
-    #[lint_allow(share_owned)]
+    #[lint_allow(share_owned), allow(deprecated_usage)]
     fun init(witness: TGLD, ctx: &mut TxContext) {
         let (treasury_cap, coin_metadata) = coin::create_currency<TGLD>(
             witness,
