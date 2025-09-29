@@ -1,12 +1,8 @@
 /// This module implements a discount minting pool for Typus NFTs.
 /// Users can request to mint an NFT with a discount, and the final price is determined by a VRF.
 module typus_nft::discount_mint {
-    use std::vector;
     use std::string;
 
-    use sui::transfer;
-    use sui::object::{Self, UID, ID};
-    use sui::tx_context::{Self, TxContext};
     use sui::coin::{Self, Coin};
     use sui::kiosk;
     use sui::balance::{Self, Balance};
@@ -34,7 +30,7 @@ module typus_nft::discount_mint {
     const DISCOUNT_PCT: u64 = 40;
 
     /// The discount minting pool object.
-    struct Pool has key {
+    public struct Pool has key {
         // constant
         id: UID,
         /// The number of NFTs remaining in the pool.
@@ -105,7 +101,7 @@ module typus_nft::discount_mint {
         n: u64,
         new_pool: &mut Pool,
     ) {
-        let nfts = typus_nft::withdraw_nfts(manager_cap, pool, n);
+        let mut nfts = typus_nft::withdraw_nfts(manager_cap, pool, n);
 
         while (!vector::is_empty(&nfts)) {
             let nft = vector::pop_back(&mut nfts);
@@ -122,13 +118,13 @@ module typus_nft::discount_mint {
         new_pool: &mut Pool,
         lt_level: u64,
         start: u64,
-        n: u64,
+        mut n: u64,
         ctx: & TxContext
     ) {
         assert!(pool.authority == tx_context::sender(ctx), 0);
         assert!(new_pool.authority == tx_context::sender(ctx), 0);
-        let i = start;
-        let len = table_vec::length(&pool.tails);
+        let mut i = start;
+        let mut len = table_vec::length(&pool.tails);
         while ((i < len) && (n > 0)) {
             let nft = table_vec::borrow<Tails>(&pool.tails, i);
             let level = typus_nft::tails_level(nft);
@@ -162,14 +158,14 @@ module typus_nft::discount_mint {
 
     /// A request to mint an NFT.
     #[lint_allow(coin_field)]
-    struct MintRequest has store {
+    public struct MintRequest has store {
         user: address,
         coin: Coin<SUI>,
         vrf_input: vector<u8>
     }
 
     /// Event emitted when a mint request is made.
-    struct MintRequestEvent has copy, drop {
+    public struct MintRequestEvent has copy, drop {
         user: address,
         vrf_input: vector<u8>,
         remaining: u64,
@@ -191,7 +187,7 @@ module typus_nft::discount_mint {
         assert!(ms < pool.end_ms, E_IS_ENDED);
         assert!(pool.is_live, E_NOT_LIVE);
 
-        let vrf_input = object::id_bytes(pool);
+        let mut vrf_input = object::id_bytes(pool);
 
         // check remaining
         let remaining = pool.num;
@@ -202,7 +198,7 @@ module typus_nft::discount_mint {
         vector::append(&mut vrf_input, bcs::to_bytes(&ms));
 
         let user = tx_context::sender(ctx);
-        let check_price = pool.price;
+        let mut check_price = pool.price;
 
         if (dynamic_field::exists_(& pool.id, string::utf8(b"whitelist"))){
             let whitelist: &mut Table<address, bool> = dynamic_field::borrow_mut(&mut pool.id, string::utf8(b"whitelist"));
@@ -264,17 +260,17 @@ module typus_nft::discount_mint {
 
             let level = typus_nft::tails_level(&nft);
 
-            let (kiosk, kiosk_cap) = kiosk::new(ctx);
+            let (mut kiosk, kiosk_cap) = kiosk::new(ctx);
             kiosk::lock(&mut kiosk, &kiosk_cap, policy, nft);
 
             transfer::public_share_object(kiosk);
             transfer::public_transfer(kiosk_cap, user);
 
             // take coin
-            let balance = coin::into_balance(coin);
+            let mut balance = coin::into_balance(coin);
             let len = vector::length(&pool.discount_pcts);
             let index = generate_answer(len, &hashed_beacon);
-            let discount_pct = *vector::borrow(&pool.discount_pcts, index);
+            let mut discount_pct = *vector::borrow(&pool.discount_pcts, index);
 
             if (coin_value == pool.price *  (100 - DISCOUNT_PCT)/ 100) {
                 discount_pct = DISCOUNT_PCT;
@@ -294,7 +290,7 @@ module typus_nft::discount_mint {
     }
 
     /// Event emitted when a discount is applied.
-    struct DiscountEventV3 has copy, drop {
+    public struct DiscountEventV3 has copy, drop {
         pool: ID,
         price: u64,
         discount_pct: u64,
@@ -380,7 +376,7 @@ module typus_nft::discount_mint {
     /// Safe with `authority` check
     entry fun add_whitelist(
         pool: &mut Pool,
-        users: vector<address>,
+        mut users: vector<address>,
         ctx: &mut TxContext
     ) {
         assert!(pool.authority == tx_context::sender(ctx), 0);
@@ -392,7 +388,7 @@ module typus_nft::discount_mint {
                 table::add(whitelist, user, true);
             };
         } else {
-            let whitelist = table::new<address, bool>(ctx);
+            let mut whitelist = table::new<address, bool>(ctx);
             while (!vector::is_empty(&users)) {
                 let user = vector::pop_back(&mut users);
                 table::add(&mut whitelist, user, true);
@@ -413,7 +409,7 @@ module typus_nft::discount_mint {
     ) {
         assert!(pool.authority == tx_context::sender(ctx), 0);
 
-        let (kiosk, kiosk_cap) = kiosk::new(ctx);
+        let (mut kiosk, kiosk_cap) = kiosk::new(ctx);
 
         let nft = table_vec::pop_back(&mut pool.tails);
         typus_nft::emit_mint_event(&nft, recipient);
@@ -426,7 +422,7 @@ module typus_nft::discount_mint {
     }
 
     /// Checks if a user is whitelisted.
-    public(friend) fun is_whitelist(
+    public(package) fun is_whitelist(
         pool: & Pool,
         user: address
     ): bool {
@@ -454,8 +450,8 @@ module typus_nft::discount_mint {
     /// Generates a random number from a given seed.
     fun generate_answer(n: u64, rnd: &vector<u8>): u64 {
         assert!(vector::length(rnd) >= 16, E_INVALID_RND_LENGTH);
-        let m: u128 = 0;
-        let i = 0;
+        let mut m: u128 = 0;
+        let mut i = 0;
         while (i < 16) {
             m = m << 8;
             let curr_byte = *vector::borrow(rnd, i);

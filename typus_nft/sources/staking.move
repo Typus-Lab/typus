@@ -2,13 +2,7 @@
 /// Users can stake their NFTs to earn experience points and level up.
 /// Deprecated: use `typus/sources/tails_staking.move` instead.
 module typus_nft::staking {
-    use std::option;
-
     use sui::event;
-    use sui::transfer;
-    use sui::object::{Self, UID, ID};
-    use sui::tx_context::{Self, TxContext};
-
     use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
     use sui::dynamic_field;
     use sui::table::{Self, Table};
@@ -24,24 +18,24 @@ module typus_nft::staking {
 
     // Registry of typus_dov_single
     /// The registry for the staking module.
-    struct Registry has key {
+    public struct Registry has key {
         id: UID,
     }
 
     /// A capability that allows the owner to manage the staking module.
-    struct ManagerCap has key {
+    public struct ManagerCap has key {
         id: UID,
     }
 
     /// A staked Typus NFT.
-    struct StakingTails has store {
+    public struct StakingTails has store {
         nft: Tails,
         snapshot_ms: u64,
         updating_url: bool,
     }
 
     /// The NFT extension for the staking module.
-    struct NftExtension has store {
+    public struct NftExtension has store {
         nft_table: Table<address, StakingTails>,
         nft_manager_cap: NftManagerCap,
     }
@@ -184,7 +178,7 @@ module typus_nft::staking {
     }
 
     /// Event emitted when a staked NFT levels up.
-    struct LevelUpEvent has copy, drop {
+    public struct LevelUpEvent has copy, drop {
         nft_id: ID,
         sender: address,
         number: u64,
@@ -206,7 +200,7 @@ module typus_nft::staking {
         assert!(table::contains(nft_table, tx_context::sender(ctx)), E_NO_STAKING);
 
         let staking_nft = table::borrow_mut<address, StakingTails>(nft_table, sender);
-        let opt_level = typus_nft::level_up(&nft_extension.nft_manager_cap, &mut staking_nft.nft);
+        let mut opt_level = typus_nft::level_up(&nft_extension.nft_manager_cap, &mut staking_nft.nft);
         if (option::is_some(&opt_level)) {
             let level = option::extract(&mut opt_level);
             let number = typus_nft::tails_number(&staking_nft.nft);

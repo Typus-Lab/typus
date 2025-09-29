@@ -1,16 +1,10 @@
 /// This module implements the Typus NFT collection.
 /// It includes functionality for minting, managing, and staking NFTs.
 module typus_nft::typus_nft {
-
     use std::string::{Self, String};
-    use std::vector;
-    use std::option::{Self, Option};
 
     use sui::url::{Self, Url};
     use sui::display;
-    use sui::transfer;
-    use sui::object::{Self, UID, ID};
-    use sui::tx_context::{Self, TxContext};
     use sui::coin;
     use sui::kiosk::{Self, Kiosk, KioskOwnerCap};
     use sui::balance;
@@ -34,13 +28,13 @@ module typus_nft::typus_nft {
     const E_INVALID_VEC: u64 = 6;
     const E_INVALID_INDEX: u64 = 7;
 
-    friend typus_nft::discount_mint;
+    /* friend typus_nft::discount_mint; */
 
     /// One time witness is only instantiated in the init method
-    struct TYPUS_NFT has drop {}
+    public struct TYPUS_NFT has drop {}
 
     /// The Typus NFT object.
-    struct Tails has key, store {
+    public struct Tails has key, store {
         id: UID,
         /// The name of the NFT.
         name: String,
@@ -67,12 +61,12 @@ module typus_nft::typus_nft {
     }
 
     /// A capability that allows the owner to manage the NFT collection.
-    struct ManagerCap has key, store { id: UID }
+    public struct ManagerCap has key, store { id: UID }
 
     const MAX_BPS: u64 = 10_000;
 
     /// The royalty object.
-    struct Royalty has key {
+    public struct Royalty has key {
         id: UID,
         /// The recipients of the royalty.
         recipients: VecMap<address, u64>,
@@ -86,7 +80,7 @@ module typus_nft::typus_nft {
     fun init(otw: TYPUS_NFT, ctx: &mut TxContext) {
         let publisher = sui::package::claim(otw, ctx);
 
-        let display = display::new<Tails>(&publisher, ctx);
+        let mut display = display::new<Tails>(&publisher, ctx);
         display::add(&mut display, string::utf8(b"name"), string::utf8(b"{name}"));
         display::add(&mut display, string::utf8(b"description"), string::utf8(b"{description}"));
         display::add(&mut display, string::utf8(b"image_url"), string::utf8(b"{url}"));
@@ -97,10 +91,10 @@ module typus_nft::typus_nft {
 
         let manager_cap = ManagerCap { id: object::new(ctx) };
 
-        let (policy, policy_cap) = transfer_policy::new<Tails>(&publisher, ctx);
+        let (mut policy, policy_cap) = transfer_policy::new<Tails>(&publisher, ctx);
         royalty_rule::add(&mut policy, &policy_cap, 1_000, 1_000_000_000); // MAX(10%, 1 SUI)
 
-        let recipients = vec_map::empty();
+        let mut recipients = vec_map::empty();
         vec_map::insert(&mut recipients, @TYPUS, 5_000);
         vec_map::insert(&mut recipients, @SM, 2_000);
         vec_map::insert(&mut recipients, @HOLDERS, 3_000);
@@ -134,11 +128,11 @@ module typus_nft::typus_nft {
         policy: &mut TransferPolicy<Tails>,
         ctx: &mut TxContext,
     ) {
-        let total = transfer_policy::withdraw(policy, &royalty.policy_cap, option::none(), ctx);
+        let mut total = transfer_policy::withdraw(policy, &royalty.policy_cap, option::none(), ctx);
         let total_v = coin::value(&total);
         let balance_mut = coin::balance_mut(&mut total);
 
-        let k = vec_map::keys(&royalty.recipients);
+        let mut k = vec_map::keys(&royalty.recipients);
 
         while (vector::length(&k) > 0) {
             let recipient = vector::pop_back(&mut k);
@@ -153,7 +147,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when the royalty is updated.
-    struct RoyaltyUpdateEvent has copy, drop {
+    public struct RoyaltyUpdateEvent has copy, drop {
         sender: address,
         recipients: VecMap<address, u64>,
     }
@@ -163,13 +157,13 @@ module typus_nft::typus_nft {
     entry fun update_royalty(
         _manager_cap: &ManagerCap,
         royalty: &mut Royalty,
-        recipients: vector<address>,
-        shares: vector<u64>,
+        mut recipients: vector<address>,
+        mut shares: vector<u64>,
         ctx: &TxContext,
     ) {
         assert!(vector::length(&recipients) == vector::length(&shares), E_INVALID_VEC);
 
-        let v = vec_map::empty();
+        let mut v = vec_map::empty();
 
         while (vector::length(&recipients) > 0) {
             let recipient = vector::pop_back(&mut recipients);
@@ -204,7 +198,7 @@ module typus_nft::typus_nft {
     }
 
     /// The NFT pool object.
-    struct Pool has key {
+    public struct Pool has key {
         id: UID,
         /// The NFTs in the pool.
         tails: TableVec<Tails>,
@@ -252,7 +246,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when a new manager capability is created.
-    struct NewManagerCapEvent has copy, drop {
+    public struct NewManagerCapEvent has copy, drop {
         id: ID,
         sender: address
     }
@@ -305,7 +299,7 @@ module typus_nft::typus_nft {
         ctx: &mut TxContext,
     ): Tails {
 
-        let description = string::utf8(b"Tails /6,666 by Typus Finance.");
+        let mut description = string::utf8(b"Tails /6,666 by Typus Finance.");
 
         let len = string::length(&name);
         let num_str = string::substring(&name, 16, len);
@@ -330,9 +324,9 @@ module typus_nft::typus_nft {
     }
 
     /// The whitelist object.
-    struct Whitelist has key {
+    public struct Whitelist has key {
         id: UID,
-        for: ID
+        `for`: ID
     }
 
     /// Issues whitelist tokens to the given recipients.
@@ -340,13 +334,13 @@ module typus_nft::typus_nft {
     entry fun issue_whitelist(
         _manager_cap: &ManagerCap,
         pool: &Pool,
-        recipients: vector<address>,
+        mut recipients: vector<address>,
         ctx: &mut TxContext,
     ) {
         while (!vector::is_empty(&recipients)) {
             let recipient = vector::pop_back<address>(&mut recipients);
             let id = object::id(pool);
-            let wl = Whitelist{ id: object::new(ctx), for: id };
+            let wl = Whitelist{ id: object::new(ctx), `for`: id };
             transfer::transfer(wl, recipient);
         }
     }
@@ -378,10 +372,10 @@ module typus_nft::typus_nft {
         pool: &mut Pool,
         policy: &TransferPolicy<Tails>,
         recipient: address,
-        n: u64,
+        mut n: u64,
         ctx: &mut TxContext,
     ) {
-        let (kiosk, kiosk_cap) = kiosk::new(ctx);
+        let (mut kiosk, kiosk_cap) = kiosk::new(ctx);
 
         while (n > 0) {
             let nft = table_vec::pop_back(&mut pool.tails);
@@ -406,12 +400,12 @@ module typus_nft::typus_nft {
     }
 
     /// Withdraws NFTs from the pool.
-    public(friend) fun withdraw_nfts(
+    public(package) fun withdraw_nfts(
         _manager_cap: &ManagerCap,
         pool: &mut Pool,
-        n: u64
+        mut n: u64
     ): vector<Tails> {
-        let nfts = vector::empty<Tails>();
+        let mut nfts = vector::empty<Tails>();
         while (n > 0) {
             let nft = table_vec::pop_back(&mut pool.tails);
             vector::push_back(&mut nfts, nft);
@@ -435,7 +429,7 @@ module typus_nft::typus_nft {
         let url = url::new_unsafe_from_bytes(url);
         let attributes = utils::from_vec_to_map(attribute_keys, attribute_values);
 
-        let description = string::utf8(b"Tails /6,666 by Typus Finance.");
+        let mut description = string::utf8(b"Tails /6,666 by Typus Finance.");
 
         let len = string::length(&name);
         let num_str = string::substring(&name, 16, len);
@@ -479,7 +473,7 @@ module typus_nft::typus_nft {
 
         let exp = get_level_exp(level);
 
-        let i = 0;
+        let mut i = 0;
 
         while (i < num) {
             let nft = table_vec::borrow_mut(&mut pool.tails, i);
@@ -506,7 +500,7 @@ module typus_nft::typus_nft {
     }
 
     /// Updates an NFT.
-    public(friend) fun update_nft(
+    public(package) fun update_nft(
         manager_cap: &ManagerCap,
         nft: &mut Tails,
         id: ID,
@@ -532,7 +526,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when an NFT gains experience points.
-    struct ExpUpEvent has copy, drop {
+    public struct ExpUpEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
@@ -556,7 +550,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when an NFT loses experience points.
-    struct ExpDownEvent has copy, drop {
+    public struct ExpDownEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_remove: u64
@@ -580,7 +574,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when an NFT makes its first bid.
-    struct FirstBidEvent has copy, drop {
+    public struct FirstBidEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
@@ -605,7 +599,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when an NFT makes its first deposit.
-    struct FirstDepositEvent has copy, drop {
+    public struct FirstDepositEvent has copy, drop {
         nft_id: ID,
         number: u64,
         exp_earn: u64
@@ -642,7 +636,7 @@ module typus_nft::typus_nft {
     }
 
     /// Event emitted when an NFT levels up.
-    struct LevelUpEvent has copy, drop {
+    public struct LevelUpEvent has copy, drop {
         nft_id: ID,
         level: u64
     }
@@ -735,7 +729,7 @@ module typus_nft::typus_nft {
 
     // User Entry
     /// Event emitted when an NFT is minted.
-    struct MintEvent has copy, drop {
+    public struct MintEvent has copy, drop {
         id: ID,
         name: String,
         description: String,
@@ -746,7 +740,7 @@ module typus_nft::typus_nft {
     }
 
     /// Emits a mint event.
-    public(friend) fun emit_mint_event(nft: &Tails, sender: address) {
+    public(package) fun emit_mint_event(nft: &Tails, sender: address) {
         let mint_event = MintEvent {
             id: object::id(nft),
             name: nft.name,
@@ -773,9 +767,9 @@ module typus_nft::typus_nft {
         let len = table_vec::length(&pool.tails);
         assert!(len > 0, E_EMPTY_POOL);
 
-        let Whitelist {id, for} = whitelist_token;
+        let Whitelist {id, `for`} = whitelist_token;
         object::delete(id);
-        assert!(for == object::id(pool), E_INVALID_WHITELIST);
+        assert!(`for` == object::id(pool), E_INVALID_WHITELIST);
 
         let nft = if (len == 1) {
             table_vec::pop_back(&mut pool.tails)
@@ -811,7 +805,7 @@ module typus_nft::typus_nft {
     ) {
         let nft = mint(pool, whitelist_token, clock, ctx);
 
-        let (kiosk, kiosk_cap) = kiosk::new(ctx);
+        let (mut kiosk, kiosk_cap) = kiosk::new(ctx);
         kiosk::lock(&mut kiosk, &kiosk_cap, policy, nft);
 
         let sender = tx_context::sender(ctx);
@@ -868,6 +862,22 @@ module typus_nft::typus_nft {
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
         init(TYPUS_NFT {}, ctx);
+    }
+
+    #[test_only]
+    public fun test_mint(ctx: &mut TxContext): (Kiosk, KioskOwnerCap, Tails) {
+        let (kiosk, kiosk_cap) = kiosk::new(ctx);
+        (
+            kiosk,
+            kiosk_cap,
+            new_nft(
+                b"name".to_string(),
+                999,
+                url::new_unsafe_from_bytes(b"url"),
+                vec_map::empty(),
+                ctx,
+            ),
+        )
     }
 }
 

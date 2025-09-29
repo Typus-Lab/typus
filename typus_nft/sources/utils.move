@@ -1,18 +1,12 @@
 /// This module provides utility functions for the Typus NFT collection.
 /// Only contains public(friend) functions
 module typus_nft::utils {
-
-    use std::vector;
-
-    use sui::transfer;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
     use sui::vec_map::{Self, VecMap};
     use sui::bcs;
-    use sui::object;
-    use sui::tx_context::{Self, TxContext};
 
-    friend typus_nft::typus_nft;
+    /* friend typus_nft::typus_nft; */
 
     const E_INSUFFICIENT_BALANCE: u64 = 0;
     const ETruncatedBytes: u64 = 1;
@@ -20,11 +14,11 @@ module typus_nft::utils {
 
     /// Extracts a balance of a given amount from a vector of coins.
     #[lint_allow(self_transfer)]
-    public(friend) fun extract_balance<Token>(coins: vector<Coin<Token>>, amount: u64, ctx: &TxContext): Balance<Token> {
-        let balance = balance::zero();
+    public(package) fun extract_balance<Token>(mut coins: vector<Coin<Token>>, mut amount: u64, ctx: &TxContext): Balance<Token> {
+        let mut balance = balance::zero();
         while (!vector::is_empty(&coins)) {
             if (amount > 0) {
-                let coin = vector::pop_back(&mut coins);
+                let mut coin = vector::pop_back(&mut coins);
                 if (coin::value(&coin) >= amount) {
                     balance::join(&mut balance, balance::split(coin::balance_mut(&mut coin), amount));
                     vector::push_back(&mut coins, coin);
@@ -51,15 +45,15 @@ module typus_nft::utils {
     }
 
     /// Creates a map from a vector of keys and a vector of values.
-    public(friend) fun from_vec_to_map<K: copy + drop, V: drop>(
-        keys: vector<K>,
-        values: vector<V>,
+    public(package) fun from_vec_to_map<K: copy + drop, V: drop>(
+        mut keys: vector<K>,
+        mut values: vector<V>,
     ): VecMap<K, V> {
         assert!(vector::length(&keys) == vector::length(&values), E_INVALID_LENGTH);
 
-        let i = 0;
+        let mut i = 0;
         let n = vector::length(&keys);
-        let map = vec_map::empty<K, V>();
+        let mut map = vec_map::empty<K, V>();
 
         while (i < n) {
             let key = vector::pop_back(&mut keys);
@@ -78,15 +72,15 @@ module typus_nft::utils {
     }
 
     /// Converts a vector of bytes to a u64.
-    public(friend) fun u64_from_bytes(bytes: &vector<u8>): u64 {
-        let m: u64 = 0;
+    public(package) fun u64_from_bytes(bytes: &vector<u8>): u64 {
+        let mut m: u64 = 0;
 
         // Cap length at 8 bytes
         let len = vector::length(bytes);
 
         assert!(len <= 8, ETruncatedBytes);
 
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             m = m * 10;
             let byte = *vector::borrow(bytes, i);
@@ -98,9 +92,9 @@ module typus_nft::utils {
     }
 
     /// Generates a random u256 number.
-    public(friend) fun rand(ctx: &mut TxContext): u256 {
+    public(package) fun rand(ctx: &mut TxContext): u256 {
         let uid = object::new(ctx);
-        let object_nonce = object::uid_to_bytes(&uid);
+        let mut object_nonce = object::uid_to_bytes(&uid);
         object::delete(uid);
 
         let epoch_nonce = bcs::to_bytes(&tx_context::epoch(ctx));
@@ -115,14 +109,14 @@ module typus_nft::utils {
     }
 
     /// Converts a vector of bytes to a u256.
-    public(friend) fun u256_from_bytes(bytes: &vector<u8>): u256 {
-        let m: u256 = 0;
+    public(package) fun u256_from_bytes(bytes: &vector<u8>): u256 {
+        let mut m: u256 = 0;
 
         // Cap length at 32 bytes
         let len = vector::length(bytes);
         assert!(len <= 32, ETruncatedBytes);
 
-        let i = 0;
+        let mut i = 0;
         while (i < len) {
             m = m << 8;
             let byte = *vector::borrow(bytes, i);
@@ -155,13 +149,13 @@ module typus_nft::utils {
         use sui::test_scenario::{Self, ctx};
         // use std::debug::print;
 
-        let scenario = test_scenario::begin(@0x1);
+        let mut scenario = test_scenario::begin(@0x1);
         let num = rand(ctx(&mut scenario));
         // std::debug::print(&num);
         assert!(115170965196527074966438585871818494722075011700686295937061508976360424967044 == num, 1);
         test_scenario::end(scenario);
 
-        let scenario = test_scenario::begin(@0x123);
+        let mut scenario = test_scenario::begin(@0x123);
         let num = rand(ctx(&mut scenario));
         assert!(29711549470554919680687358874047181380854438259270651202242130999283702377307 == num, 1);
         test_scenario::end(scenario);
@@ -200,7 +194,7 @@ module typus_nft::utils {
         let num_str = string::sub_string(&name, 16, len);
         debug::print(&num_str);
 
-        let description = string::utf8(b"Tails /6,666 by Typus Finance.");
+        let mut description = string::utf8(b"Tails /6,666 by Typus Finance.");
         string::insert(&mut description, 6, num_str);
         debug::print(&description);
     }

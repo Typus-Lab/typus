@@ -49,7 +49,7 @@ module typus_nft::royalty_rule {
     const MAX_BPS: u16 = 10_000;
 
     /// The "Rule" witness to authorize the policy.
-    struct Rule has drop {}
+    public struct Rule has drop {}
 
     /// Configuration for the Rule. The `amount_bp` is the percentage
     /// of the transfer amount to be paid as a royalty fee. The `min_amount`
@@ -58,7 +58,7 @@ module typus_nft::royalty_rule {
     ///
     /// Adding a mininum amount is useful to enforce a fixed fee even if
     /// the transfer amount is very small or 0.
-    struct Config has store, drop {
+    public struct Config has store, drop {
         amount_bp: u16,
         min_amount: u64
     }
@@ -95,7 +95,7 @@ module typus_nft::royalty_rule {
     /// Can be used dry-runned to estimate the fee amount based on the Kiosk listing price.
     public fun fee_amount<T>(policy: &TransferPolicy<T>, paid: u64): u64 {
         let config: &Config = policy::get_rule(Rule {}, policy);
-        let amount = (((paid as u128) * (config.amount_bp as u128) / 10_000) as u64);
+        let mut amount = (((paid as u128) * (config.amount_bp as u128) / 10_000) as u64);
 
         // If the amount is less than the minimum, use the minimum
         if (amount < config.min_amount) {
