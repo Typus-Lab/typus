@@ -4,3 +4,5 @@ _*
 .DS_Store
 node_modules
 *.lock
+.coverage_map.mvcov
+.trace
