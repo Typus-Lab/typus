@@ -865,18 +865,16 @@ module typus_nft::typus_nft {
     }
 
     #[test_only]
-    public fun test_mint(ctx: &mut TxContext): (Kiosk, KioskOwnerCap, Tails) {
-        let (kiosk, kiosk_cap) = kiosk::new(ctx);
-        (
-            kiosk,
-            kiosk_cap,
-            new_nft(
-                b"name".to_string(),
-                999,
-                url::new_unsafe_from_bytes(b"url"),
-                vec_map::empty(),
-                ctx,
-            ),
+    public fun test_mint(number: u64, ctx: &mut TxContext): Tails {
+        let mut name = b"Tails By Typus ".to_string();
+        name.append(number.to_string());
+
+        new_nft(
+            name,
+            number,
+            url::new_unsafe_from_bytes(b"https://docs.typus.finance/"),
+            vec_map::empty(),
+            ctx,
         )
     }
 }
