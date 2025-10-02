@@ -1747,4 +1747,752 @@ module typus::tails_staking {
         test_scenario::return_shared(typus_user_registry);
         test_scenario::end(scenario);
     }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_level_up_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        level_up(&version, &mut tails_staking_registry, @0xABAB, false);
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInsufficientExp)]
+    fun test_level_up_insufficient_exp_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        let tails = object::id_address(&tailses[0]);
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(3, scenario.ctx()), 3, 1, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[2,1,1,1,1,1,1], coin::mint_for_testing(3, scenario.ctx()), 18, 1, scenario.ctx());
+        level_up(&version, &mut tails_staking_registry, tails, false);
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_public_exp_up_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        public_exp_up(&manager_cap, &version, &mut tails_staking_registry, @0xABAB, 10);
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_public_exp_down_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        public_exp_down(&manager_cap, &version, &mut tails_staking_registry, @0xABAB, 10);
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidFee)]
+    fun test_exp_down_without_staking_with_fee_invalid_feestaking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let mut typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let (mut kiosk, kiosk_owner_cap) = kiosk::new(scenario.ctx());
+        exp_down_without_staking_with_fee(&mut version, &tails_staking_registry, &mut typus_user_registry, &mut kiosk, &kiosk_owner_cap, @0xABAB, 10, coin::mint_for_testing(1_000000000, scenario.ctx()), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        transfer::public_share_object(kiosk);
+        transfer::public_transfer(kiosk_owner_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidFee)]
+    fun test_exp_down_with_fee_invalid_fee_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let mut typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        exp_down_with_fee(&mut version, &mut tails_staking_registry, &mut typus_user_registry, @0xABAB, 10, coin::mint_for_testing(1_000000000, scenario.ctx()), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_exp_down_with_fee_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let mut typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        exp_down_with_fee(&mut version, &mut tails_staking_registry, &mut typus_user_registry, @0xABAB, 10, coin::mint_for_testing(10_000000000, scenario.ctx()), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_exp_up_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let mut typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        exp_up(&version, &mut tails_staking_registry, &mut typus_user_registry, @0xABAB, 10, scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EAlreadySignedUp)]
+    fun test_daily_sign_up_already_signed_up_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(3, scenario.ctx()), 3, 1, scenario.ctx());
+        let (mut kiosk, kiosk_owner_cap) = kiosk::new(scenario.ctx());
+        let nft = typus_nft::test_mint(9, scenario.ctx());
+        let tails = object::id_address(&nft);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft);
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        daily_sign_up(&mut version, &mut tails_staking_registry, coin::mint_for_testing(0_050000000, scenario.ctx()), &clock, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        transfer::public_share_object(kiosk);
+        transfer::public_transfer(kiosk_owner_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_daily_sign_up_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        daily_sign_up(&mut version, &mut tails_staking_registry, coin::mint_for_testing(0_050000000, scenario.ctx()), &clock, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidFee)]
+    fun test_daily_sign_up_invalid_fee_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        daily_sign_up(&mut version, &mut tails_staking_registry, coin::mint_for_testing(0_010000000, scenario.ctx()), &clock, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidFee)]
+    fun test_transfer_tails_invalid_fee_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let (mut kiosk, kiosk_owner_cap) = kiosk::new(scenario.ctx());
+        transfer_tails(&mut version, &tails_staking_registry, &mut kiosk, &kiosk_owner_cap, @0xABAB, coin::mint_for_testing(0_001000000, scenario.ctx()), @0xAAAA, scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        transfer::public_share_object(kiosk);
+        transfer::public_transfer(kiosk_owner_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidFee)]
+    fun test_stake_tails_invalid_fee_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let (mut kiosk, kiosk_owner_cap) = kiosk::new(scenario.ctx());
+        let nft = typus_nft::test_mint(9, scenario.ctx());
+        let tails = object::id_address(&nft);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft);
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails, coin::mint_for_testing(0_010000000, scenario.ctx()), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        transfer::public_share_object(kiosk);
+        transfer::public_transfer(kiosk_owner_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EMaxStakeAmountReached)]
+    fun test_stake_tails_max_stake_amount_reached_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(11, scenario.ctx()),
+            typus_nft::test_mint(12, scenario.ctx()),
+            typus_nft::test_mint(13, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(3, scenario.ctx()), 3, 1, scenario.ctx());
+        let (mut kiosk, kiosk_owner_cap) = kiosk::new(scenario.ctx());
+        let nft1 = typus_nft::test_mint(1, scenario.ctx());
+        let tails1 = object::id_address(&nft1);
+        let nft2 = typus_nft::test_mint(2, scenario.ctx());
+        let tails2 = object::id_address(&nft2);
+        let nft3 = typus_nft::test_mint(3, scenario.ctx());
+        let tails3 = object::id_address(&nft3);
+        let nft4 = typus_nft::test_mint(4, scenario.ctx());
+        let tails4 = object::id_address(&nft4);
+        let nft5 = typus_nft::test_mint(5, scenario.ctx());
+        let tails5 = object::id_address(&nft5);
+        let nft6 = typus_nft::test_mint(6, scenario.ctx());
+        let tails6 = object::id_address(&nft6);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft1);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft2);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft3);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft4);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft5);
+        kiosk::lock(&mut kiosk, &kiosk_owner_cap, &tails_staking_registry.transfer_policy, nft6);
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails1, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails2, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails3, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails4, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails5, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+        stake_tails(&mut version, &mut tails_staking_registry, &mut kiosk, &kiosk_owner_cap, tails6, coin::mint_for_testing(0_050000000, scenario.ctx()), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        transfer::public_share_object(kiosk);
+        transfer::public_transfer(kiosk_owner_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInsufficientBalance)]
+    fun test_set_profit_sharing_insufficient_balance_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(1, scenario.ctx()), 3, 1, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidInput)]
+    fun test_set_profit_sharing_invalid_input_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(6, scenario.ctx()), 3, 1, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidToken)]
+    fun test_remove_profit_sharing_invalid_token_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        remove_profit_sharing<sui::sui::SUI>(&version, &mut tails_staking_registry, scenario.sender(), scenario.ctx());
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidInput)]
+    fun test_import_tails_invalid_input_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EInvalidToken)]
+    fun test_claim_profit_sharing_invalid_token_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        claim_profit_sharing<sui::sui::SUI>(&mut version, &mut tails_staking_registry, scenario.ctx()).destroy_for_testing();
+
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
+
+    #[test, expected_failure(abort_code = EStakingInfoNotFound)]
+    fun test_claim_profit_sharing_staking_info_not_found_error() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        ecosystem::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        user::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        typus_nft::test_init(scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut version = test_scenario::take_shared<Version>(&scenario);
+        let tails_manager_cap = scenario.take_from_sender();
+        let publisher = scenario.take_from_sender();
+        let (transfer_policy, transfer_policy_cap) = transfer_policy::new<Tails>(&publisher, scenario.ctx());
+        init_tails_staking_registry(&version, tails_manager_cap, transfer_policy, scenario.ctx());
+        test_scenario::next_tx(&mut scenario, @0xABCD);
+        let mut tails_staking_registry = test_scenario::take_shared<TailsStakingRegistry>(&scenario);
+        let typus_user_registry = test_scenario::take_shared<TypusUserRegistry>(&scenario);
+        let manager_cap = ecosystem::issue_manager_cap(&version, scenario.ctx());
+        let clock = clock::create_for_testing(test_scenario::ctx(&mut scenario));
+        upload_ids(&version, &mut tails_staking_registry, scenario.ctx());
+        upload_levels(&version, &mut tails_staking_registry, scenario.ctx());
+        let tailses = vector[
+            typus_nft::test_mint(1, scenario.ctx()),
+            typus_nft::test_mint(2, scenario.ctx()),
+            typus_nft::test_mint(3, scenario.ctx()),
+        ];
+        let users = vector[@0xAAAA, @0xBBBB, @0xCCCC];
+        import_tails(&mut version, &mut tails_staking_registry, tailses, users, scenario.ctx());
+        set_profit_sharing<sui::sui::SUI, sui::sui::SUI>(&version, &mut tails_staking_registry, vector[1,1,1,1,1,1,1], coin::mint_for_testing(3, scenario.ctx()), 3, 1, scenario.ctx());
+        claim_profit_sharing<sui::sui::SUI>(&mut version, &mut tails_staking_registry, scenario.ctx()).destroy_for_testing();
+
+        clock.destroy_for_testing();
+        transfer::public_transfer(transfer_policy_cap, scenario.sender());
+        ecosystem::burn_manager_cap(&version, manager_cap, scenario.ctx());
+        test_scenario::return_to_sender(&scenario, publisher);
+        test_scenario::return_shared(version);
+        test_scenario::return_shared(tails_staking_registry);
+        test_scenario::return_shared(typus_user_registry);
+        test_scenario::end(scenario);
+    }
 }
