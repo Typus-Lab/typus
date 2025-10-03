@@ -80,8 +80,6 @@ module typus::tails_staking {
     const EMaxStakeAmountReached: u64 = 6;
     /// Error when staking information for a user is not found.
     const EStakingInfoNotFound: u64 = 7;
-    /// Error for a deprecated function.
-    const EDeprecated: u64 = 999;
 
     // ======== Tails Staking ========
 
@@ -1434,9 +1432,6 @@ module typus::tails_staking {
         level
     }
 
-    /// Aborts with a deprecated error.
-    fun deprecated() { abort EDeprecated }
-
     #[deprecated(note = b"Use `exp_down_with_fee` instead.")]
     public fun exp_down(
         _version: &Version,
@@ -1446,7 +1441,7 @@ module typus::tails_staking {
         _amount: u64,
         _ctx: &TxContext,
     ) {
-        deprecated();
+        abort 0
     }
     #[deprecated(note = b"Use `exp_down_without_staking_with_fee` instead.")]
     public fun exp_down_without_staking(
@@ -1459,7 +1454,7 @@ module typus::tails_staking {
         _amount: u64,
         _ctx: &TxContext,
     ) {
-        deprecated();
+        abort 0
     }
 
     #[test_only]
