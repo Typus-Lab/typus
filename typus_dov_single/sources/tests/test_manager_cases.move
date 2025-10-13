@@ -1,7 +1,7 @@
 #[test_only]
 module typus_dov::test_manager_cases {
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_from_address};
+    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_from_sender};
 
     use typus_dov::test_environment::{Self, USDC, current_ts_ms};
     use typus_dov::test_tds_user_entry;

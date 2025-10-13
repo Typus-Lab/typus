@@ -9,6 +9,7 @@ module typus_dov::test_user_cases {
     use typus_framework::vault::{TypusDepositReceipt, TypusBidReceipt};
 
     const ADMIN: address = @0xFFFF;
+    const BABE1: address = @0xBABE1;
 
     #[test]
     public(package) fun test_user_operations() {
@@ -75,12 +76,52 @@ module typus_dov::test_user_cases {
         );
         transfer::public_transfer(bid_receipt, sender(&scenario));
         transfer::public_transfer(rebate_coin, sender(&scenario));
-        next_tx(&mut scenario, ADMIN);
+        next_tx(&mut scenario, BABE1);
+        let premium = 100000_0000_00000; // 100 * 0.0167 => rebate ~ 0.164
+        let bid_ts_ms = activate_ts_ms + 100_000;
+        let (bid_receipt, rebate_coin) = test_tds_user_entry::test_public_bid_<SUI, SUI>(
+            &mut scenario,
+            index,
+            premium,
+            1000_0000_00000, // exceed max size
+            bid_ts_ms,
+        );
+        transfer::public_transfer(bid_receipt, BABE1);
+        transfer::public_transfer(rebate_coin, BABE1);
 
+        next_tx(&mut scenario, ADMIN);
         let ts_ms = activate_ts_ms + 300_000;
         test_manager_entry::test_delivery_<SUI, SUI, SUI>(&mut scenario, index, ts_ms);
 
+        // transfer bid receipt
+        next_tx(&mut scenario, BABE1);
+        let receipt = take_from_sender<TypusBidReceipt>(&scenario);
+        test_tds_user_entry::test_transfer_bid_receipt_<SUI, SUI>(
+            &mut scenario,
+            index,
+            vector[receipt],
+            option::some(100_0000_00000),
+            ADMIN,
+        );
+        let receipt = take_from_sender<TypusBidReceipt>(&scenario);
+        test_tds_user_entry::test_public_transfer_bid_receipt_<SUI, SUI>(
+            &mut scenario,
+            index,
+            vector[receipt],
+            option::some(100_0000_00000),
+            ADMIN,
+        );
+        let receipt = take_from_sender<TypusBidReceipt>(&scenario);
+        test_tds_user_entry::test_transfer_bid_receipt_<SUI, SUI>(
+            &mut scenario,
+            index,
+            vector[receipt],
+            option::none(),
+            ADMIN,
+        );
+
         // compound
+        next_tx(&mut scenario, ADMIN);
         let ts_ms = activate_ts_ms + 300_001;
         let deposit_amount = 0;
         let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
@@ -93,7 +134,7 @@ module typus_dov::test_user_cases {
 
         // settle
         let ts_ms = activate_ts_ms + 86400_000;
-        let oracle_price = 100000_0000_0000;
+        let oracle_price = 110000_0000_0000;
         test_manager_entry::test_settle_<SUI, SUI>(
             &mut scenario,
             index,
@@ -103,6 +144,9 @@ module typus_dov::test_user_cases {
             oracle_price,
             ts_ms,
         );
+
+        let receipt = take_from_sender<TypusBidReceipt>(&scenario);
+        test_tds_user_entry::test_exercise_<SUI, SUI>(&mut scenario, index, vector[receipt]);
 
         // activate
         activate_ts_ms = ts_ms;
@@ -117,7 +161,12 @@ module typus_dov::test_user_cases {
             ts_ms,
         );
 
+        // refresh deposit snapshot
+        let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
+        test_tds_user_entry::test_public_refresh_deposit_snapshot_<SUI, SUI>(&mut scenario, index, vector[receipt], ts_ms);
+
         // unsubscribe
+        next_tx(&mut scenario, ADMIN);
         let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
         test_tds_user_entry::test_public_reduce_fund_<SUI, SUI, SUI>(
             &mut scenario,
@@ -130,6 +179,22 @@ module typus_dov::test_user_cases {
             false,
             ts_ms,
         );
+
+        // split deposit receipt
+        next_tx(&mut scenario, ADMIN);
+        let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
+        test_tds_user_entry::test_split_deposit_receipt_v2_(
+            &mut scenario,
+            index,
+            receipt,
+            100_0000_00000,
+            0,
+        );
+
+        // merge deposit receipt
+        let receipt_1 = take_from_sender<TypusDepositReceipt>(&scenario);
+        let receipt_0 = take_from_sender<TypusDepositReceipt>(&scenario);
+        test_tds_user_entry::test_merge_deposit_receipts_(&mut scenario, index, vector[receipt_1, receipt_0]);
 
         // // withdraw all fund from premium share
         // let ts_ms = activate_ts_ms + 86400_000;

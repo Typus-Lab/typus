@@ -4,7 +4,7 @@ module typus_dov::test_environment {
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
+    use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
     use typus_dov::typus_dov_single::{Self, Registry as DovRegistry};
     use typus_dov::babe::{Self, BABE};
     use typus_dov::babe2::{Self, BABE2};

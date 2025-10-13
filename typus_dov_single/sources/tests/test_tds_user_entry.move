@@ -142,5 +142,155 @@ module typus_dov::test_tds_user_entry {
 
         next_tx(scenario, ADMIN);
     }
+
+    public(package) fun test_exercise_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusBidReceipt>,
+    ): u64 {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let (balance, _log) = tds_user_entry::exercise<D_TOKEN, B_TOKEN>(
+            &mut dov_registry,
+            index,
+            receipts,
+            ctx(scenario)
+        );
+        let value = balance.value();
+        transfer::public_transfer(coin::from_balance(balance, ctx(scenario)), sender(scenario));
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+        value
+    }
+
+    public(package) fun test_public_refresh_deposit_snapshot_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusDepositReceipt>,
+        ts_ms: u64,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let mut typus_user_registry = test_environment::typus_user_registry(scenario);
+        let mut leaderboard_registry = test_environment::leaderboard_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+
+        let (receipt, _log) = tds_user_entry::public_refresh_deposit_snapshot<D_TOKEN, B_TOKEN>(
+            &ecosystem_version,
+            &mut typus_user_registry,
+            &mut leaderboard_registry,
+            &mut dov_registry,
+            index,
+            receipts,
+            &clock,
+            ctx(scenario)
+        );
+
+        transfer::public_transfer(receipt, sender(scenario));
+
+        return_shared(dov_registry);
+        return_shared(typus_user_registry);
+        return_shared(leaderboard_registry);
+        return_shared(ecosystem_version);
+        clock.destroy_for_testing();
+
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_transfer_bid_receipt_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusBidReceipt>,
+        share: Option<u64>,
+        recipient: address,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        tds_user_entry::transfer_bid_receipt<D_TOKEN, B_TOKEN>(
+            &mut dov_registry,
+            index,
+            receipts,
+            share,
+            recipient,
+            ctx(scenario)
+        );
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_public_transfer_bid_receipt_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusBidReceipt>,
+        share: Option<u64>,
+        recipient: address,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let (mut my_receipt_option, _log) = tds_user_entry::public_transfer_bid_receipt<D_TOKEN, B_TOKEN>(
+            &mut dov_registry,
+            index,
+            receipts,
+            share,
+            recipient,
+            ctx(scenario)
+        );
+
+        if (my_receipt_option.is_some()) {
+            let bid_receipt = my_receipt_option.extract();
+            transfer::public_transfer(bid_receipt, sender(scenario));
+        };
+        my_receipt_option.destroy_none();
+
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_split_deposit_receipt_v2_(
+        scenario: &mut Scenario,
+        index: u64,
+        receipt: TypusDepositReceipt,
+        split_active_share: u64,
+        split_warmup_share: u64,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let (mut receipt_0_option, mut receipt_1_option) = tds_user_entry::split_deposit_receipt_v2(
+            &mut dov_registry,
+            index,
+            receipt,
+            split_active_share,
+            split_warmup_share,
+            ctx(scenario)
+        );
+
+        if (receipt_0_option.is_some()) {
+            let recepit_0 = receipt_0_option.extract();
+            transfer::public_transfer(recepit_0, sender(scenario));
+        };
+        receipt_0_option.destroy_none();
+        if (receipt_1_option.is_some()) {
+            let recepit_1 = receipt_1_option.extract();
+            transfer::public_transfer(recepit_1, sender(scenario));
+        };
+        receipt_1_option.destroy_none();
+
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_merge_deposit_receipts_(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusDepositReceipt>,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let (mut receipt, _log) = tds_user_entry::merge_deposit_receipts(
+            &mut dov_registry,
+            index,
+            receipts,
+            ctx(scenario)
+        );
+        transfer::public_transfer(receipt, sender(scenario));
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+    }
 }
 
