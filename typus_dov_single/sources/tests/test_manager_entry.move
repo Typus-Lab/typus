@@ -1,12 +1,13 @@
 #[test_only]
 module typus_dov::test_manager_entry {
     use sui::clock::{Self, Clock};
+    use sui::coin::Coin;
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_from_address};
-    use typus_dov::tds_registry_authorized_entry;
+    use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared};
     use typus_dov::tds_authorized_entry;
-    use typus_dov::test_environment::{Self, USDC, current_ts_ms};
-    use typus_dov::test_tds_user_entry;
+    use typus_dov::tds_registry_authorized_entry;
+    use typus_dov::test_environment::{Self, current_ts_ms};
+    use pyth::price_info::PriceInfoObject;
 
     const ADMIN: address = @0xFFFF;
 
@@ -265,136 +266,237 @@ module typus_dov::test_manager_entry {
         next_tx(scenario, ADMIN);
     }
 
-    #[test]
-    public(package) fun test_new_portfolio_vault() {
-        let mut scenario = test_environment::begin_test();
-        let sui_oracle_id = test_environment::new_oracle<SUI>(&mut scenario);
-
-        // create daily call
-        test_new_portfolio_vault_<SUI, SUI>(
-            &mut scenario,
-            0, // option type
-            0, // period
-            9, 9, 9, // d b o decimal
-            current_ts_ms() / 86400_000 * 86400_000, // activation ts ms
-            current_ts_ms() / 86400_000 * 86400_000 + 86400_000, // expiration ts ms
-            sui_oracle_id, 100000_0000_0000, // oracle id, price
-            1_0000_00000, 1_0000_00000, // deposit, bid lot size
-            100_0000_00000, 100_0000_00000, // min deposit, bid size
-            10000, 10000, // max deposit, bid entry
-            0, 1000, // deposit, bid fee bp
-            10, 1000, // deposit, bid incentive bp
-            0, 300_000, // auction delay, duration ts ms
-            86400_000,// recoup_delay_ts_ms
-            1000000_0000_00000, 100, 1, // capacity, leverage, risk_level
-            true, vector[10100], vector[1], vector[false], // has_next, strike_bp, weight, is_buyer
-            0_0100_00000, // strike_increment
-            1, 100_0000_00000, 50_0000_00000, // decay_speed, upper bound price, lower bound price
-            vector[ADMIN], // whitelist
-            current_ts_ms()
-        );
-
-        // create weekly put (ts_ms 0 is Thursday 0:00)
-        let activation_ts_ms = current_ts_ms() / 604800_000 * 604800_000 + 86400_000 + 8 * 3600_000;
-        test_new_portfolio_vault_<USDC, SUI>(
-            &mut scenario,
-            1, // option type
-            1, // period
-            6, 9, 9, // d b o decimal
-            activation_ts_ms,
-            activation_ts_ms + 604800_000, // expiration ts ms
-            sui_oracle_id, 100000_0000_0000, // oracle id, price
-            1_0000_00000, 1_0000_00000, // deposit, bid lot size
-            100_0000_00000, 100_0000_00000, // min deposit, bid size
-            10000, 10000, // max deposit, bid entry
-            0, 1000, // deposit, bid fee bp
-            10, 1000, // deposit, bid incentive bp
-            0, 1800_000, // auction delay, duration ts ms
-            86400_000,// recoup_delay_ts_ms
-            1000000_000_000, 100, 1, // capacity, leverage, risk_level
-            true, vector[9000], vector[1], vector[false], // has_next, strike_bp, weight, is_buyer
-            0_0100_00000, // strike_increment
-            1, 100_0000_00000, 50_0000_00000, // decay_speed, upper bound price, lower bound price
-            vector[ADMIN], // whitelist
-            current_ts_ms()
-        );
-
-        end(scenario);
+    public(package) fun test_close_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::close<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
     }
 
-    #[test]
-    public(package) fun test_vault_evolution() {
-        let mut scenario = test_environment::begin_test();
-        let sui_oracle_id = test_environment::new_oracle<SUI>(&mut scenario);
+    public(package) fun test_resume_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::resume<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
 
-        // create daily call
-        test_new_portfolio_vault_<SUI, SUI>(
-            &mut scenario,
-            0, // option type
-            0, // period
-            9, 9, 9, // d b o decimal
-            current_ts_ms() / 86400_000 * 86400_000, // activation ts ms
-            current_ts_ms() / 86400_000 * 86400_000 + 86400_000, // expiration ts ms
-            sui_oracle_id, 100000_0000_0000, // oracle id, price
-            1_0000_00000, 1_0000_00000, // deposit, bid lot size
-            100_0000_00000, 100_0000_00000, // min deposit, bid size
-            10000, 10000, // max deposit, bid entry
-            0, 1000, // deposit, bid fee bp
-            10, 1000, // deposit, bid incentive bp
-            0, 300_000, // auction delay, duration ts ms
-            86400_000,// recoup_delay_ts_ms
-            1000000_0000_00000, 100, 1, // capacity, leverage, risk_level
-            true, vector[10100], vector[1], vector[false], // has_next, strike_bp, weight, is_buyer
-            0_0100_00000, // strike_increment
-            1, 100_0000_00000, 50_0000_00000, // decay_speed, upper bound price, lower bound price
-            vector[ADMIN], // whitelist
-            current_ts_ms()
-        );
+    public(package) fun test_drop_vault_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::drop_vault<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
 
-        let index = 0;
-        let activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
+    public(package) fun test_terminate_vault_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::terminate_vault<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
 
-        // deposit
-        let ts_ms = activate_ts_ms;
-        let deposit_amount = 1000_0000_00000;
-        let receipt = test_tds_user_entry::test_deposit_<SUI, SUI>(&mut scenario, index, vector[], deposit_amount, ts_ms);
-        transfer::public_transfer(receipt, sender(&mut scenario));
+    public(package) fun test_incentivise_<TOKEN>(
+        scenario: &mut Scenario,
+        amount: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let incentive_coin = test_environment::mint_test_coin<TOKEN>(scenario, amount);
+        tds_registry_authorized_entry::incentivise<TOKEN>(&mut registry, incentive_coin, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
 
-        // activate
-        let ts_ms = activate_ts_ms;
-        let oracle_price = 100000_0000_0000;
-        test_activate_<SUI, SUI, SUI>(
-            &mut scenario,
+    // set I_INFO_CURRENT_LENDING_PROTOCOL
+    public(package) fun test_set_current_lending_protocol_flag_(
+        scenario: &mut Scenario,
+        index: u64,
+        lending_protocol: u64, // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::set_current_lending_protocol_flag(&mut registry, index, lending_protocol, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_set_safu_vault_index_(
+        scenario: &mut Scenario,
+        index: u64,
+        safu_index: u64, // set as 999 -> for off-chain preventing vault evolution
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::set_safu_vault_index(&mut registry, index, safu_index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    // set I_CONFIG_NEXT_LENDING_PROTOCOL
+    public(package) fun test_set_lending_protocol_flag_(
+        scenario: &mut Scenario,
+        index: u64,
+        lending_protocol: u64, // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::set_lending_protocol_flag(&mut registry, index, lending_protocol, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_add_portfolio_vault_authorized_user_(
+        scenario: &mut Scenario,
+        index: u64,
+        users: vector<address>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::add_portfolio_vault_authorized_user(&mut registry, index, users, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_remove_portfolio_vault_authorized_user_(
+        scenario: &mut Scenario,
+        index: u64,
+        users: vector<address>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::remove_portfolio_vault_authorized_user(&mut registry, index, users, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_deposit_navi_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        asset_id: u8,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<D_TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::deposit_navi<D_TOKEN, B_TOKEN>(
+            &mut registry,
             index,
-            sui_oracle_id,
-            sui_oracle_id,
-            oracle_price,
-            oracle_price,
-            ts_ms,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            &clock,
+            ctx(scenario)
         );
+        return_shared(registry);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
 
-        test_new_auction_<SUI, SUI>(&mut scenario, index);
+    public(package) fun test_reward_navi_<D_TOKEN, B_TOKEN, R_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+        let mut reward_fund = take_shared<lending_core::incentive_v3::RewardFund<R_TOKEN>>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
 
-        let ts_ms = activate_ts_ms + 300_000;
-        test_delivery_<SUI, SUI, SUI>(&mut scenario, index, ts_ms);
+        let coin_types = vector[];
+        let rule_ids = vector[];
 
-        let ts_ms = activate_ts_ms + 86400_000;
-        test_recoup_<SUI, SUI>(&mut scenario, index, ts_ms);
-
-        // settle
-        let ts_ms = activate_ts_ms + 86400_000;
-        let oracle_price = 100000_0000_0000;
-        test_settle_<SUI, SUI>(
-            &mut scenario,
+        let reward_balance = tds_authorized_entry::pre_reward_navi<D_TOKEN, B_TOKEN, R_TOKEN>(
+            &mut registry,
             index,
-            sui_oracle_id,
-            sui_oracle_id,
-            oracle_price,
-            oracle_price,
-            ts_ms,
+            &mut storage,
+            &mut reward_fund,
+            coin_types,
+            rule_ids,
+            &mut incentive_v3,
+            &clock,
+            ctx(scenario)
         );
 
-        end(scenario);
+        tds_authorized_entry::post_reward_navi<D_TOKEN, B_TOKEN, R_TOKEN>(
+            &mut registry,
+            index,
+            vector[reward_balance],
+            ctx(scenario)
+        );
 
+        return_shared(registry);
+        return_shared(storage);
+        return_shared(incentive_v3);
+        return_shared(reward_fund);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_withdraw_navi_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        asset_id: u8,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<D_TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::withdraw_navi<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
     }
 }

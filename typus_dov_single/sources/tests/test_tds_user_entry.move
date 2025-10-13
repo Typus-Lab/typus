@@ -1,17 +1,22 @@
 #[test_only]
 module typus_dov::test_tds_user_entry {
+    use sui::coin::{Self, Coin};
+    use sui::sui::SUI;
     use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_from_address};
     use typus_dov::tds_user_entry;
-    use typus_dov::test_environment;
-    use typus_framework::vault::TypusDepositReceipt;
+    use typus_dov::test_environment::{Self, current_ts_ms};
+    use typus_dov::test_manager_entry;
+    use typus_framework::vault::{TypusDepositReceipt, TypusBidReceipt};
 
     const ADMIN: address = @0xFFFF;
 
-    public(package) fun test_deposit_<D_TOKEN, B_TOKEN>(
+    public(package) fun test_public_raise_fund_<D_TOKEN, B_TOKEN>(
         scenario: &mut Scenario,
         index: u64,
         receipts: vector<TypusDepositReceipt>,
         amount: u64,
+        raise_from_premium: bool,
+        raise_from_inactive: bool,
         ts_ms: u64,
     ): TypusDepositReceipt {
         let mut dov_registry = test_environment::dov_registry(scenario);
@@ -29,8 +34,8 @@ module typus_dov::test_tds_user_entry {
             index,
             receipts,
             deposit_coin.into_balance(),
-            false,
-            false,
+            raise_from_premium,
+            raise_from_inactive,
             &clock,
             ctx(scenario)
         );
@@ -43,6 +48,99 @@ module typus_dov::test_tds_user_entry {
 
         next_tx(scenario, ADMIN);
         deposit_receipt
+    }
+
+    public(package) fun test_public_bid_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        premium_amount: u64,
+        size: u64,
+        ts_ms: u64,
+    ): (TypusBidReceipt, Coin<B_TOKEN>) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let mut typus_user_registry = test_environment::typus_user_registry(scenario);
+        let mut tgld_registry = test_environment::tgld_registry(scenario);
+        let mut leaderboard_registry = test_environment::leaderboard_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+        let premium_coin = test_environment::mint_test_coin<B_TOKEN>(scenario, premium_amount);
+        let (bid_receipt, rebate_coin, _log) = tds_user_entry::public_bid<D_TOKEN, B_TOKEN>(
+            &ecosystem_version,
+            &mut typus_user_registry,
+            &mut tgld_registry,
+            &mut leaderboard_registry,
+            &mut dov_registry,
+            index,
+            vector[premium_coin],
+            size,
+            &clock,
+            ctx(scenario)
+        );
+
+        return_shared(dov_registry);
+        return_shared(typus_user_registry);
+        return_shared(tgld_registry);
+        return_shared(leaderboard_registry);
+        return_shared(ecosystem_version);
+        clock.destroy_for_testing();
+
+        next_tx(scenario, ADMIN);
+        (bid_receipt, rebate_coin)
+    }
+
+    public(package) fun test_public_reduce_fund_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        receipts: vector<TypusDepositReceipt>,
+        reduce_from_warmup: u64, // amount
+        reduce_from_active: u64,  // amount
+        reduce_from_premium: bool,
+        reduce_from_inactive: bool,
+        reduce_from_incentive: bool,
+        ts_ms: u64,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+        let mut typus_user_registry = test_environment::typus_user_registry(scenario);
+        let mut leaderboard_registry = test_environment::leaderboard_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+
+        let (mut deposit_receipt_option, d_balance, b_balance, i_balance, _log) = tds_user_entry::public_reduce_fund<D_TOKEN, B_TOKEN, I_TOKEN>(
+            &ecosystem_version,
+            &mut typus_user_registry,
+            &mut leaderboard_registry,
+            &mut dov_registry,
+            index,
+            receipts,
+            reduce_from_warmup,
+            reduce_from_active,
+            reduce_from_premium,
+            reduce_from_inactive,
+            reduce_from_incentive,
+            &clock,
+            ctx(scenario)
+        );
+
+        transfer::public_transfer(coin::from_balance(d_balance, ctx(scenario)), sender(scenario));
+        transfer::public_transfer(coin::from_balance(b_balance, ctx(scenario)), sender(scenario));
+        transfer::public_transfer(coin::from_balance(i_balance, ctx(scenario)), sender(scenario));
+
+        if (deposit_receipt_option.is_some()) {
+            let deposit_receipt = deposit_receipt_option.extract();
+            transfer::public_transfer(deposit_receipt, sender(scenario));
+        };
+
+        deposit_receipt_option.destroy_none();
+
+        return_shared(dov_registry);
+        return_shared(typus_user_registry);
+        return_shared(leaderboard_registry);
+        return_shared(ecosystem_version);
+        clock.destroy_for_testing();
+
+        next_tx(scenario, ADMIN);
     }
 }
 
