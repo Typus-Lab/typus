@@ -3,11 +3,13 @@ module typus_dov::test_environment {
     use std::type_name;
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
+    use sui::math as sui_math;
     use sui::sui::SUI;
     use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
     use typus_dov::typus_dov_single::{Self, Registry as DovRegistry};
     use typus_dov::babe::{Self, BABE};
     use typus_dov::babe2::{Self, BABE2};
+    use typus_dov::scallop_tests;
     use typus::ecosystem::{Self, Version as TypusEcosystemVersion};
     use typus::leaderboard::{Self, TypusLeaderboardRegistry};
     use typus::user::{Self, TypusUserRegistry};
@@ -16,13 +18,14 @@ module typus_dov::test_environment {
 
     use pyth::pyth_tests;
     use pyth::pyth;
-    use pyth::price_info::PriceInfoObject;
     use wormhole::state::{State as WormState};
     use wormhole::vaa::{Self, VAA};
     use oracle::oracle::{Self as navi_oracle};
     use oracle::oracle_manage;
+    use protocol::mint;
 
     const ADMIN: address = @0xFFFF;
+    const BABE_2: address = @0xBABE2;
     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
     const SUI_PRICE: u64 = 100000_0000_0000;
     const SUI_PRICE_DECIMAL: u64 = 8;
@@ -207,7 +210,7 @@ module typus_dov::test_environment {
         verified_vaas
     }
 
-    fun prepare_pyth(): (Scenario, u64) {
+    public(package) fun prepare_pyth(): (Scenario, u64) {
         let (mut scenario, test_coins, clock) = pyth_tests::setup_test(
             500 /* stale_price_threshold */,
             23 /* governance emitter chain */,
@@ -232,6 +235,35 @@ module typus_dov::test_environment {
         return_shared(pyth_state);
         return_shared(worm_state);
         (scenario, ts_ms)
+    }
+
+    public(package) fun prepare_scallop_lending_env(scenario: &mut Scenario) {
+        let clock = new_clock(scenario);
+        let version = protocol::version::create_for_testing(ctx(scenario));
+        let (mut market, admin_cap) = scallop_tests::app_init(scenario);
+        let babe_interest_params = scallop_tests::babe_interest_model_params();
+        next_tx(scenario, ADMIN);
+
+        scallop_tests::add_interest_model_t<BABE>(scenario, std::u64::pow(10, 18), 60 * 60 * 24, 30 * 60, &mut market, &admin_cap, &babe_interest_params, &clock);
+
+        let mut coin_decimals_registry_obj = scallop_tests::coin_decimals_registry_init(scenario);
+        coin_decimals_registry::coin_decimals_registry::register_decimals_t<BABE>(&mut coin_decimals_registry_obj, 9);
+
+        next_tx(scenario, BABE_2);
+        let babe_coin = mint_test_coin<BABE>(scenario, 1000_0000_00000);
+        let babe_amount = babe_coin.value();
+        // clock::increment_for_testing(&mut clock, 100 * 1000);
+        let market_coin = mint::mint(&version, &mut market, babe_coin, &clock, ctx(scenario));
+        assert!(market_coin.value() == babe_amount, 0);
+
+        transfer::public_transfer(market_coin, sender(scenario));
+
+        protocol::version::destroy_for_testing(version);
+        return_shared(coin_decimals_registry_obj);
+        return_shared(market);
+        transfer::public_transfer(admin_cap, sender(scenario));
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
     }
 
     public(package) fun prepare_navi_lending_env(scenario: &mut Scenario) {
@@ -407,4 +439,172 @@ module typus_dov::babe2 {
     public(package) fun test_init(ctx: &mut TxContext) {
         init(BABE2 {}, ctx);
     }
+}
+
+#[test_only]
+module typus_dov::scallop_tests {
+    use sui::test_scenario::{Self, Scenario, next_tx, next_epoch, sender, ctx, take_shared, take_from_sender};
+    use sui::math;
+    use sui::clock::Clock;
+    use protocol::market::Market;
+    use protocol::app::{Self, AdminCap};
+    use whitelist::whitelist;
+    use coin_decimals_registry::coin_decimals_registry::{Self, CoinDecimalsRegistry};
+    use math::u64;
+    use typus_dov::babe::BABE;
+
+    const ADMIN: address = @0xFFFF;
+
+    public struct InterestModelParams<phantom T> has copy, drop {
+        base_rate_per_sec: u64,
+        interest_rate_scale: u64,
+        borrow_rate_on_mid_kink: u64,
+        mid_kink: u64,
+        borrow_rate_on_high_kink: u64,
+        high_kink: u64,
+        max_borrow_rate: u64,
+        revenue_factor: u64,
+        scale: u64,
+        min_borrow_amount: u64,
+        borrow_weight: u64,
+    }
+
+    public fun app_init(scenario: &mut Scenario): (Market, AdminCap) {
+        app::init_t(ctx(scenario));
+        let sender = sender(scenario);
+        next_tx(scenario, sender);
+        let adminCap = take_from_sender<AdminCap>(scenario);
+        let mut market = take_shared<Market>(scenario);
+
+        // set-up incentive rewards
+        app::set_incentive_reward_factor<BABE>(
+            &adminCap,
+            &mut market,
+            1000,
+            1,
+            ctx(scenario)
+        );
+
+        app::update_borrow_fee<BABE>(
+            &adminCap,
+            &mut market,
+            0,
+            1
+        );
+
+        app::update_supply_limit<BABE>(
+            &adminCap,
+            &mut market,
+            1_000_000 * std::u64::pow(10, 9),
+        );
+
+
+        app::update_borrow_limit<BABE>(
+            &adminCap,
+            &mut market,
+            1_000_000 * std::u64::pow(10, 9),
+        );
+
+        app::update_borrow_fee_recipient(
+            &adminCap,
+            &mut market,
+            sender
+        );
+
+        whitelist::allow_all(app::ext(&adminCap, &mut market));
+
+        (market, adminCap)
+    }
+
+    public fun babe_interest_model_params(): InterestModelParams<BABE> {
+        let interest_rate_scale = std::u64::pow(10, 7);
+        let scale = std::u64::pow(10, 12);
+        let secs_per_year = 365 * 24 * 60 * 60;
+
+        let borrow_rate_on_mid_kink = 8 * u64::mul_div(scale, interest_rate_scale, secs_per_year) / 100;
+        let borrow_rate_on_high_kink = 50 * u64::mul_div(scale, interest_rate_scale, secs_per_year) / 100;
+        let max_borrow_rate = 300 * u64::mul_div(scale, interest_rate_scale, secs_per_year) / 100;
+        InterestModelParams {
+            base_rate_per_sec: 0,
+            interest_rate_scale,
+            borrow_rate_on_mid_kink,
+            borrow_rate_on_high_kink,
+            max_borrow_rate,
+            mid_kink: u64::mul_div(60, scale, 100),
+            high_kink: u64::mul_div(90, scale, 100),
+            revenue_factor: u64::mul_div(2, scale, 100),
+            scale,
+            min_borrow_amount: std::u64::pow(10, 8),
+            borrow_weight: 1 * scale,
+        }
+    }
+
+    public fun add_interest_model_t<T>(
+        scenario: &mut Scenario,
+        outflow_limit: u64, outflow_cycle_duration: u32, outflow_segment_duration: u32,
+        market: &mut Market, admin_cap: &AdminCap, params: &InterestModelParams<T>, clock: &Clock,
+    ) {
+        test_scenario::next_tx(scenario, ADMIN);
+        let interest_model = app::create_interest_model_change<T>(
+            admin_cap,
+            base_rate_per_sec(params),
+            interest_rate_scale(params),
+            borrow_rate_on_mid_kink(params),
+            mid_kink(params),
+            borrow_rate_on_high_kink(params),
+            high_kink(params),
+            max_borrow_rate(params),
+            revenue_factor(params),
+            borrow_weight(params),
+            interest_model_scale(params),
+            min_borrow_amount(params),
+            test_scenario::ctx(scenario)
+        );
+        app::add_interest_model<T>(
+            market,
+            admin_cap,
+            interest_model,
+            clock,
+            test_scenario::ctx(scenario),
+        );
+
+        skip_epoch(scenario, 11);
+
+        app::add_limiter<T>(
+            admin_cap,
+            market,
+            outflow_limit,
+            outflow_cycle_duration,
+            outflow_segment_duration,
+            ctx(scenario)
+        );
+        next_tx(scenario, ADMIN);
+    }
+
+    public fun skip_epoch(scenario: &mut Scenario, number_of_skipped_epoch: u32) {
+        let mut i = 0;
+        while (i < number_of_skipped_epoch) {
+            next_epoch(scenario, @0x0);
+            i = i + 1;
+        };
+    }
+
+    public fun coin_decimals_registry_init(scenario: &mut Scenario): CoinDecimalsRegistry {
+        coin_decimals_registry::init_t(ctx(scenario));
+        let sender = sender(scenario);
+        next_tx(scenario, sender);
+        take_shared<CoinDecimalsRegistry>(scenario)
+    }
+
+    public fun base_rate_per_sec<T>(params: &InterestModelParams<T>): u64 { params.base_rate_per_sec }
+    public fun interest_rate_scale<T>(params: &InterestModelParams<T>): u64 { params.interest_rate_scale }
+    public fun borrow_rate_on_mid_kink<T>(params: &InterestModelParams<T>): u64 { params.borrow_rate_on_mid_kink }
+    public fun mid_kink<T>(params: &InterestModelParams<T>): u64 { params.mid_kink }
+    public fun borrow_rate_on_high_kink<T>(params: &InterestModelParams<T>): u64 { params.borrow_rate_on_high_kink }
+    public fun high_kink<T>(params: &InterestModelParams<T>): u64 { params.high_kink }
+    public fun max_borrow_rate<T>(params: &InterestModelParams<T>): u64 { params.max_borrow_rate }
+    public fun revenue_factor<T>(params: &InterestModelParams<T>): u64 { params.revenue_factor }
+    public fun interest_model_scale<T>(params: &InterestModelParams<T>): u64 { params.scale }
+    public fun min_borrow_amount<T>(params: &InterestModelParams<T>): u64 { params.min_borrow_amount }
+    public fun borrow_weight<T>(params: &InterestModelParams<T>): u64 { params.borrow_weight }
 }

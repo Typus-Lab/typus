@@ -1,11 +1,9 @@
 #[test_only]
 module typus_dov::test_tds_user_entry {
     use sui::coin::{Self, Coin};
-    use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_from_address};
+    use sui::test_scenario::{Scenario, ctx, sender, next_tx, return_shared};
     use typus_dov::tds_user_entry;
-    use typus_dov::test_environment::{Self, current_ts_ms};
-    use typus_dov::test_manager_entry;
+    use typus_dov::test_environment;
     use typus_framework::vault::{TypusDepositReceipt, TypusBidReceipt};
 
     const ADMIN: address = @0xFFFF;
@@ -282,7 +280,7 @@ module typus_dov::test_tds_user_entry {
         receipts: vector<TypusDepositReceipt>,
     ) {
         let mut dov_registry = test_environment::dov_registry(scenario);
-        let (mut receipt, _log) = tds_user_entry::merge_deposit_receipts(
+        let (receipt, _log) = tds_user_entry::merge_deposit_receipts(
             &mut dov_registry,
             index,
             receipts,

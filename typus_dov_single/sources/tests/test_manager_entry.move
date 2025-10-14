@@ -2,12 +2,12 @@
 module typus_dov::test_manager_entry {
     use sui::clock::{Self, Clock};
     use sui::coin::Coin;
-    use sui::sui::SUI;
     use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared};
     use typus_dov::tds_authorized_entry;
     use typus_dov::tds_registry_authorized_entry;
-    use typus_dov::test_environment::{Self, current_ts_ms};
+    use typus_dov::test_environment;
     use pyth::price_info::PriceInfoObject;
+    use spool::spool::Spool;
 
     const ADMIN: address = @0xFFFF;
 
@@ -105,6 +105,107 @@ module typus_dov::test_manager_entry {
         next_tx(scenario, ADMIN);
     }
 
+    public(package) fun test_update_config_(
+        scenario: &mut Scenario,
+        index: u64,
+        oracle_id: Option<address>,
+        deposit_lot_size: Option<u64>,
+        bid_lot_size: Option<u64>,
+        min_deposit_size: Option<u64>,
+        min_bid_size: Option<u64>,
+        max_deposit_entry: Option<u64>,
+        max_bid_entry: Option<u64>,
+        deposit_fee_bp: Option<u64>,
+        deposit_fee_share_bp: Option<u64>,
+        deposit_shared_fee_pool: Option<Option<vector<u8>>>,
+        bid_fee_bp: Option<u64>,
+        deposit_incentive_bp: Option<u64>,
+        bid_incentive_bp: Option<u64>,
+        auction_delay_ts_ms: Option<u64>,
+        auction_duration_ts_ms: Option<u64>,
+        recoup_delay_ts_ms: Option<u64>,
+        capacity: Option<u64>,
+        leverage: Option<u64>,
+        risk_level: Option<u64>,
+        deposit_incentive_bp_divisor_decimal: Option<u64>,
+        incentive_fee_bp: Option<u64>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+
+        tds_authorized_entry::update_config(
+            &mut registry,
+            index,
+            oracle_id,
+            deposit_lot_size,
+            bid_lot_size,
+            min_deposit_size,
+            min_bid_size,
+            max_deposit_entry,
+            max_bid_entry,
+            deposit_fee_bp,
+            deposit_fee_share_bp,
+            deposit_shared_fee_pool,
+            bid_fee_bp,
+            deposit_incentive_bp,
+            bid_incentive_bp,
+            auction_delay_ts_ms,
+            auction_duration_ts_ms,
+            recoup_delay_ts_ms,
+            capacity,
+            leverage,
+            risk_level,
+            deposit_incentive_bp_divisor_decimal,
+            incentive_fee_bp,
+            ctx(scenario)
+        );
+
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_update_oracle_(
+        scenario: &mut Scenario,
+        index: u64,
+        oracle_id: ID,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let oracle = test_environment::oracle(scenario, oracle_id);
+        tds_authorized_entry::update_oracle(&mut registry, index, &oracle, ctx(scenario));
+        return_shared(oracle);
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_update_warmup_vault_config_(
+        scenario: &mut Scenario,
+        index: u64,
+        strike_pct: vector<u64>,
+        weight: vector<u64>,
+        is_buyer: vector<bool>,
+        strike_increment: u64,
+        decay_speed: u64,
+        initial_price: u64,
+        final_price: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::update_warmup_vault_config(
+            &mut registry,
+            index,
+            strike_pct,
+            weight,
+            is_buyer,
+            strike_increment,
+            decay_speed,
+            initial_price,
+            final_price,
+            ctx(scenario),
+        );
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    // ===== Vault evolution entries =====
+
     public(package) fun test_activate_<D_TOKEN, B_TOKEN, I_TOKEN>(
         scenario: &mut Scenario,
         index: u64,
@@ -174,6 +275,59 @@ module typus_dov::test_manager_entry {
         next_tx(scenario, ADMIN);
     }
 
+    public(package) fun test_terminate_auction_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::terminate_auction<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_update_auction_config_(
+        scenario: &mut Scenario,
+        index: u64,
+        start_ts_ms: u64,
+        end_ts_ms: u64,
+        decay_speed: u64,
+        initial_price: u64,
+        final_price: u64,
+        fee_bp: u64,
+        incentive_bp: u64,
+        token_decimal: u64, // bid token
+        size_decimal: u64, // deposit token / contract size
+        able_to_remove_bid: bool,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        tds_authorized_entry::update_auction_config(
+            &mut registry,
+            index,
+            start_ts_ms,
+            end_ts_ms,
+            decay_speed,
+            initial_price,
+            final_price,
+            fee_bp,
+            incentive_bp,
+            token_decimal,
+            size_decimal,
+            able_to_remove_bid,
+            &clock,
+            ctx(scenario),
+        );
+        return_shared(registry);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
     public(package) fun test_delivery_<D_TOKEN, B_TOKEN, I_TOKEN>(
         scenario: &mut Scenario,
         index: u64,
@@ -189,6 +343,31 @@ module typus_dov::test_manager_entry {
             &clock,
             ctx(scenario)
         );
+        return_shared(registry);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_update_strike_(
+        scenario: &mut Scenario,
+        index: u64,
+        oracle_id: ID,
+        oracle_price: u64,
+        ts_ms: u64
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        let sender_address = sender(scenario);
+        next_tx(scenario, ADMIN);
+        let mut oracle = test_environment::oracle(scenario, oracle_id);
+        test_environment::update_oracle(scenario, &mut oracle, oracle_price, ts_ms);
+        next_tx(scenario, sender_address);
+
+        tds_authorized_entry::update_strike(&mut registry, index, &oracle, &clock, ctx(scenario));
+        return_shared(oracle);
         return_shared(registry);
         clock.destroy_for_testing();
         next_tx(scenario, ADMIN);
@@ -261,6 +440,89 @@ module typus_dov::test_manager_entry {
             return_shared(oracle);
             return_shared(d_oracle);
         };
+        return_shared(registry);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_otc_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        delivery_price: u64,
+        delivery_size: u64,
+        bidder_bid_value: u64,
+        bidder_fee_balance_value: u64,
+        incentive_bid_value: u64,
+        incentive_fee_balance_value: u64,
+        depositor_incentive_value: u64,
+        ts_ms: u64
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        let coin = test_environment::mint_test_coin<B_TOKEN>(scenario, bidder_bid_value + bidder_fee_balance_value);
+        tds_authorized_entry::otc<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            vector[coin],
+            delivery_price,
+            delivery_size,
+            bidder_bid_value,
+            bidder_fee_balance_value,
+            incentive_bid_value,
+            incentive_fee_balance_value,
+            depositor_incentive_value,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_safu_otc_v2_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        delivery_price: u64,
+        premium: u64,
+        ts_ms: u64
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        let coin = test_environment::mint_test_coin<B_TOKEN>(scenario, premium);
+        let (mut receipt_option, _log) = tds_authorized_entry::safu_otc_v2<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            delivery_price,
+            coin.into_balance(),
+            &clock,
+            ctx(scenario)
+        );
+        if (receipt_option.is_some()) {
+            let receipt = receipt_option.extract();
+            transfer::public_transfer(receipt, sender(scenario));
+        };
+        receipt_option.destroy_none();
+        return_shared(registry);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_skip_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        ts_ms: u64
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        tds_authorized_entry::skip<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            &clock,
+            ctx(scenario)
+        );
         return_shared(registry);
         clock.destroy_for_testing();
         next_tx(scenario, ADMIN);
@@ -497,6 +759,78 @@ module typus_dov::test_manager_entry {
         return_shared(incentive_v2);
         return_shared(incentive_v3);
         clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_deposit_scallop_basic_lending_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let scallop_version = protocol::version::create_for_testing(ctx(scenario));
+        let mut scallop_market = take_shared<protocol::market::Market>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::deposit_scallop_basic_lending<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            &scallop_version,
+            &mut scallop_market,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        protocol::version::destroy_for_testing(scallop_version);
+        return_shared(scallop_market);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_withdraw_scallop_basic_lending_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let scallop_version = protocol::version::create_for_testing(ctx(scenario));
+        let mut scallop_market = take_shared<protocol::market::Market>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::withdraw_scallop_basic_lending<D_TOKEN, B_TOKEN>(
+            &mut registry,
+            index,
+            &scallop_version,
+            &mut scallop_market,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        protocol::version::destroy_for_testing(scallop_version);
+        return_shared(scallop_market);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_enable_additional_lending_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::enable_additional_lending<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_disable_additional_lending_<D_TOKEN, B_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::disable_additional_lending<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
+        return_shared(registry);
         next_tx(scenario, ADMIN);
     }
 }
