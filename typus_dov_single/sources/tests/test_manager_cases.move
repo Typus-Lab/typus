@@ -15,6 +15,9 @@ module typus_dov::test_manager_cases {
     const BABE2: address = @0xBABE2;
     const BABE3: address = @0xBABE3;
 
+    public struct WITNESS_1 has drop {}
+    public struct WITNESS_2 has drop {}
+
     #[test]
     public(package) fun test_new_portfolio_vault() {
         let mut scenario = test_environment::begin_test();
@@ -75,9 +78,26 @@ module typus_dov::test_manager_cases {
     #[test]
     public(package) fun test_vault_evolution() {
         let mut scenario = test_environment::begin_test();
+
+        // test authorized user
+        test_manager_entry::test_add_authorized_user_(&mut scenario, vector[BABE1, BABE2]);
+        test_manager_entry::test_add_authorized_user_(&mut scenario, vector[]); // nothing happened
+        test_manager_entry::test_remove_authorized_user_(&mut scenario, vector[BABE2]);
+        test_manager_entry::test_remove_authorized_user_(&mut scenario, vector[]);  // nothing happened
+
+        // test witness
+        test_manager_entry::test_add_witness_<WITNESS_1>(&mut scenario);
+        test_manager_entry::test_add_witness_<WITNESS_2>(&mut scenario);
+        test_manager_entry::test_remove_witness_<WITNESS_2>(&mut scenario);
+
+        test_manager_entry::test_suspend_transaction_(&mut scenario);
+        test_manager_entry::test_resume_transaction_(&mut scenario);
+
+        // prepare env
         test_environment::prepare_navi_lending_env(&mut scenario);
         test_environment::prepare_scallop_lending_env(&mut scenario);
         test_manager_entry::test_incentivise_<BABE>(&mut scenario, 10000_0000_00000);
+        test_manager_entry::test_withdraw_incentive_<BABE>(&mut scenario, option::some(1_0000_00000));
         let sui_oracle_id = test_environment::new_oracle<BABE>(&mut scenario);
 
         // create daily call
@@ -111,6 +131,7 @@ module typus_dov::test_manager_cases {
         test_manager_entry::test_remove_portfolio_vault_authorized_user_(&mut scenario, 0, vector[BABE2]);
 
         let index = 0;
+        test_manager_entry::test_set_available_incentive_amount_(&mut scenario, index, 999999_0000_00000);
         let mut activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
 
         // deposit
@@ -162,6 +183,10 @@ module typus_dov::test_manager_cases {
 
         let ts_ms = activate_ts_ms + 86400_000;
         test_manager_entry::test_recoup_<BABE, BABE>(&mut scenario, index, ts_ms);
+
+        // update deposit point
+        test_manager_entry::test_update_deposit_point_(&mut scenario, vector[], ts_ms); // nothing happened
+        test_manager_entry::test_update_deposit_point_(&mut scenario, vector[ADMIN], ts_ms);
 
         // settle
         let ts_ms = activate_ts_ms + 86400_000;

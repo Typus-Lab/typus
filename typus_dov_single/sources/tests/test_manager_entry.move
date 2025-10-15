@@ -579,6 +579,27 @@ module typus_dov::test_manager_entry {
         next_tx(scenario, ADMIN);
     }
 
+    public(package) fun test_withdraw_incentive_<TOKEN>(
+        scenario: &mut Scenario,
+        amount: Option<u64>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::withdraw_incentive<TOKEN>(&mut registry, amount, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_set_available_incentive_amount_(
+        scenario: &mut Scenario,
+        index: u64,
+        amount: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::set_available_incentive_amount(&mut registry, index, amount, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
     // set I_INFO_CURRENT_LENDING_PROTOCOL
     public(package) fun test_set_current_lending_protocol_flag_(
         scenario: &mut Scenario,
@@ -831,6 +852,101 @@ module typus_dov::test_manager_entry {
         let mut registry = test_environment::dov_registry(scenario);
         tds_authorized_entry::disable_additional_lending<D_TOKEN, B_TOKEN>(&mut registry, index, ctx(scenario));
         return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_add_authorized_user_(
+        scenario: &mut Scenario,
+        users: vector<address>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::add_authorized_user(&mut registry, users, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_remove_authorized_user_(
+        scenario: &mut Scenario,
+        users: vector<address>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::remove_authorized_user(&mut registry, users, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_add_witness_<W: drop>(
+        scenario: &mut Scenario,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::add_witness<W>(&mut registry, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_remove_witness_<W: drop>(
+        scenario: &mut Scenario,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::remove_witness<W>(&mut registry, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    // cannot be tested due to C_VERSION editing is not available in the test environment
+    // public(package) fun test_upgrade_registry_(
+    //     scenario: &mut Scenario,
+    // ) {
+    //     let mut registry = test_environment::dov_registry(scenario);
+    //     tds_registry_authorized_entry::upgrade_registry(&mut registry, ctx(scenario));
+    //     return_shared(registry);
+    //     next_tx(scenario, ADMIN);
+    // }
+
+    public(package) fun test_suspend_transaction_(
+        scenario: &mut Scenario,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::suspend_transaction(&mut registry, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_resume_transaction_(
+        scenario: &mut Scenario,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_registry_authorized_entry::resume_transaction(&mut registry, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_update_deposit_point_(
+        scenario: &mut Scenario,
+        users: vector<address>,
+        ts_ms: u64,
+    ) {
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+        let mut typus_user_registry = test_environment::typus_user_registry(scenario);
+        let mut leaderboard_registry = test_environment::leaderboard_registry(scenario);
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+        tds_registry_authorized_entry::update_deposit_point(
+            &ecosystem_version,
+            &mut typus_user_registry,
+            &mut leaderboard_registry,
+            &mut registry,
+            users,
+            &clock,
+            ctx(scenario),
+        );
+
+        return_shared(registry);
+        return_shared(typus_user_registry);
+        return_shared(leaderboard_registry);
+        return_shared(ecosystem_version);
+        clock.destroy_for_testing();
         next_tx(scenario, ADMIN);
     }
 }

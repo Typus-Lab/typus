@@ -16,6 +16,7 @@ module typus_dov::test_user_cases {
     public(package) fun test_user_operations() {
         let mut scenario = test_environment::begin_test();
         test_manager_entry::test_incentivise_<SUI>(&mut scenario, 10000_0000_00000);
+        test_manager_entry::test_withdraw_incentive_<SUI>(&mut scenario, option::some(1_0000_00000));
         let sui_oracle_id = test_environment::new_oracle<SUI>(&mut scenario);
 
         // create daily call
