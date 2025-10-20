@@ -1,8 +1,8 @@
 [package]
 name = "typus_oracle"
-version = "0.7.2"
-published-at = "0x4658a0fbd9a234dfc87726addcbe1a602f27ce4513ecc1ec99e6d973c7bfb101"
 edition = "2024.beta"
+version = "2.0.2"
+published-at = "0xe684e3780fcb82a70c19937a1ef34b03db054dc0d8dc8f6f3980c3c42ae4b61b"
 
 [dependencies.Pyth]
 git = "https://github.com/Typus-Lab/pyth-crosschain.git"

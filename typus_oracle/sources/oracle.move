@@ -1,16 +1,50 @@
 module typus_oracle::oracle {
-    use sui::event::emit;
     use sui::clock::{Self, Clock};
     use sui::dynamic_field;
+    use sui::event::emit;
 
+    use std::ascii::{Self, String};
     use std::string;
     use std::type_name::{Self, TypeName};
-    use std::ascii::{Self, String};
+
+    use pyth::price_info::PriceInfoObject;
+    use pyth::state::State;
+
+    use typus_oracle::pyth_parser;
+
+    // ======== Constants =========
+
+    const CVersion: u64 = 2;
+
+    // ======== Errors =========
+
+    #[error]
+    const EInvalidPrice: vector<u8> = b"Invalid Price";
+    #[error]
+    const EInvalidPyth: vector<u8> = b"Invalid Pyth";
+    #[error]
+    const EInvalidUpdateCap: vector<u8> = b"Invalid Update Cap";
+    #[error]
+    const EInvalidVersion: vector<u8> = b"Invalid Version";
+    #[error]
+    const ENotPyth: vector<u8> = b"Not Pyth";
+    #[error]
+    const EOracleExpired: vector<u8> = b"Oracle Expired";
 
     // ======== Structs =========
 
     public struct ManagerCap has key {
         id: UID,
+    }
+
+    public struct UpdateCap has key {
+        id: UID,
+        `for`: address,
+    }
+
+    public struct UpdateCaps has key {
+        id: UID,
+        `for`: vector<address>,
     }
 
     public struct Oracle has key {
@@ -29,7 +63,11 @@ module typus_oracle::oracle {
         pyth: Option<ID>,
     }
 
-    // ======== Functions =========
+    public struct PriceEvent has copy, drop {
+        id: ID,
+        price: u64,
+        ts_ms: u64,
+    }
 
     fun init(ctx: &mut TxContext) {
         transfer::transfer(
@@ -38,9 +76,113 @@ module typus_oracle::oracle {
         );
     }
 
-    #[test_only]
-    public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
+    // ======== Manager Functions =========
+
+    #[allow(deprecated_usage)]
+    public fun burn_update_authority(
+        update_authority: UpdateAuthority,
+    ) {
+        let UpdateAuthority {
+            id,
+            authority: _,
+        } = update_authority;
+        id.delete();
+    }
+
+    public fun copy_manager_cap(
+        _manager_cap: &ManagerCap,
+        recipient: address,
+        ctx: &mut TxContext,
+    ) {
+        transfer::transfer(ManagerCap {id: object::new(ctx)}, recipient);
+    }
+
+    public fun burn_manager_cap(
+        manager_cap: ManagerCap,
+    ) {
+        let ManagerCap {
+            id
+        } = manager_cap;
+        id.delete();
+    }
+
+    entry fun create_update_cap(
+        _manager_cap: &ManagerCap,
+        recipient: address,
+        ctx: &mut TxContext,
+    ) {
+        transfer::share_object(
+            UpdateCap {
+                id: object::new(ctx),
+                `for`: recipient,
+            }
+        );
+    }
+
+    entry fun burn_update_cap(
+        _manager_cap: &ManagerCap,
+        update_cap: UpdateCap,
+    ) {
+        let UpdateCap {
+            id,
+            `for`: _,
+        } = update_cap;
+        id.delete();
+    }
+
+    entry fun create_update_caps(
+        _manager_cap: &ManagerCap,
+        ctx: &mut TxContext,
+    ) {
+        transfer::share_object(
+            UpdateCaps {
+                id: object::new(ctx),
+                `for`: vector[],
+            }
+        );
+    }
+
+    entry fun burn_update_caps(
+        _manager_cap: &ManagerCap,
+        update_caps: UpdateCaps,
+    ) {
+        let UpdateCaps {
+            id,
+            `for`: _,
+        } = update_caps;
+        id.delete();
+    }
+
+    entry fun add_update_caps_user(
+        _manager_cap: &ManagerCap,
+        update_caps: &mut UpdateCaps,
+        user: address,
+    ) {
+        if (!update_caps.`for`.contains(&user)) {
+            update_caps.`for`.push_back(user);
+        };
+    }
+
+    entry fun remove_update_caps_user(
+        _manager_cap: &ManagerCap,
+        update_caps: &mut UpdateCaps,
+        user: address,
+    ) {
+        let (user_exists, index) = update_caps.`for`.index_of(&user);
+        if (user_exists) {
+            update_caps.`for`.remove(index);
+        };
+    }
+
+    entry fun update_version(
+        oracle: &mut Oracle,
+        _manager_cap: &ManagerCap,
+    ) {
+        if (dynamic_field::exists_(&oracle.id, string::utf8(b"VERSION"))) {
+            *dynamic_field::borrow_mut(&mut oracle.id, string::utf8(b"VERSION")) = CVersion;
+        } else {
+            dynamic_field::add(&mut oracle.id, string::utf8(b"VERSION"), CVersion);
+        }
     }
 
     public fun new_oracle<B_TOKEN, Q_TOKEN>(
@@ -69,84 +211,9 @@ module typus_oracle::oracle {
             pyth: option::none(),
         };
         // add version
-        dynamic_field::add(&mut oracle.id, string::utf8(b"VERSION"), VERSION);
+        dynamic_field::add(&mut oracle.id, string::utf8(b"VERSION"), CVersion);
 
         transfer::share_object(oracle);
-    }
-
-    public struct UpdateAuthority has key {
-        id: UID,
-        authority: vector<address>,
-    }
-
-    entry fun new_update_authority(
-        _manager_cap: &ManagerCap,
-        ctx: &mut TxContext
-    ) {
-        let update_authority = UpdateAuthority {id: object::new(ctx), authority: vector[ tx_context::sender(ctx) ]};
-        transfer::share_object(update_authority);
-    }
-
-    entry fun add_update_authority(
-        _manager_cap: &ManagerCap,
-        update_authority: &mut UpdateAuthority,
-        mut addresses: vector<address>,
-    ) {
-        while (vector::length(&addresses) > 0) {
-            let a: address = vector::pop_back(&mut addresses);
-            vector::push_back(&mut update_authority.authority, a);
-        }
-    }
-
-    entry fun remove_update_authority(
-        _manager_cap: &ManagerCap,
-        update_authority: &mut UpdateAuthority,
-        mut addresses: vector<address>,
-    ) {
-        while (vector::length(&addresses) > 0) {
-            let a: address = vector::pop_back(&mut addresses);
-            let (find, i) = vector::index_of(&update_authority.authority, &a);
-            if (find) {
-                vector::remove(&mut update_authority.authority, i);
-            }
-        }
-    }
-
-    const VERSION: u64 = 1;
-
-    entry fun update_version(
-        oracle: &mut Oracle,
-        _manager_cap: &ManagerCap,
-    ) {
-        if (dynamic_field::exists_(&oracle.id, string::utf8(b"VERSION"))) {
-            *dynamic_field::borrow_mut(&mut oracle.id, string::utf8(b"VERSION")) = VERSION;
-        } else {
-            dynamic_field::add(&mut oracle.id, string::utf8(b"VERSION"), VERSION);
-        }
-    }
-
-    fun version_check(oracle: &Oracle,) {
-        if (dynamic_field::exists_(&oracle.id, string::utf8(b"VERSION"))) {
-            let v: u64 = *dynamic_field::borrow(&oracle.id, string::utf8(b"VERSION"));
-            assert!(VERSION >= v, E_INVALID_VERSION);
-        } else {
-            abort(E_INVALID_VERSION)
-        }
-    }
-
-    public fun update_v2(
-        oracle: &mut Oracle,
-        update_authority: & UpdateAuthority,
-        price: u64,
-        twap_price: u64,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ) {
-        // check authority
-        vector::contains(&update_authority.authority, &tx_context::sender(ctx));
-        version_check(oracle);
-
-        update_(oracle, price, twap_price, clock, ctx);
     }
 
     public fun update(
@@ -155,335 +222,36 @@ module typus_oracle::oracle {
         price: u64,
         twap_price: u64,
         clock: &Clock,
-        ctx: &mut TxContext
+        ctx: &mut TxContext,
     ) {
         version_check(oracle);
         update_(oracle, price, twap_price, clock, ctx);
     }
 
-    fun update_(
+    public fun update_with_update_cap(
         oracle: &mut Oracle,
+        update_cap: &UpdateCap,
         price: u64,
         twap_price: u64,
         clock: &Clock,
-        ctx: & TxContext
-    ) {
-        assert!(price > 0, E_INVALID_PRICE);
-        assert!(twap_price > 0, E_INVALID_PRICE);
-
-        let ts_ms = clock::timestamp_ms(clock);
-
-        oracle.price = price;
-        oracle.twap_price = twap_price;
-        oracle.ts_ms = ts_ms;
-        oracle.epoch = tx_context::epoch(ctx);
-
-        emit(PriceEvent {id: object::id(oracle), price, ts_ms});
-    }
-
-    // use switchboard_std::aggregator::{Aggregator};
-    // use typus_oracle::switchboard_feed_parser;
-
-    // entry fun update_switchboard_oracle(
-    //     oracle: &mut Oracle,
-    //     _manager_cap: &ManagerCap,
-    //     feed: &Aggregator,
-    // ) {
-    //     version_check(oracle);
-    //     let id = object::id(feed);
-    //     oracle.switchboard = option::some(id);
-    // }
-
-    // entry fun update_with_switchboard(
-    //     oracle: &mut Oracle,
-    //     feed: &Aggregator,
-    //     clock: &Clock,
-    //     ctx: & TxContext
-    // ) {
-    //     version_check(oracle);
-    //     assert!(option::is_some(&oracle.switchboard), E_NOT_SWITCHBOARD);
-    //     assert!(option::borrow(&oracle.switchboard) == &object::id(feed), E_INVALID_SWITCHBOARD);
-
-    //     let ts_ms = clock::timestamp_ms(clock);
-
-    //     let (mut price_u128, decimal_u8) = switchboard_feed_parser::log_aggregator_info(feed);
-    //     assert!(price_u128 > 0, E_INVALID_PRICE);
-
-    //     let decimal = (decimal_u8 as u64);
-    //     if (decimal > oracle.decimal) {
-    //         price_u128 = price_u128 / (10u64.pow((decimal - oracle.decimal) as u8) as u128);
-    //     } else {
-    //         price_u128 = price_u128 * (10u64.pow((oracle.decimal - decimal) as u8) as u128);
-    //     };
-
-    //     let price = (price_u128 as u64);
-    //     oracle.price = price;
-    //     oracle.twap_price = price;
-    //     oracle.ts_ms = ts_ms;
-    //     oracle.epoch = tx_context::epoch(ctx);
-
-    //     emit(PriceEvent {id: object::id(oracle), price, ts_ms});
-    // }
-
-    use typus_oracle::pyth_parser;
-    use pyth::state::{State as PythState};
-    use pyth::price_info::{PriceInfoObject};
-
-    entry fun update_pyth_oracle(
-        oracle: &mut Oracle,
-        _manager_cap: &ManagerCap,
-        base_price_info_object: &PriceInfoObject,
-        quote_price_info_object: &PriceInfoObject,
+        ctx: &TxContext,
     ) {
         version_check(oracle);
-        let id = object::id(base_price_info_object);
-        oracle.pyth = option::some(id);
-        // add quote
-        let id = object::id(quote_price_info_object);
-        dynamic_field::add(&mut oracle.id, string::utf8(b"quote_price_info_object"), id);
+        assert!(update_cap.`for` == ctx.sender(), EInvalidUpdateCap);
+        update_(oracle, price, twap_price, clock, ctx);
     }
 
-    public fun update_with_pyth(
+    public fun update_with_update_caps(
         oracle: &mut Oracle,
-        state: &PythState,
-        base_price_info_object: &PriceInfoObject,
-        quote_price_info_object: &PriceInfoObject,
+        update_cap: &UpdateCaps,
+        price: u64,
+        twap_price: u64,
         clock: &Clock,
-        ctx: & TxContext
+        ctx: &TxContext,
     ) {
         version_check(oracle);
-        assert!(option::is_some(&oracle.pyth), E_NOT_PYTH);
-        assert!(option::borrow(&oracle.pyth) == &object::id(base_price_info_object), E_INVALID_PYTH);
-        assert!(dynamic_field::borrow(&oracle.id, string::utf8(b"quote_price_info_object"))== &object::id(quote_price_info_object), E_INVALID_PYTH);
-
-        let (mut base_price, decimal) = pyth_parser::get_price(state, base_price_info_object, clock);
-        assert!(base_price > 0, E_INVALID_PRICE);
-
-        if (decimal > oracle.decimal) {
-            base_price = base_price / 10u64.pow((decimal - oracle.decimal) as u8);
-        } else {
-            base_price = base_price * 10u64.pow((oracle.decimal - decimal) as u8);
-        };
-
-        let (quote_price, decimal) = pyth_parser::get_price(state, quote_price_info_object, clock);
-        assert!(quote_price > 0, E_INVALID_PRICE);
-
-        let price = (((base_price as u128) * (10u64.pow(decimal as u8) as u128) / (quote_price as u128)) as u64);
-        oracle.price = price;
-        let ts_ms = clock::timestamp_ms(clock);
-        oracle.ts_ms = ts_ms;
-        oracle.epoch = tx_context::epoch(ctx);
-
-        let (mut base_price, decimal, pyth_ts) = pyth_parser::get_ema_price(base_price_info_object);
-        assert!(base_price > 0, E_INVALID_PRICE);
-        assert!(ts_ms - pyth_ts * 1000 < oracle.time_interval, E_ORACLE_EXPIRED);
-
-        if (decimal > oracle.decimal) {
-            base_price = base_price / 10u64.pow((decimal - oracle.decimal) as u8);
-        } else {
-            base_price = base_price * 10u64.pow((oracle.decimal - decimal) as u8);
-        };
-
-        let (quote_price, decimal, pyth_ts) = pyth_parser::get_ema_price(quote_price_info_object);
-        assert!(quote_price > 0, E_INVALID_PRICE);
-        assert!(ts_ms - pyth_ts * 1000 < oracle.time_interval, E_ORACLE_EXPIRED);
-
-        oracle.twap_price = (((base_price as u128) * (10u64.pow(decimal as u8) as u128) / (quote_price as u128)) as u64);
-
-        emit(PriceEvent {id: object::id(oracle), price, ts_ms});
-    }
-
-    entry fun update_pyth_oracle_usd(
-        oracle: &mut Oracle,
-        _manager_cap: &ManagerCap,
-        base_price_info_object: &PriceInfoObject,
-    ) {
-        version_check(oracle);
-        // only quote token is USD
-        assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), E_NOT_PYTH);
-        let id = object::id(base_price_info_object);
-        oracle.pyth = option::some(id);
-    }
-
-    entry fun update_pyth_oracle_usd_reciprocal(
-        oracle: &mut Oracle,
-        _manager_cap: &ManagerCap,
-        base_price_info_object: &PriceInfoObject,
-    ) {
-        version_check(oracle);
-        // only quote token is USD
-        assert!(oracle.quote_token == ascii::string(b"USD"), E_NOT_PYTH);
-        let id = object::id(base_price_info_object);
-        oracle.pyth = option::none();
-        dynamic_field::add(&mut oracle.id, string::utf8(b"reciprocal_pyth"), id);
-    }
-
-    public fun update_with_pyth_usd(
-        oracle: &mut Oracle,
-        state: &PythState,
-        base_price_info_object: &PriceInfoObject,
-        clock: &Clock,
-        ctx: & TxContext
-    ) {
-        version_check(oracle);
-        // only quote token is USD
-        assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), E_NOT_PYTH);
-
-        let mut reciprocal = false;
-        if (dynamic_field::exists_(&oracle.id, string::utf8(b"reciprocal_pyth"))) {
-            reciprocal = true;
-            let pyth = *dynamic_field::borrow(&oracle.id, string::utf8(b"reciprocal_pyth"));
-            assert!(pyth == &object::id(base_price_info_object), E_INVALID_PYTH);
-        } else {
-            // normal situation
-            assert!(option::is_some(&oracle.pyth), E_NOT_PYTH);
-            assert!(option::borrow(&oracle.pyth) == &object::id(base_price_info_object), E_INVALID_PYTH);
-        };
-
-        let (mut base_price, decimal) = pyth_parser::get_price(state, base_price_info_object, clock);
-        assert!(base_price > 0, E_INVALID_PRICE);
-
-        if (decimal > oracle.decimal) {
-            base_price = base_price / 10u64.pow((decimal - oracle.decimal) as u8);
-        } else {
-            base_price = base_price * 10u64.pow((oracle.decimal - decimal) as u8);
-        };
-
-        let price = if (reciprocal) {
-            10u64.pow((oracle.decimal * 2) as u8) / base_price
-        } else {
-            base_price
-        };
-
-        oracle.price = price;
-        let ts_ms = clock::timestamp_ms(clock);
-        oracle.ts_ms = ts_ms;
-        oracle.epoch = tx_context::epoch(ctx);
-
-        let (mut base_price, decimal, pyth_ts) = pyth_parser::get_ema_price(base_price_info_object);
-        assert!(base_price > 0, E_INVALID_PRICE);
-        assert!(ts_ms - pyth_ts * 1000 < oracle.time_interval, E_ORACLE_EXPIRED);
-
-        if (decimal > oracle.decimal) {
-            base_price = base_price / 10u64.pow((decimal - oracle.decimal) as u8);
-        } else {
-            base_price = base_price * 10u64.pow((oracle.decimal - decimal) as u8);
-        };
-
-        if (reciprocal) {
-            oracle.twap_price = 10u64.pow((oracle.decimal * 2) as u8) / base_price
-        } else {
-            oracle.twap_price = base_price
-        };
-
-        emit(PriceEvent {id: object::id(oracle), price, ts_ms});
-    }
-
-    // use typus_oracle::supra;
-    // use SupraOracle::SupraSValueFeed::OracleHolder;
-
-    // entry fun update_supra_oracle(
-    //     oracle: &mut Oracle,
-    //     _manager_cap: &ManagerCap,
-    //     pair: u32
-    // ) {
-    //     version_check(oracle);
-    //     if (dynamic_field::exists_(& oracle.id, string::utf8(b"supra_pair"))) {
-    //         let supra_pair: &mut u32 = dynamic_field::borrow_mut(&mut oracle.id, string::utf8(b"supra_pair"));
-    //         *supra_pair = pair;
-    //     } else {
-    //         dynamic_field::add(&mut oracle.id, string::utf8(b"supra_pair"), pair);
-    //     };
-    // }
-
-    // entry fun update_with_supra(
-    //     oracle: &mut Oracle,
-    //     oracle_holder: &OracleHolder,
-    //     clock: &Clock,
-    //     ctx: & TxContext
-    // ) {
-    //     version_check(oracle);
-    //     let pair: u32 = *dynamic_field::borrow(&oracle.id, string::utf8(b"supra_pair"));
-
-    //     let (mut price_u128, decimal, timestamp_ms_u128) = supra::retrieve_price(oracle_holder, pair);
-    //     assert!(price_u128 > 0, E_INVALID_PRICE);
-
-    //     let ts_ms = clock::timestamp_ms(clock);
-    //     assert!(ts_ms - (timestamp_ms_u128 as u64) < oracle.time_interval, E_ORACLE_EXPIRED);
-
-    //     let oracle_decimal = (oracle.decimal as u16);
-
-    //     if (decimal > oracle_decimal) {
-    //         price_u128 = price_u128 / (10u64.pow(((decimal - oracle_decimal) as u8)) as u128);
-    //     } else {
-    //         price_u128 = price_u128 * (10u64.pow(((oracle_decimal - decimal) as u8)) as u128);
-    //     };
-
-    //     let price_u64 = (price_u128 as u64);
-
-    //     oracle.price = price_u64;
-    //     oracle.twap_price = price_u64;
-    //     oracle.ts_ms = ts_ms;
-    //     oracle.epoch = tx_context::epoch(ctx);
-
-    //     emit(PriceEvent {id: object::id(oracle), price: price_u64, ts_ms});
-    // }
-
-    public fun copy_manager_cap(
-        _manager_cap: &ManagerCap,
-        recipient: address,
-        ctx: &mut TxContext
-    ) {
-        transfer::transfer(ManagerCap {id: object::new(ctx)}, recipient);
-    }
-
-    public fun burn_manager_cap(
-        manager_cap: ManagerCap,
-    ) {
-        let ManagerCap {
-            id
-        } = manager_cap;
-        id.delete();
-    }
-
-    public fun get_oracle(
-        oracle: &Oracle
-    ): (u64, u64, u64, u64) {
-        (oracle.price, oracle.decimal, oracle.ts_ms, oracle.epoch)
-    }
-
-    public fun get_token(
-        oracle: &Oracle
-    ): (String, String, TypeName, TypeName) {
-        (oracle.base_token, oracle.quote_token, oracle.base_token_type, oracle.quote_token_type)
-    }
-
-    public fun get_price(
-        oracle: &Oracle,
-        clock: &Clock,
-    ): (u64, u64) {
-        let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms - oracle.ts_ms < oracle.time_interval, E_ORACLE_EXPIRED);
-        (oracle.price, oracle.decimal)
-    }
-
-    public fun get_twap_price(
-        oracle: &Oracle,
-        clock: &Clock,
-    ): (u64, u64) {
-        let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms - oracle.ts_ms < oracle.time_interval, E_ORACLE_EXPIRED);
-        (oracle.twap_price, oracle.decimal)
-    }
-
-    public fun get_price_with_interval_ms(
-        oracle: &Oracle,
-        clock: &Clock,
-        interval_ms: u64,
-    ): (u64, u64) {
-        let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms - oracle.ts_ms < oracle.time_interval && ts_ms - oracle.ts_ms <= interval_ms, E_ORACLE_EXPIRED);
-        (oracle.price, oracle.decimal)
+        assert!(update_cap.`for`.contains(&ctx.sender()), EInvalidUpdateCap);
+        update_(oracle, price, twap_price, clock, ctx);
     }
 
     public fun update_time_interval(
@@ -506,14 +274,235 @@ module typus_oracle::oracle {
         oracle.base_token = base_token;
     }
 
+    entry fun update_pyth_oracle(
+        oracle: &mut Oracle,
+        _manager_cap: &ManagerCap,
+        base_price_info_object: &PriceInfoObject,
+        quote_price_info_object: &PriceInfoObject,
+    ) {
+        version_check(oracle);
+        let id = object::id(base_price_info_object);
+        oracle.pyth = option::some(id);
+        // add quote
+        let id = object::id(quote_price_info_object);
+        dynamic_field::add(&mut oracle.id, string::utf8(b"quote_price_info_object"), id);
+    }
 
-    const E_ORACLE_EXPIRED: u64 = 1;
-    const E_INVALID_PRICE: u64 = 2;
-    // const E_NOT_SWITCHBOARD: u64 = 3;
-    // const E_INVALID_SWITCHBOARD: u64 = 4;
-    const E_NOT_PYTH: u64 = 5;
-    const E_INVALID_PYTH: u64 = 6;
-    const E_INVALID_VERSION: u64 = 7;
+    entry fun update_pyth_oracle_usd(
+        oracle: &mut Oracle,
+        _manager_cap: &ManagerCap,
+        base_price_info_object: &PriceInfoObject,
+    ) {
+        version_check(oracle);
+        // only quote token is USD
+        assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), ENotPyth);
+        let id = object::id(base_price_info_object);
+        oracle.pyth = option::some(id);
+    }
 
-    public struct PriceEvent has copy, drop { id: ID, price: u64, ts_ms: u64 }
+    entry fun update_pyth_oracle_usd_reciprocal(
+        oracle: &mut Oracle,
+        _manager_cap: &ManagerCap,
+        base_price_info_object: &PriceInfoObject,
+    ) {
+        version_check(oracle);
+        // only quote token is USD
+        assert!(oracle.quote_token == ascii::string(b"USD"), ENotPyth);
+        let id = object::id(base_price_info_object);
+        oracle.pyth = option::none();
+        dynamic_field::add(&mut oracle.id, string::utf8(b"reciprocal_pyth"), id);
+    }
+
+    // ======== Permissionless Functions =========
+
+    public fun update_with_pyth(
+        oracle: &mut Oracle,
+        state: &State,
+        base_price_info_object: &PriceInfoObject,
+        quote_price_info_object: &PriceInfoObject,
+        clock: &Clock,
+        ctx: & TxContext
+    ) {
+        version_check(oracle);
+        assert!(option::is_some(&oracle.pyth), ENotPyth);
+        assert!(option::borrow(&oracle.pyth) == &object::id(base_price_info_object), EInvalidPyth);
+        assert!(dynamic_field::borrow(&oracle.id, string::utf8(b"quote_price_info_object"))== &object::id(quote_price_info_object), EInvalidPyth);
+
+        let (base_price, base_decimal, _) = pyth_parser::get_price(state, base_price_info_object, clock);
+        let (quote_price, quote_decimal, _) = pyth_parser::get_price(state, quote_price_info_object, clock);
+        assert!(base_price > 0, EInvalidPrice);
+        assert!(quote_price > 0, EInvalidPrice);
+        let price = (((base_price as u256)
+            * (10u64.pow(oracle.decimal as u8) as u256)
+            * (10u64.pow(quote_decimal as u8) as u256)
+            / (10u64.pow(base_decimal as u8) as u256)
+            / (quote_price as u256)) as u64);
+        let (base_price, base_decimal, _) = pyth_parser::get_ema_price(base_price_info_object);
+        let (quote_price, quote_decimal, _) = pyth_parser::get_ema_price(quote_price_info_object);
+        assert!(base_price > 0, EInvalidPrice);
+        assert!(quote_price > 0, EInvalidPrice);
+        let twap_price = (((base_price as u256)
+            * (10u64.pow(oracle.decimal as u8) as u256)
+            * (10u64.pow(quote_decimal as u8) as u256)
+            / (10u64.pow(base_decimal as u8) as u256)
+            / (quote_price as u256)) as u64);
+
+        oracle.price = price;
+        oracle.twap_price = twap_price;
+        oracle.ts_ms = clock.timestamp_ms();
+        oracle.epoch = tx_context::epoch(ctx);
+
+        emit(PriceEvent {
+            id: object::id(oracle),
+            price,
+            ts_ms: clock.timestamp_ms(),
+        });
+    }
+
+    public fun update_with_pyth_usd(
+        oracle: &mut Oracle,
+        state: &State,
+        base_price_info_object: &PriceInfoObject,
+        clock: &Clock,
+        ctx: & TxContext
+    ) {
+        version_check(oracle);
+        // only quote token is USD
+        assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), ENotPyth);
+
+        let mut reciprocal = false;
+        if (dynamic_field::exists_(&oracle.id, string::utf8(b"reciprocal_pyth"))) {
+            reciprocal = true;
+            assert!(dynamic_field::borrow(&oracle.id, string::utf8(b"reciprocal_pyth")) == object::id(base_price_info_object), EInvalidPyth);
+        } else {
+            assert!(oracle.pyth == option::some(object::id(base_price_info_object)), EInvalidPyth);
+        };
+
+        let (base_price, base_decimal, _) = pyth_parser::get_price(state, base_price_info_object, clock);
+        assert!(base_price > 0, EInvalidPrice);
+        let mut price = (((base_price as u256)
+            * (10u64.pow(oracle.decimal as u8) as u256)
+            / (10u64.pow(base_decimal as u8) as u256)) as u64);
+        let (base_price, base_decimal, _) = pyth_parser::get_ema_price(base_price_info_object);
+        assert!(base_price > 0, EInvalidPrice);
+        let mut twap_price = (((base_price as u256)
+            * (10u64.pow(oracle.decimal as u8) as u256)
+            / (10u64.pow(base_decimal as u8) as u256)) as u64);
+        if (reciprocal) {
+            price = 10u64.pow((oracle.decimal * 2) as u8) / price;
+            twap_price = 10u64.pow((oracle.decimal * 2) as u8) / twap_price;
+        };
+
+        oracle.price = price;
+        oracle.twap_price = twap_price;
+        oracle.ts_ms = clock.timestamp_ms();
+        oracle.epoch = tx_context::epoch(ctx);
+
+        emit(PriceEvent {
+            id: object::id(oracle),
+            price,
+            ts_ms: clock.timestamp_ms(),
+        });
+    }
+
+    // ======== Utility =========
+
+    fun version_check(
+        oracle: &Oracle,
+    ) {
+        if (dynamic_field::exists_(&oracle.id, string::utf8(b"VERSION"))) {
+            let v: u64 = *dynamic_field::borrow(&oracle.id, string::utf8(b"VERSION"));
+            assert!(CVersion >= v, EInvalidVersion);
+            return
+        };
+
+        abort EInvalidVersion
+    }
+
+    fun update_(
+        oracle: &mut Oracle,
+        price: u64,
+        twap_price: u64,
+        clock: &Clock,
+        ctx: &TxContext
+    ) {
+        assert!(price > 0, EInvalidPrice);
+        assert!(twap_price > 0, EInvalidPrice);
+
+        let ts_ms = clock::timestamp_ms(clock);
+
+        oracle.price = price;
+        oracle.twap_price = twap_price;
+        oracle.ts_ms = ts_ms;
+        oracle.epoch = tx_context::epoch(ctx);
+
+        emit(PriceEvent {id: object::id(oracle), price, ts_ms});
+    }
+
+    public fun get_oracle(
+        oracle: &Oracle,
+    ): (u64, u64, u64, u64) {
+        (oracle.price, oracle.decimal, oracle.ts_ms, oracle.epoch)
+    }
+
+    public fun get_token(
+        oracle: &Oracle,
+    ): (String, String, TypeName, TypeName) {
+        (oracle.base_token, oracle.quote_token, oracle.base_token_type, oracle.quote_token_type)
+    }
+
+    public fun get_price(
+        oracle: &Oracle,
+        clock: &Clock,
+    ): (u64, u64) {
+        let ts_ms = clock::timestamp_ms(clock);
+        assert!(ts_ms - oracle.ts_ms < oracle.time_interval, EOracleExpired);
+        (oracle.price, oracle.decimal)
+    }
+
+    public fun get_twap_price(
+        oracle: &Oracle,
+        clock: &Clock,
+    ): (u64, u64) {
+        let ts_ms = clock::timestamp_ms(clock);
+        assert!(ts_ms - oracle.ts_ms < oracle.time_interval, EOracleExpired);
+        (oracle.twap_price, oracle.decimal)
+    }
+
+    public fun get_price_with_interval_ms(
+        oracle: &Oracle,
+        clock: &Clock,
+        interval_ms: u64,
+    ): (u64, u64) {
+        let ts_ms = clock::timestamp_ms(clock);
+        assert!(ts_ms - oracle.ts_ms < oracle.time_interval && ts_ms - oracle.ts_ms <= interval_ms, EOracleExpired);
+        (oracle.price, oracle.decimal)
+    }
+
+    // ======== Tests =========
+
+    #[test_only]
+    public fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
+
+    // ======== Deprecated =========
+
+    #[deprecated]
+    public struct UpdateAuthority has key {
+        id: UID,
+        authority: vector<address>,
+    }
+
+    #[deprecated]
+    public fun update_v2(
+        _oracle: &mut Oracle,
+        _update_authority: & UpdateAuthority,
+        _price: u64,
+        _twap_price: u64,
+        _clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        abort 0
+    }
 }

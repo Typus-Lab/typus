@@ -1,16 +1,15 @@
 module typus_oracle::supra {
-    use sui::event::emit;
-    use SupraOracle::SupraSValueFeed::{get_price, OracleHolder};
+    // ======== Deprecated =========
 
+    #[deprecated]
     public fun retrieve_price(
-        oracle_holder: &OracleHolder,
-        pair: u32
+        _oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pair: u32
     ): (u128, u16, u128) {
-        let (price, decimal, timestamp, round) = get_price(oracle_holder, pair);
-        emit(SupraPrice { pair, price, decimal, timestamp, round });
-        (price, decimal, timestamp)
+        abort 0
     }
 
+    #[deprecated]
     public struct SupraPrice has copy, drop {
         pair: u32,
         price: u128,

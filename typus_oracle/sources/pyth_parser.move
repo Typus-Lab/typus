@@ -1,32 +1,32 @@
 module typus_oracle::pyth_parser {
     use sui::clock::Clock;
 
-    use pyth::pyth;
-    use pyth::state::{State as PythState};
+    use pyth::i64::{Self, I64};
+    use pyth::price_feed;
     use pyth::price_info::{Self, PriceInfoObject};
     use pyth::price::{Self, Price};
-    use pyth::price_feed;
-    use pyth::i64::{Self, I64};
+    use pyth::pyth;
+    use pyth::state::State;
 
     public(package) entry fun get_price(
-        state: &PythState,
+        state: &State,
         price_info_object: &PriceInfoObject,
         clock: &Clock
-    ): (u64, u64) {
+    ): (u64, u64, u64) {
 
         let price_result: Price = pyth::get_price(state, price_info_object, clock);
 
         let price: I64 = price::get_price(&price_result);
         let expo: I64 = price::get_expo(&price_result);
         // let conf = price::get_conf(&price_result);
-        // let timestamp = price::get_timestamp(&price_result);
+        let timestamp = price::get_timestamp(&price_result);
 
         let price = i64::get_magnitude_if_positive(&price);
         let decimal = i64::get_magnitude_if_negative(&expo);
         // price * (10^expo) => expo = -decimal
 
         // emit(PythPrice{price, conf, timestamp, decimal});
-        (price, decimal)
+        (price, decimal, timestamp)
     }
 
     public(package) entry fun get_ema_price(
@@ -48,12 +48,14 @@ module typus_oracle::pyth_parser {
         (price, decimal, timestamp)
     }
 
-    #[allow(unused)]
+    // ======== Deprecated =========
+
+    #[deprecated]
     public struct PythPriceInfoObject has copy, drop {
         id: ID
     }
 
-    #[allow(unused_field)]
+    #[deprecated]
     public struct PythPrice has copy, drop {
         price: u64,
         conf: u64,
