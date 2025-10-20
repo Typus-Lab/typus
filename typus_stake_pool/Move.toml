@@ -4,26 +4,9 @@ edition = "2024.beta"
 version = "0.3.0"
 published-at = "0xd8527fedb706627eb972f07018c8e378c479806043b7244fa2852cc7fe44fa37"
 
-[dependencies.Sui]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/sui-framework"
-rev = "mainnet"
-override = true
-
 [dependencies.typus]
-git = "git@github.com:Typus-Lab/typus-move.git"
-subdir = "typus"
-rev = "mainnet"
+local = "../typus"
 
 [addresses]
 typus_stake_pool = "0xc427209145715a00a93d7e674a95c556a7147d79fda1bbaeb1a1cac5f9923966"
 typus_perp_fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
-# upgrade_cap = "0xa56f6b85079366f32f6c76420fe20c5b48d6b529e037f4feb2e79d182c36d322"
-# StakePoolRegistry = "0x2cdf93717f87a8a7aeb98b27777b3b643f0ae2b277f44e6bcda0fc655a47d3e0"
-# Version = "0xdf3ed1599218b2415b2cd7fa06296f7f647676019b2873ec18e55a626c584f1b"
-
-# sui client upgrade --upgrade-capability 0xa56f6b85079366f32f6c76420fe20c5b48d6b529e037f4feb2e79d182c36d322 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt
-# sui keytool sign --address 0xb3e9235ae84bf06f1e51c9e98ce66d30d09efa3b00036f978d3fd64405d6fadd --data "$(cat data.txt)"
-# sui keytool multi-sig-combine-partial-sig --pks AMRpzJbrI1fbe/m5w9i4Y5oBUdt5PlmYd8vrVz8VdRcw ABhvd0+woaAG33pe/CTyYlS6/UkP9H2BFy35+Ch3iyQ+ AH0U2vAxvY4vagbmsUC9bsFHhsnk9bFUOdmMposcGe77 ALn8kQubZ0N1sMfcsyRZ+f4rb3WBZkl48eDvPkXs7Ly8 AFVAc5wUOvdH2GzqavT9JmjT2R82vvcWuFSE0EK8ENBG --weights 3 2 1 1 1 --threshold 3 --sigs
-
-# sui client execute-signed-tx --tx-bytes "$(cat data.txt)" --signatures <multisigSerialized>

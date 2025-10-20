@@ -5,26 +5,9 @@ version = "0.0.24"
 published-at = "0x1c0b49f9469d1da42e6825f69db52e235af5357baf7586d48cd6490b0fff15a4"
 
 [dependencies.typus_dov]
-git = "git@github.com:Typus-Lab/typus.git"
-subdir = "typus_dov_single"
-rev = "100298902341451d70ba1b96e0c5282ed805ca92"
-
+local = "../typus_dov_single"
 
 [addresses]
 typus_perp = "0xe27969a70f93034de9ce16e6ad661b480324574e68d15a64b513fd90eb2423e5"
 typus_perp_fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
 insurance_fund_address = "0x83fdb2649217b1beb5dccf81f21b6425718579b7902ca5fc0842b71d2cb283eb"
-# upgrade_cap = "0x7855e4cf210eecbada3a273427ebf4f9b355b0cd052a5f51a9718a888f045427"
-# Registry = "0xfee68e535bf24702be28fa38ea2d5946e617e0035027d5ca29dbed99efd82aaa"
-# MarketRegistry = "0xc969d946a2b6b917a83b5fb71765793c4a52149e50d2c8cf5c01d7421fc7cd73"
-# Version = "0xa12c282a068328833ec4a9109fc77803ec1f523f8da1bb0f82bac8450335f0c9"
-# LpRegistry = "0xc0a8cc0201d202321cd40b3f19fcf4cc88d6b63ceac0de55b08a2ab16f8a721e"
-# TreasuryCaps = "0x77c75fb1d78cca25b5e2d69decfe2837abf95c4ef44b809868e6ca20f42b63bc"
-# TLP CoinMetadata = "0x655d36874ee37cf81bfca349e3cb13f64fbe8811c7e1134e32b8def114fea66c"
-# 0xe27969a70f93034de9ce16e6ad661b480324574e68d15a64b513fd90eb2423e5::tlp::TLP
-
-# sui client upgrade --upgrade-capability 0x7855e4cf210eecbada3a273427ebf4f9b355b0cd052a5f51a9718a888f045427 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt
-# sui keytool sign --address 0xb3e9235ae84bf06f1e51c9e98ce66d30d09efa3b00036f978d3fd64405d6fadd --data "$(cat data.txt)"
-# sui keytool multi-sig-combine-partial-sig --pks AMRpzJbrI1fbe/m5w9i4Y5oBUdt5PlmYd8vrVz8VdRcw ABhvd0+woaAG33pe/CTyYlS6/UkP9H2BFy35+Ch3iyQ+ AH0U2vAxvY4vagbmsUC9bsFHhsnk9bFUOdmMposcGe77 ALn8kQubZ0N1sMfcsyRZ+f4rb3WBZkl48eDvPkXs7Ly8 AFVAc5wUOvdH2GzqavT9JmjT2R82vvcWuFSE0EK8ENBG --weights 3 2 1 1 1 --threshold 3 --sigs
-
-# sui client execute-signed-tx --signatures <multisigSerialized> --tx-bytes "$(cat data.txt)"
