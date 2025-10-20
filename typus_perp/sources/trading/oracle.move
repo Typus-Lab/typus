@@ -1,3 +1,5 @@
+/// This module is a placeholder for interacting with the Pyth oracle.
+/// [Deprecated] Use `typus_oracle` instead.
 module typus_perp::oracle {
     // use sui::clock::Clock;
     // use sui::event::emit;
@@ -11,11 +13,13 @@ module typus_perp::oracle {
 
     // use typus_perp::error;
 
+    // /// Gets the Pyth price info object ID.
     // entry fun get_price_info_object_id(state: &PythState, price_identifier_bytes: vector<u8>) {
     //     let id = state::get_price_info_object_id(state, price_identifier_bytes);
     //     emit(PythPriceInfoObject{ id });
     // }
 
+    // /// Gets the Pyth price.
     // public(package) entry fun get_price(
     //     state: &PythState,
     //     price_info_object: &PriceInfoObject,
@@ -39,6 +43,7 @@ module typus_perp::oracle {
     //     (price, decimal)
     // }
 
+    // /// Gets the Pyth EMA price.
     // public(package) entry fun get_ema_price(
     //     price_info_object: &PriceInfoObject
     // ): (u64, u64, u64) {
@@ -59,10 +64,12 @@ module typus_perp::oracle {
     //     (price, decimal, timestamp)
     // }
 
+    // /// An event that is emitted with the Pyth price info object ID.
     // public struct PythPriceInfoObject has copy, drop {
     //     id: ID
     // }
 
+    // /// An event that is emitted with the Pyth price.
     // public struct PythPrice has copy, drop {
     //     price: u64,
     //     conf: u64,

@@ -1,3 +1,5 @@
+/// The `position` module defines the `Position` and `TradingOrder` structs, and the logic for creating, updating, and closing them.
+/// All of the functions are inner package functions used in `trading.move`.
 module typus_perp::position {
     use std::type_name::{Self, TypeName};
     use std::string::{Self, String};
@@ -34,62 +36,109 @@ module typus_perp::position {
     const K_PORTFOLIO_INDEX: vector<u8> = b"portfolio_index";   // u64 (TradingOrder)
 
     // ======== Structs ========
+    /// A struct that represents a trading position.
     #[allow(lint(missing_key))]
     public struct Position has store {
         id: UID,
+        /// The timestamp when the position was created.
         create_ts_ms: u64,
+        /// The ID of the position.
         position_id: u64,
+        /// A vector of the linked order IDs.
         linked_order_ids: vector<u64>,
+        /// A vector of the linked order prices.
         linked_order_prices: vector<u64>,
+        /// The address of the user.
         user: address,
+        /// Whether the position is long.
         is_long: bool,
+        /// The size of the position.
         size: u64, // position size represent order.to_token_amount in USD when opening order
+        /// The number of decimals for the size.
         size_decimal: u64,
+        /// The type name of the collateral token.
         collateral_token: TypeName, // C_TOKEN
+        /// The number of decimals for the collateral token.
         collateral_token_decimal: u64,
+        /// The symbol of the trading pair.
         symbol: Symbol,
+        /// The amount of collateral.
         collateral_amount: u64,// order.collateral_amount - execution_fee_amount in c_token amount
+        /// The amount of reserved collateral.
         reserve_amount: u64, // position.size in collateral token amount
+        /// The average price of the position.
         average_price: u64,
+        /// The entry borrow index.
         entry_borrow_index: u64,
+        /// The sign of the entry funding rate index.
         entry_funding_rate_index_sign: bool,
+        /// The entry funding rate index.
         entry_funding_rate_index: u64,
+        /// The unrealized loss.
         unrealized_loss: u64, // only option collateral position uses it
+        /// The sign of the unrealized funding fee.
         unrealized_funding_sign: bool, // true -> should pay
+        /// The unrealized funding fee.
         unrealized_funding_fee: u64,
+        /// The unrealized trading fee.
         unrealized_trading_fee: u64,
+        /// The unrealized borrow fee.
         unrealized_borrow_fee: u64, // option collateral position also uses this field to store unrealized trading fee
+        /// The unrealized rebate.
         unrealized_rebate: u64,
+        /// Information about the option collateral.
         option_collateral_info: Option<OptionCollateralInfo>, // if token collateral position, this field is None
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// A struct that holds information about option collateral.
     public struct OptionCollateralInfo has store, drop {
+        /// The index of the portfolio.
         index: u64,
+        /// The type name of the bid token.
         bid_token: TypeName, // deposit_token = collateral_token
+        /// A vector of the BCS-serialized bid receipts.
         bid_receipts_bcs: vector<vector<u8>>, // vector[bcs of one bid receipt]
     }
 
+    /// A struct that represents a trading order.
     #[allow(lint(missing_key))]
     public struct TradingOrder has store {
         id: UID,
+        /// The timestamp when the order was created.
         create_ts_ms: u64,
+        /// The ID of the order.
         order_id: u64,
+        /// The ID of the linked position.
         linked_position_id: Option<u64>,
+        /// The address of the user.
         user: address,
         // user token type
+        /// The type name of the collateral token.
         collateral_token: TypeName, // C_TOKEN
+        /// The number of decimals for the collateral token.
         collateral_token_decimal: u64,
+        /// The symbol of the trading pair.
         symbol: Symbol,
         // order parameters
+        /// The leverage in mega basis points.
         leverage_mbp: u64, // TODO: adjust for removing collateral
+        /// Whether the order is reduce-only.
         reduce_only: bool,
+        /// Whether the order is long.
         is_long: bool,
+        /// Whether the order is a stop order.
         is_stop_order: bool,
+        /// The size of the order.
         size: u64,
+        /// The number of decimals for the size.
         size_decimal: u64,
+        /// The trigger price of the order.
         trigger_price: u64,
+        /// The oracle price when the order was placed.
         oracle_price_when_placing: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>, // [collateral.value]
         // record the amount user deposited into MarketCollateral<TOKEN>
         // execution_info: ExecutionInfo,
@@ -97,6 +146,8 @@ module typus_perp::position {
         // execution_fee_amount: u64,
     }
 
+    /// Creates a new trading order.
+    /// WARNING: no authority check inside
     public(package) fun create_order<C_TOKEN>(
         version: &Version,
         // order parameters
@@ -142,6 +193,8 @@ module typus_perp::position {
         order
     }
 
+    /// Removes a trading order.
+    /// WARNING: no authority check inside
     public(package) fun remove_order<C_TOKEN>(
         version: &Version,
         order: TradingOrder,
@@ -175,6 +228,7 @@ module typus_perp::position {
         balance
     }
 
+    /// [Authorized Function] Creates a reduce-only order by the manager.
     public(package) fun manager_create_reduce_only_order<C_TOKEN>(
         version: &Version,
         // order parameters
@@ -218,6 +272,8 @@ module typus_perp::position {
         order
     }
 
+    /// Increases the collateral of a position.
+    /// WARNING: no authority check inside
     public(package) fun increase_collateral<C_TOKEN>(
         position: &mut Position,
         collateral: Balance<C_TOKEN>,
@@ -242,6 +298,8 @@ module typus_perp::position {
         position.reserve_amount = reserve_amount;
     }
 
+    /// Releases collateral from a position.
+    /// WARNING: no authority check inside
     public(package) fun release_collateral<C_TOKEN>(
         position: &mut Position,
         release_amount: u64,
@@ -267,6 +325,7 @@ module typus_perp::position {
         released_balance
     }
 
+    /// An event that is emitted when a position is removed.
     public struct RemovePositionEvent has copy, drop {
         user: address,
         collateral_token: TypeName,
@@ -278,6 +337,8 @@ module typus_perp::position {
         realized_borrow_fee_amount: u64,
         u64_padding: vector<u64>
     }
+    /// Removes a position.
+    /// WARNING: no authority check inside
     public(package) fun remove_position<C_TOKEN>(
         version: &Version,
         position: Position,
@@ -347,6 +408,7 @@ module typus_perp::position {
         (balance, trading_fee_balance, linked_order_ids, linked_order_prices)
     }
 
+    /// An event that is emitted when an order is filled.
     public struct OrderFilledEvent has copy, drop {
         user: address,
         collateral_token: TypeName,
@@ -366,6 +428,8 @@ module typus_perp::position {
         realized_amount_sign: bool,
         u64_padding: vector<u64>
     }
+    /// Handles a filled order.
+    /// WARNING: no authority check inside
     public(package) fun order_filled<C_TOKEN>(
         version: &Version,
         ecosystem_version: &TypusEcosystemVersion,
@@ -602,6 +666,8 @@ module typus_perp::position {
         )
     }
 
+    /// Realizes the PnL and fees of a position.
+    /// WARNING: no authority check inside
     public(package) fun realize_position_pnl_and_fee<C_TOKEN>(
         version: &mut Version,
         liquidity_pool: &mut LiquidityPool,
@@ -741,6 +807,8 @@ module typus_perp::position {
         profit_balance
     }
 
+    /// Realizes the funding fee of a position.
+    /// WARNING: no authority check inside
     public(package) fun realize_funding_fee<C_TOKEN>(
         liquidity_pool: &mut LiquidityPool,
         position: &mut Position,
@@ -1237,45 +1305,45 @@ module typus_perp::position {
         order
     }
 
-    public(package) fun remove_order_with_bid_receipts(
-        version: &Version,
-        order: TradingOrder,
-    ): vector<TypusBidReceipt> {
-        // safety check
-        admin::version_check(version);
-        let TradingOrder {
-            id: mut id,
-            create_ts_ms: _,
-            order_id: _,
-            linked_position_id: _,
-            user: _,
-            // user token type
-            collateral_token, // TypusBidReceipt
-            collateral_token_decimal: _,
-            symbol: _,
-            // order parameters
-            leverage_mbp: _,
-            reduce_only: _,
-            is_long: _,
-            is_stop_order: _,
-            size: _,
-            size_decimal: _,
-            // to_token_usd_size: u64,
-            trigger_price: _,
-            oracle_price_when_placing: _,
-            u64_padding: _,
-        } = order;
-        assert!(collateral_token == type_name::with_defining_ids<TypusBidReceipt>(), error::wrong_collateral_type());
-        let bid_receipts = if (dynamic_field::exists_<String>(&id, string::utf8(K_COLLATERAL))) {
-            dynamic_field::remove<String, vector<TypusBidReceipt>>(&mut id, string::utf8(K_COLLATERAL))
-        } else {
-            vector::empty()
-        };
-        let _ = dynamic_field::remove<String, TypeName>(&mut id, string::utf8(K_DEPOSIT_TOKEN));
-        let _ = dynamic_field::remove<String, u64>(&mut id, string::utf8(K_PORTFOLIO_INDEX));
-        object::delete(id);
-        bid_receipts
-    }
+    // public(package) fun remove_order_with_bid_receipts(
+    //     version: &Version,
+    //     order: TradingOrder,
+    // ): vector<TypusBidReceipt> {
+    //     // safety check
+    //     admin::version_check(version);
+    //     let TradingOrder {
+    //         id: mut id,
+    //         create_ts_ms: _,
+    //         order_id: _,
+    //         linked_position_id: _,
+    //         user: _,
+    //         // user token type
+    //         collateral_token, // TypusBidReceipt
+    //         collateral_token_decimal: _,
+    //         symbol: _,
+    //         // order parameters
+    //         leverage_mbp: _,
+    //         reduce_only: _,
+    //         is_long: _,
+    //         is_stop_order: _,
+    //         size: _,
+    //         size_decimal: _,
+    //         // to_token_usd_size: u64,
+    //         trigger_price: _,
+    //         oracle_price_when_placing: _,
+    //         u64_padding: _,
+    //     } = order;
+    //     assert!(collateral_token == type_name::with_defining_ids<TypusBidReceipt>(), error::wrong_collateral_type());
+    //     let bid_receipts = if (dynamic_field::exists_<String>(&id, string::utf8(K_COLLATERAL))) {
+    //         dynamic_field::remove<String, vector<TypusBidReceipt>>(&mut id, string::utf8(K_COLLATERAL))
+    //     } else {
+    //         vector::empty()
+    //     };
+    //     let _ = dynamic_field::remove<String, TypeName>(&mut id, string::utf8(K_DEPOSIT_TOKEN));
+    //     let _ = dynamic_field::remove<String, u64>(&mut id, string::utf8(K_PORTFOLIO_INDEX));
+    //     object::delete(id);
+    //     bid_receipts
+    // }
 
     public(package) fun remove_position_with_bid_receipts(
         version: &Version,
@@ -1701,6 +1769,8 @@ module typus_perp::position {
         } else { false }
     }
 
+    /// Adds linked order info to a position.
+    /// WARNING: no authority check inside
     public(package) fun add_position_linked_order_info(
         position: &mut Position,
         linked_order_id: u64,
@@ -1711,6 +1781,8 @@ module typus_perp::position {
         assert!(position.linked_order_ids.length() <= C_MAX_LINKED_ORDER_AMOUNT, error::too_many_linked_orders());
     }
 
+    /// Removes linked order info from a position.
+    /// WARNING: no authority check inside
     public(package) fun remove_position_linked_order_info(
         position: &mut Position,
         linked_order_id: u64,
@@ -1721,6 +1793,8 @@ module typus_perp::position {
         position.linked_order_prices.remove(index);
     }
 
+    /// Updates the borrow rate and funding rate of a position.
+    /// WARNING: no authority check inside
     public(package) fun update_position_borrow_rate_and_funding_rate(
         position: &mut Position,
         collateral_oracle_price: u64,
@@ -1761,6 +1835,7 @@ module typus_perp::position {
 
     // only token collateral positions can use this
     // input funding_income from lp pool, and return balance for funding payout
+    /// An event that is emitted when a funding fee is realized.
     public struct RealizeFundingEvent has copy, drop {
         user: address,
         collateral_token: TypeName,
@@ -1772,6 +1847,8 @@ module typus_perp::position {
         u64_padding: vector<u64>
     }
 
+    /// Updates the collateral amount of an option position.
+    /// WARNING: no authority check inside
     public(package) fun update_option_position_collateral_amount<C_TOKEN>(
         dov_registry: &DovRegistry,
         typus_oracle_trading_symbol: &Oracle,
@@ -2412,728 +2489,3 @@ module typus_perp::position {
 
     public(package) fun get_max_order_type_tag(): u8 { C_MAX_ORDER_TYPE_TAG }
 }
-
-// #[test_only]
-// module typus_perp::test_position {
-//     use std::type_name;
-
-//     use sui::clock::{Self, Clock};
-//     use sui::coin::{Self, Coin};
-//     use sui::dynamic_field;
-//     use sui::sui::SUI;
-//     use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared};
-
-//     use typus_perp::admin::{Self, Version};
-//     use typus_perp::error;
-//     use typus_perp::position::{Self, TradingOrder, Position};
-//     use typus_perp::symbol;
-
-//     const K_ORDERS: vector<u8> = b"orders";
-//     const K_POSITIONS: vector<u8> = b"positions";
-
-//     const ADMIN: address = @0xFFFF;
-//     // const USER_1: address = @0xBABE1;
-//     // const USER_2: address = @0xBABE2;
-//     const SIZE_DECIMAL: u64 = 9;
-//     const COLLATERAL_TOKEN_DECIMAL: u64 = 9;
-//     const ORACLE_PRICE_DECIMAL: u64 = 8;
-//     const TRADING_FEE_MBP: u64 = 10000;
-//     const MAINTENANCE_MARGIN_RATE_BP: u64 = 150;
-//     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
-
-//     const CUMULATIVE_FUNDING_RATE_INDEX_SIGN: bool = true;
-//     const CUMULATIVE_FUNDING_RATE_INDEX: u64 = 0;
-
-//     public struct TSUI has drop {}
-//     public struct USD has drop {}
-
-//     // use for storing orders and positions when testing
-//     public struct Orders has key {
-//         id: UID
-//     }
-//     public struct Positions has key {
-//         id: UID
-//     }
-
-//     fun new_orders(scenario: &mut Scenario) {
-//         let mut orders = Orders {id: object::new(ctx(scenario))};
-//         dynamic_field::add(&mut orders.id, K_ORDERS, vector::empty<TradingOrder>());
-//         transfer::share_object(orders);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_positions(scenario: &mut Scenario) {
-//         let mut positions = Positions {id: object::new(ctx(scenario))};
-//         dynamic_field::add(&mut positions.id, K_POSITIONS, vector::empty<Position>());
-//         transfer::share_object(positions);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_version(scenario: &mut Scenario) {
-//         admin::test_init(ctx(scenario));
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_clock(scenario: &mut Scenario): Clock {
-//         let mut clock = clock::create_for_testing(ctx(scenario));
-//         clock::set_for_testing(&mut clock, CURRENT_TS_MS);
-//         clock
-//     }
-
-//     fun orders(scenario: &Scenario): Orders {
-//         take_shared<Orders>(scenario)
-//     }
-
-//     fun positions(scenario: &Scenario): Positions {
-//         take_shared<Positions>(scenario)
-//     }
-
-//     fun version(scenario: &Scenario): Version {
-//         take_shared<Version>(scenario)
-//     }
-
-//     fun mint_test_coin<T>(scenario: &mut Scenario, amount: u64): Coin<T> {
-//         coin::mint_for_testing<T>(amount, ctx(scenario))
-//     }
-
-//     fun test_create_order_<C_TOKEN, BASE_TOKEN, QUOTE_TOKEN>(
-//         scenario: &mut Scenario,
-//         leverage_mbp: u64,
-//         reduce_only: bool,
-//         is_long: bool,
-//         is_stop_order: bool,
-//         size: u64,
-//         trigger_price: u64,
-//         collateral_amount: u64,
-//         linked_position_id: Option<u64>,
-//         order_id: u64,
-//         oracle_price: u64,
-//     ) {
-//         let mut orders = orders(scenario);
-//         let version = version(scenario);
-//         let clock = new_clock(scenario);
-//         let collateral = mint_test_coin<C_TOKEN>(scenario, collateral_amount);
-//         let balance = coin::into_balance(collateral);
-//         let symbol = symbol::create(type_name::with_defining_ids<BASE_TOKEN>(), type_name::with_defining_ids<QUOTE_TOKEN>());
-//         let order = position::create_order<C_TOKEN>(
-//             &version,
-//             // order parameters
-//             symbol,
-//             leverage_mbp,
-//             reduce_only,
-//             is_long,
-//             is_stop_order,
-//             size,
-//             SIZE_DECIMAL,
-//             trigger_price,
-//             balance,
-//             COLLATERAL_TOKEN_DECIMAL,
-//             // generated by entry function
-//             linked_position_id,
-//             order_id,
-//             oracle_price,
-//             &clock,
-//             ctx(scenario)
-//         );
-
-//         let active_orders = dynamic_field::borrow_mut<vector<u8>, vector<TradingOrder>>(&mut orders.id, K_ORDERS);
-//         active_orders.push_back(order);
-//         return_shared(version);
-//         return_shared(orders);
-//         clock::destroy_for_testing(clock);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_remove_order_<C_TOKEN>(scenario: &mut Scenario, collateral_amount: u64) {
-//         let mut orders = orders(scenario);
-//         let version = version(scenario);
-//         let active_orders = dynamic_field::borrow_mut<vector<u8>, vector<TradingOrder>>(&mut orders.id, K_ORDERS);
-//         let order = active_orders.pop_back();
-//         let user = position::get_order_user(&order);
-
-//         let balance = position::remove_order<C_TOKEN>(&version, order);
-//         assert!(balance.value() == collateral_amount, 0);
-//         transfer::public_transfer(coin::from_balance(balance, ctx(scenario)), user);
-
-//         return_shared(version);
-//         return_shared(orders);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_check_order_filled_<C_TOKEN, BASE_TOKEN, QUOTE_TOKEN>(
-//         scenario: &mut Scenario,
-//         order_side: bool,
-//         stop_order: bool,
-//         trigger_price: u64
-//     ) {
-//         let oracle_price = 60000_0000_0000;
-//         test_create_order_<C_TOKEN, BASE_TOKEN, QUOTE_TOKEN>(
-//             scenario,
-//             10000,
-//             false,
-//             order_side,
-//             stop_order,
-//             1_0000_00000,
-//             trigger_price,
-//             0_0100_00000,
-//             option::none(),
-//             0,
-//             oracle_price,
-//         );
-
-//         let orders = orders(scenario);
-//         let active_orders = dynamic_field::borrow<vector<u8>, vector<TradingOrder>>(&orders.id, K_ORDERS);
-
-//         let (result_0, result_1, result_2) = if (order_side) {
-//             if (!stop_order) { (true, true, false) } else { (false, true, true) }
-//         } else {
-//             if (!stop_order) { (false, true, true) } else { (true, true, false) }
-//         };
-//         let oracle_price = trigger_price - 1000_0000_00000;
-//         assert!(position::check_order_filled(&active_orders[active_orders.length() - 1], oracle_price) == result_0, 0);
-//         let oracle_price = trigger_price;
-//         assert!(position::check_order_filled(&active_orders[active_orders.length() - 1], oracle_price) == result_1, 1);
-//         let oracle_price = trigger_price + 1000_0000_00000;
-//         assert!(position::check_order_filled(&active_orders[active_orders.length() - 1], oracle_price) == result_2, 2);
-
-//         return_shared(orders);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_order_filled_<C_TOKEN>(
-//         scenario: &mut Scenario,
-//         collateral_oracle_price: u64,
-//         trading_pair_oracle_price: u64,
-//         cumulative_borrow_rate: u64,
-//         cumulative_funding_rate_index_sign: bool,
-//         cumulative_funding_rate_index: u64,
-//     ): (u64, u64, u64) {
-//         let mut positions = positions(scenario);
-//         let next_position_id = {
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             if (active_positions.length() > 0) {
-//                 position::get_position_id(&active_positions[active_positions.length() - 1]) + 1
-//             } else {
-//                 0
-//             }
-//         };
-//         let mut orders = orders(scenario);
-//         let active_orders = dynamic_field::borrow_mut<vector<u8>, vector<TradingOrder>>(&mut orders.id, K_ORDERS);
-//         let order = active_orders.pop_back();
-//         let linked_position = if (position::get_order_linked_position_id(&order).is_some()) {
-//             let linked_position_id = position::get_order_linked_position_id(&order).extract();
-//             let active_positions = dynamic_field::borrow_mut<vector<u8>, vector<Position>>(&mut positions.id, K_POSITIONS);
-//             let mut i = 0;
-//             let length = active_positions.length();
-//             let mut linked_position = option::none();
-//             while (i < length) {
-//                 if (position::get_position_id(&active_positions[i]) == linked_position_id) {
-//                     let original_position = active_positions.remove(i);
-//                     linked_position.fill(original_position);
-//                     break
-//                 };
-//                 i = i + 1;
-//             };
-//             linked_position
-//         } else {
-//             option::none()
-//         };
-
-//         let version = version(scenario);
-//         let clock = new_clock(scenario);
-//         let (
-//             position,
-//             realized_loss_balance,
-//             realized_fee_balance,
-//             realized_profit_value,
-//             _unrealized_funding_sign,
-//             _unrealized_funding_fee,
-//             _fee_usd
-//         ) = position::order_filled<C_TOKEN>(
-//             &version,
-//             order,
-//             linked_position,
-//             next_position_id,
-//             collateral_oracle_price,
-//             ORACLE_PRICE_DECIMAL,
-//             trading_pair_oracle_price,
-//             ORACLE_PRICE_DECIMAL,
-//             cumulative_borrow_rate,
-//             cumulative_funding_rate_index_sign,
-//             cumulative_funding_rate_index,
-//             TRADING_FEE_MBP,
-//             &clock,
-//             ctx(scenario)
-//         );
-
-//         let (realized_loss, realized_fee)
-//             = (realized_loss_balance.value(), realized_fee_balance.value());
-
-//         let active_positions = dynamic_field::borrow_mut<vector<u8>, vector<Position>>(&mut positions.id, K_POSITIONS);
-//         active_positions.push_back(position);
-//         transfer::public_transfer(coin::from_balance(realized_loss_balance, ctx(scenario)), ADMIN);
-//         transfer::public_transfer(coin::from_balance(realized_fee_balance, ctx(scenario)), ADMIN);
-
-//         return_shared(version);
-//         return_shared(orders);
-//         return_shared(positions);
-//         clock::destroy_for_testing(clock);
-//         next_tx(scenario, ADMIN);
-//         (realized_loss, realized_fee, realized_profit_value)
-//     }
-
-//     fun test_check_position_liquidated_(
-//         scenario: &mut Scenario,
-//         collateral_oracle_price: u64,
-//         trading_pair_oracle_price: u64,
-//         cumulative_borrow_rate: u64,
-//         cumulative_funding_rate_index_sign: bool,
-//         cumulative_funding_rate_index: u64,
-//         position_id: u64,
-//     ): bool {
-//         let mut positions = positions(scenario);
-//         let active_positions = dynamic_field::borrow_mut<vector<u8>, vector<Position>>(&mut positions.id, K_POSITIONS);
-//         let mut i = 0;
-//         let length = active_positions.length();
-//         let mut position = option::none();
-//         while (i < length) {
-//             if (position::get_position_id(&active_positions[i]) == position_id) {
-//                 let original_position = active_positions.remove(i);
-//                 position.fill(original_position);
-//                 break
-//             };
-//             i = i + 1;
-//         };
-//         let position_liquidated = position::check_position_liquidated(
-//             position.borrow(),
-//             collateral_oracle_price,
-//             ORACLE_PRICE_DECIMAL,
-//             trading_pair_oracle_price,
-//             ORACLE_PRICE_DECIMAL,
-//             TRADING_FEE_MBP,
-//             MAINTENANCE_MARGIN_RATE_BP,
-//             cumulative_borrow_rate,
-//             cumulative_funding_rate_index_sign,
-//             cumulative_funding_rate_index
-//         );
-//         let active_positions = dynamic_field::borrow_mut<vector<u8>, vector<Position>>(&mut positions.id, K_POSITIONS);
-//         let current_position = position.destroy_some();
-//         active_positions.push_back(current_position);
-//         return_shared(positions);
-//         next_tx(scenario, ADMIN);
-//         position_liquidated
-//     }
-
-//     #[test]
-//     public(package) fun test_create_order() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_version(&mut scenario);
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_remove_order() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_version(&mut scenario);
-//         let collateral_amount = 0_0100_00000;
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-//         test_remove_order_<SUI>(&mut scenario, collateral_amount);
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_check_order_filled() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_version(&mut scenario);
-
-//         // order side / stop order flag / order price
-//         test_check_order_filled_<SUI, TSUI, USD>(&mut scenario, true, false, 60000_0000_0000);
-//         test_check_order_filled_<SUI, TSUI, USD>(&mut scenario, true, true, 60000_0000_0000);
-//         test_check_order_filled_<SUI, TSUI, USD>(&mut scenario, false, false, 60000_0000_0000);
-//         test_check_order_filled_<SUI, TSUI, USD>(&mut scenario, false, true, 60000_0000_0000);
-
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_order_filled() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_positions(&mut scenario);
-//         new_version(&mut scenario);
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_1000_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         let cumulative_borrow_rate = 0;
-//         let (realized_loss, realized_fee, realized_profit_value)
-//             = test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-//         assert!(realized_loss == 0, 0);
-//         assert!(realized_fee == 0_0010_00000, 0);
-//         assert!(realized_profit_value == 0, 0);
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 1_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_1000_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 58000_0000_0000;
-//         let cumulative_borrow_rate = 0;
-//         let (realized_loss, realized_fee, realized_profit_value)
-//             = test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-//         assert!(realized_loss == 0, 0);
-//         assert!(realized_fee == 1_0000_00000 * 58_0000_0000 / collateral_oracle_price, 0);
-//         assert!(realized_profit_value == 0, 0);
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 2_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             true, // reduce only
-//             false, // sell
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0000_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 57000_0000_0000;
-//         let cumulative_borrow_rate = 0_0001_00000;
-//         let (realized_loss, realized_fee, realized_profit_value)
-//             = test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-//         assert!(
-//             realized_loss
-//                 == (1_0000_00000
-//                     * (59000_0000_0000 - (trading_pair_oracle_price as u128))
-//                         / (collateral_oracle_price as u128) as u64),
-//             0
-//         );
-//         assert!(
-//             realized_fee
-//                 == 1_0000_00000 * 57_0000_0000 / collateral_oracle_price
-//                     + (2_0000_00000
-//                         * (trading_pair_oracle_price as u128)
-//                             * (cumulative_borrow_rate as u128)
-//                                 / 1_0000_00000
-//                                     / (collateral_oracle_price as u128) as u64),
-//             0
-//         );
-//         assert!(realized_profit_value == 0, 0);
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 1_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             false, // sell
-//             false,
-//             3_0000_00000, // flip to short 2_0000_00000
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 2_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             false, // sell
-//             true, // stop
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 3_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true, // buy
-//             true, // stop
-//             5_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, cumulative_borrow_rate, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 2_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         end(scenario);
-//     }
-
-//     #[expected_failure(abort_code = error::ENotReduceOnlyExecution)]
-//     #[test]
-//     public(package) fun test_wrong_reduce_only_error() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_positions(&mut scenario);
-//         new_version(&mut scenario);
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, 0, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         {
-//             let positions = positions(&scenario);
-//             let active_positions = dynamic_field::borrow<vector<u8>, vector<Position>>(&positions.id, K_POSITIONS);
-//             assert!(
-//                 position::get_position_size(&active_positions[active_positions.length() - 1])
-//                     == 1_0000_00000,
-//                 0
-//             );
-//             return_shared(positions);
-//         };
-
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             true, // reduce only
-//             false, // sell
-//             false,
-//             3_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::some(0),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, 0, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_check_position_liquidated() {
-//         let mut scenario = begin(ADMIN);
-//         new_orders(&mut scenario);
-//         new_positions(&mut scenario);
-//         new_version(&mut scenario);
-
-//         // create order
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_0100_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         // order filled
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, 0, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         // position liquidated
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         let cumulative_borrow_rate = 0_0001_00000;
-//         let cumulative_funding_rate_index_sign = true;
-//         let cumulative_funding_rate_index = 0;
-//         let position_liquidated = test_check_position_liquidated_(
-//             &mut scenario,
-//             collateral_oracle_price,
-//             trading_pair_oracle_price,
-//             cumulative_borrow_rate,
-//             cumulative_funding_rate_index_sign,
-//             cumulative_funding_rate_index,
-//             0,
-//         );
-//         assert!(position_liquidated, 0);
-
-//         // create order
-//         test_create_order_<SUI, TSUI, USD>(
-//             &mut scenario,
-//             10000,
-//             false,
-//             true,
-//             false,
-//             1_0000_00000,
-//             60000_0000_0000,
-//             0_1000_00000,
-//             option::none(),
-//             0,
-//             60000_0000_0000,
-//         );
-
-//         // order filled
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         test_order_filled_<SUI>(&mut scenario, collateral_oracle_price, trading_pair_oracle_price, 0, CUMULATIVE_FUNDING_RATE_INDEX_SIGN, CUMULATIVE_FUNDING_RATE_INDEX);
-
-//         // position liquidated
-//         let collateral_oracle_price = 60000_0000_0000;
-//         let trading_pair_oracle_price = 60000_0000_0000;
-//         let cumulative_borrow_rate = 0_0001_00000;
-//         let cumulative_funding_rate_index_sign = true;
-//         let cumulative_funding_rate_index = 0;
-//         let position_liquidated = test_check_position_liquidated_(
-//             &mut scenario,
-//             collateral_oracle_price,
-//             trading_pair_oracle_price,
-//             cumulative_borrow_rate,
-//             cumulative_funding_rate_index_sign,
-//             cumulative_funding_rate_index,
-//             1,
-//         );
-//         assert!(position_liquidated == false, 0);
-
-//         end(scenario);
-//     }
-// }

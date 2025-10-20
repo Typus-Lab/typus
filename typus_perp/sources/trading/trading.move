@@ -26,7 +26,7 @@ module typus_perp::trading {
     use typus_dov::tds_user_entry;
     use typus::keyed_big_vector::{Self, KeyedBigVector};
     use typus::ecosystem::Version as TypusEcosystemVersion;
-    use typus::linked_object_table::{LinkedObjectTable};
+    use typus::linked_object_table::{Self, LinkedObjectTable};
     use typus::tails_staking::TailsStakingRegistry;
     use typus::leaderboard::TypusLeaderboardRegistry;
     use typus::user::TypusUserRegistry;
@@ -62,70 +62,116 @@ module typus_perp::trading {
 
     // ======== Structs ========
 
-    #[allow(unused_field)]
     public struct MarketRegistry has key {
         id: UID,
+        /// The UID of the referral registry.
         referral_registry: UID,
+        /// A linked object table of markets.
         markets: LinkedObjectTable<u64, Markets>,
+        /// The number of markets.
         num_market: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// A collection of symbol markets for a specific LP token and quote token.
     public struct Markets has key, store {
         id: UID,
+        /// The index of the market.
         index: u64,
+        /// The type name of the LP token.
         lp_token_type: TypeName,
+        /// The type name of the quote token.
         quote_token_type: TypeName,
+        /// Whether the market is active.
         is_active: bool,
+        /// The protocol's share of the trading fee in basis points.
         protocol_fee_share_bp: u64,
+        /// A vector of the symbols in the market.
         symbols: vector<TypeName>,
+        /// An object table of the symbol markets.
         symbol_markets: ObjectTable<TypeName, SymbolMarket>,
+        /// Padding for future use.
         u64_padding: vector<u64>,
         // df:
         // user_accounts: ObjectTable<address, UserAccount>
     }
 
+    /// A market for a specific trading symbol.
     public struct SymbolMarket has key, store {
         id: UID,
+        /// A keyed big vector of user positions.
         user_positions: KeyedBigVector, // KeyedBigVector of Position
+        /// The UID of the token collateral orders.
         token_collateral_orders: UID,
+        /// The UID of the option collateral orders.
         option_collateral_orders: UID,
         // limit_buy_orders, limit_sell_orders, stop_buy_orders, stop_sell_orders: VecMap<vector<TradingOrder>>,
+        /// Information about the market.
         market_info: MarketInfo,
+        /// Configuration for the market.
         market_config: MarketConfig,
     }
 
+    /// Information about a market.
     public struct MarketInfo has copy, drop, store {
+        /// Whether the market is active.
         is_active: bool,
+        /// The number of decimals for the size.
         size_decimal: u64,
+        /// The total size of long positions.
         user_long_position_size: u64,
+        /// The total size of short positions.
         user_short_position_size: u64,
+        /// The next position ID.
         next_position_id: u64,
+        /// The total size of long orders.
         user_long_order_size: u64,
+        /// The total size of short orders.
         user_short_order_size: u64,
+        /// The next order ID.
         next_order_id: u64,
+        /// The timestamp of the last funding.
         last_funding_ts_ms: u64,
+        /// The sign of the cumulative funding rate index.
         cumulative_funding_rate_index_sign: bool, // true -> longs pay fee to shorts
+        /// The cumulative funding rate index.
         cumulative_funding_rate_index: u64,
+        /// The previous timestamp of the last funding.
         previous_last_funding_ts_ms: u64,
+        /// The previous sign of the cumulative funding rate index.
         previous_cumulative_funding_rate_index_sign: bool, // true -> longs pay fee to shorts
+        /// The previous cumulative funding rate index.
         previous_cumulative_funding_rate_index: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// Configuration for a market.
     public struct MarketConfig has copy, drop, store {
+        /// The address of the oracle.
         oracle_id: address,
+        /// The maximum leverage in mega basis points.
         max_leverage_mbp: u64,
+        /// The maximum leverage for option collateral in mega basis points.
         option_collateral_max_leverage_mbp: u64,
+        /// The minimum size of an order.
         min_size: u64,
+        /// The lot size of an order.
         lot_size: u64,
+        /// The trading fee configuration.
         trading_fee_config: vector<u64>,
+        /// The basic funding rate.
         basic_funding_rate: u64,
+        /// The funding interval in milliseconds.
         funding_interval_ts_ms: u64,
+        /// The experience multiplier.
         exp_multiplier: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// A struct representing the USD token.
     public struct USD has drop {}
 
     // public struct Referrals has key, store {
@@ -144,24 +190,25 @@ module typus_perp::trading {
 
     // ======= Functions =======
 
-    // fun init(ctx: &mut TxContext) {
-    //     let registry = MarketRegistry {
-    //         id: object::new(ctx),
-    //         referral_registry: object::new(ctx),
-    //         markets: linked_object_table::new<u64, Markets>(ctx),
-    //         num_market: 0,
-    //         u64_padding: vector::empty(),
-    //     };
-    //     // let referrals = Referrals {
-    //     //     id: object::new(ctx),
-    //     //     referrals: table::new(ctx),
-    //     //     rebates: table::new(ctx),
-    //     //     u64_padding: vector::empty(),
-    //     // };
-    //     // dynamic_object_field::add(&mut registry.referral_registry, string::utf8(K_REFERRAL), referrals);
-    //     transfer::share_object(registry);
-    // }
+    fun init(ctx: &mut TxContext) {
+        let registry = MarketRegistry {
+            id: object::new(ctx),
+            referral_registry: object::new(ctx),
+            markets: linked_object_table::new<u64, Markets>(ctx),
+            num_market: 0,
+            u64_padding: vector::empty(),
+        };
+        // let referrals = Referrals {
+        //     id: object::new(ctx),
+        //     referrals: table::new(ctx),
+        //     rebates: table::new(ctx),
+        //     u64_padding: vector::empty(),
+        // };
+        // dynamic_object_field::add(&mut registry.referral_registry, string::utf8(K_REFERRAL), referrals);
+        transfer::share_object(registry);
+    }
 
+    /// An event that is emitted when a new market is created.
     public struct NewMarketsEvent has copy, drop {
         index: u64,
         lp_token_type: TypeName,
@@ -169,6 +216,7 @@ module typus_perp::trading {
         protocol_fee_share_bp: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Creates a new market.
     entry fun new_markets<LP_TOKEN, QUOTE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -203,6 +251,7 @@ module typus_perp::trading {
         registry.num_market = registry.num_market + 1;
     }
 
+    /// An event that is emitted when a new trading symbol is added.
     public struct AddTradingSymbolEvent has copy, drop {
         index: u64,
         base_token_type: TypeName,
@@ -210,6 +259,7 @@ module typus_perp::trading {
         market_config: MarketConfig,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Adds a new trading symbol to a market.
     entry fun add_trading_symbol<BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -249,6 +299,8 @@ module typus_perp::trading {
         // add into market.symbols
         vector::push_back(&mut market.symbols, base_token);
 
+        let last_funding_ts_ms = clock::timestamp_ms(clock) / funding_interval_ts_ms * funding_interval_ts_ms;
+
         // add into market.symbol_markets
         let market_info = MarketInfo {
             is_active: true,
@@ -259,10 +311,10 @@ module typus_perp::trading {
             user_long_order_size: 0,
             user_short_order_size: 0,
             next_order_id: 0,
-            last_funding_ts_ms: clock::timestamp_ms(clock),
+            last_funding_ts_ms,
             cumulative_funding_rate_index_sign: true,
             cumulative_funding_rate_index: 0,
-            previous_last_funding_ts_ms: clock::timestamp_ms(clock),
+            previous_last_funding_ts_ms: last_funding_ts_ms - funding_interval_ts_ms,
             previous_cumulative_funding_rate_index_sign: true,
             previous_cumulative_funding_rate_index: 0,
             u64_padding: vector::empty(),
@@ -315,12 +367,14 @@ module typus_perp::trading {
         object_table::add(&mut market.symbol_markets, base_token, symbol_market);
     }
 
+    /// An event that is emitted when the protocol fee share is updated.
     public struct UpdateProtocolFeeShareBpEvent has copy, drop {
         index: u64,
         previous_protocol_fee_share_bp: u64,
         new_protocol_fee_share_bp: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the protocol fee share.
     entry fun update_protocol_fee_share_bp(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -343,6 +397,7 @@ module typus_perp::trading {
         });
     }
 
+    /// An event that is emitted when the market configuration is updated.
     public struct UpdateMarketConfigEvent has copy, drop {
         index: u64,
         base_token_type: TypeName,
@@ -350,6 +405,7 @@ module typus_perp::trading {
         new_market_config: MarketConfig,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the market configuration.
     entry fun update_market_config<BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -444,10 +500,12 @@ module typus_perp::trading {
         });
     }
 
+    /// An event that is emitted when a market is suspended.
     public struct SuspendMarketEvent has copy, drop {
         index: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Suspends a market.
     entry fun suspend_market(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -465,10 +523,12 @@ module typus_perp::trading {
         });
     }
 
+    /// An event that is emitted when a market is resumed.
     public struct ResumeMarketEvent has copy, drop {
         index: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Resumes a market.
     entry fun resume_market(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -486,11 +546,13 @@ module typus_perp::trading {
         });
     }
 
+    /// An event that is emitted when a trading symbol is suspended.
     public struct SuspendTradingSymbolEvent has copy, drop {
         index: u64,
         suspended_base_token: TypeName,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Suspends a trading symbol.
     entry fun suspend_trading_symbol<BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -515,11 +577,13 @@ module typus_perp::trading {
         });
     }
 
+    /// An event that is emitted when a trading symbol is resumed.
     public struct ResumeTradingSymbolEvent has copy, drop {
         index: u64,
         resumed_base_token: TypeName,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Resumes a trading symbol.
     entry fun resume_trading_symbol<BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -544,6 +608,7 @@ module typus_perp::trading {
         });
     }
 
+    /// [Authorized Function] Removes a trading symbol from a market.
     entry fun remove_trading_symbol<BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -665,6 +730,7 @@ module typus_perp::trading {
         u64_padding: vector<u64>
     }
 
+    /// [User Function] Creates a new trading order.
     public fun create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -871,7 +937,7 @@ module typus_perp::trading {
 
         symbol_market.market_info.next_order_id = symbol_market.market_info.next_order_id + 1;
 
-        let filled = position::check_order_filled(&order, trading_pair_oracle_price);
+        // let filled = position::check_order_filled(&order, trading_pair_oracle_price);
 
         emit(CreateTradingOrderEvent {
             user,
@@ -888,50 +954,50 @@ module typus_perp::trading {
             is_stop_order,
             size,
             trigger_price,
-            filled,
-            filled_price: if (filled) {option::some(trading_pair_oracle_price)} else {option::none()},
+            filled: false,
+            filled_price: option::none(),
             u64_padding: vector::empty()
         });
 
         // check order filled
-        if (filled) {
-            let (collateral_balance, _, _) = execute_order_<C_TOKEN>(
-                version,
-                // referrals,
-                market_index,
-                symbol_market,
-                liquidity_pool,
-                order,
-                market.protocol_fee_share_bp,
-                collateral_oracle_price,
-                collateral_oracle_price_decimal,
-                trading_pair_oracle_price,
-                trading_pair_oracle_price_decimal,
-                typus_ecosystem_version,
-                typus_user_registry,
-                typus_leaderboard_registry,
-                tails_staking_registry,
-                competition_config,
-                clock,
-                ctx,
-            );
-            return_to_user(&mut market.id, collateral_balance, user, ctx);
-        } else {
-            // update market info
-            adjust_market_info_user_order_size(symbol_market, is_long, false, size);
+        // if (filled) {
+        //     let (collateral_balance, _, _) = execute_order_<C_TOKEN>(
+        //         version,
+        //         // referrals,
+        //         market_index,
+        //         symbol_market,
+        //         liquidity_pool,
+        //         order,
+        //         market.protocol_fee_share_bp,
+        //         collateral_oracle_price,
+        //         collateral_oracle_price_decimal,
+        //         trading_pair_oracle_price,
+        //         trading_pair_oracle_price_decimal,
+        //         typus_ecosystem_version,
+        //         typus_user_registry,
+        //         typus_leaderboard_registry,
+        //         tails_staking_registry,
+        //         competition_config,
+        //         clock,
+        //         ctx,
+        //     );
+        //     return_to_user(&mut market.id, collateral_balance, user, ctx);
+        // } else {
+        // update market info
+        adjust_market_info_user_order_size(symbol_market, is_long, false, size);
 
-            // put order into vec map
-            let order_type_tag = position::get_order_type_tag(&order);
-            let active_orders_vec_map = get_mut_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
-            // does not have leaf => no same trigger price order
-            if (!active_orders_vec_map.contains(&trigger_price)) {
-                active_orders_vec_map.insert(trigger_price, vector::singleton(order));
-            } else {
-                // first layer has leaf => append the order
-                let active_orders = active_orders_vec_map.get_mut(&trigger_price);
-                active_orders.push_back(order);
-            };
+        // put order into vec map
+        let order_type_tag = position::get_order_type_tag(&order);
+        let active_orders_vec_map = get_mut_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
+        // does not have leaf => no same trigger price order
+        if (!active_orders_vec_map.contains(&trigger_price)) {
+            active_orders_vec_map.insert(trigger_price, vector::singleton(order));
+        } else {
+            // first layer has leaf => append the order
+            let active_orders = active_orders_vec_map.get_mut(&trigger_price);
+            active_orders.push_back(order);
         };
+        // };
     }
 
     public struct CancelTradingOrderEvent has copy, drop {
@@ -944,6 +1010,7 @@ module typus_perp::trading {
         released_collateral_amount: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Cancels a trading order.
     public fun cancel_trading_order<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -1199,6 +1266,8 @@ module typus_perp::trading {
         remaining_collateral_amount: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Releases collateral from a position.
+    /// Safe with `check_position_user_matched`
     public fun release_collateral<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -1347,6 +1416,8 @@ module typus_perp::trading {
         remaining_collateral_amount: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Increases the collateral of a position.
+    /// Safe with `check_position_user_matched`
     public fun increase_collateral<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -1462,6 +1533,8 @@ module typus_perp::trading {
         });
     }
 
+    /// Collects the funding fee for a position.
+    /// Safe with `check_position_user_matched`
     public fun collect_position_funding_fee<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -1570,6 +1643,7 @@ module typus_perp::trading {
         filled_price: Option<u64>,
         u64_padding: vector<u64>
     }
+    /// [User Function] Creates a new trading order with a bid receipt as collateral.
     public fun create_trading_order_with_bid_receipt_v3<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -1822,6 +1896,7 @@ module typus_perp::trading {
     }
 
 
+    /// [User Function] Reduces the size of an option collateral position.
     public fun reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -1866,7 +1941,6 @@ module typus_perp::trading {
 
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
         if (mut_position.get_position_user() != user) {
             admin::verify(version, ctx);
@@ -2051,6 +2125,7 @@ module typus_perp::trading {
         matched_order_ids: vector<u64>,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Matches trading orders.
     public fun match_trading_order_v2<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -2222,6 +2297,7 @@ module typus_perp::trading {
         order_prices: vector<u64>,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Cancels orders by the manager due to open interest limit.
     public fun manager_cancel_order_by_open_interest_limit<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -2325,6 +2401,7 @@ module typus_perp::trading {
         };
     }
 
+    /// [Authorized Function] Cancels linked orders.
     public fun cancel_linked_orders<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -2366,6 +2443,7 @@ module typus_perp::trading {
         cancelled_order_ids: vector<u64>,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Reduces a position by the manager.
     public fun manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -2505,6 +2583,88 @@ module typus_perp::trading {
         });
     }
 
+    /// [Authorized Function] Clear a position without pnl calculation by the manager.
+    public struct ManagerClearPositionEvent has copy, drop {
+        user: address,
+        collateral_token: TypeName,
+        base_token: TypeName,
+        position_id: u64,
+        removed_size: u64,
+        cancelled_order_ids: vector<u64>,
+        u64_padding: vector<u64>
+    }
+    public fun manager_clear_position<C_TOKEN, BASE_TOKEN>(
+        // for share objects
+        version: &mut Version,
+        registry: &mut MarketRegistry,
+        pool_registry: &mut PoolRegistry,
+        market_index: u64,
+        pool_index: u64,
+        position_id: u64,
+        ctx: &mut TxContext
+    ) {
+        // safety check
+        admin::verify(version, ctx);
+
+        // clear position
+        let (linked_order_ids, linked_order_prices, user) = {
+
+            let market = registry.markets.borrow_mut(market_index);
+            let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+            let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+            assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+
+            let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
+            let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
+            let position = keyed_big_vector::swap_remove_by_key<u64, Position>(&mut symbol_market.user_positions, position_id);
+            let user = position.get_position_user();
+            let position_side = position.get_position_side();
+            let position_size = position.get_position_size();
+            let position_reserve = position.get_reserve_amount();
+            let (
+                mut balance,
+                trading_fee_balance,
+                linked_order_ids,
+                linked_order_prices
+            ) = position::remove_position<C_TOKEN>(version, position);
+
+            if (position_side) {
+                symbol_market.market_info.user_long_position_size = symbol_market.market_info.user_long_position_size - position_size;
+            } else {
+                symbol_market.market_info.user_short_position_size = symbol_market.market_info.user_short_position_size - position_size;
+            };
+
+            lp_pool::update_reserve_amount<C_TOKEN>(liquidity_pool, false, position_reserve);
+
+            balance.join(trading_fee_balance);
+
+            return_to_user(&mut market.id, balance, user, ctx);
+            emit(ManagerClearPositionEvent {
+                user,
+                collateral_token,
+                base_token,
+                position_id,
+                removed_size: position_size,
+                cancelled_order_ids: linked_order_ids,
+                u64_padding: vector::empty()
+            });
+            (linked_order_ids, linked_order_prices, user)
+        };
+
+        if (linked_order_ids.length() > 0) {
+            cancel_linked_orders<C_TOKEN, BASE_TOKEN>(
+                // for share objects
+                version,
+                registry,
+                market_index,
+                linked_order_ids,
+                linked_order_prices,
+                user,
+                ctx,
+            );
+        };
+    }
+
     public struct ManagerCloseOptionPositionEvent has copy, drop {
         user: address,
         collateral_token: TypeName,
@@ -2516,6 +2676,7 @@ module typus_perp::trading {
         cancelled_order_ids: vector<u64>,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Closes an option position by the manager.
     public fun manager_close_option_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -2628,11 +2789,76 @@ module typus_perp::trading {
         process: RemoveLiquidityTokenProcess,
         ctx: &mut TxContext
     ): RemoveLiquidityTokenProcess {
-        deprecated();
-        process
+        abort 0
+        // // safety check
+        // admin::verify(version, ctx);
+        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
+        // lp_pool::check_remove_liquidity_token_process_status(&process, 0);
+        // {
+        //     let market = registry.markets.borrow(market_index);
+        //     assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
+        //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+        //     assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+
+        //     let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
+        //     let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        //     liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
+        //     let symbol_market = object_table::borrow<TypeName, SymbolMarket>(&market.symbol_markets, base_token);
+        //     assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
+        // };
+
+        // if (is_option_position) {
+        //     reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+        //         // for share objects
+        //         version,
+        //         registry,
+        //         pool_registry,
+        //         dov_registry,
+        //         typus_oracle_c_token,
+        //         typus_oracle_trading_symbol,
+        //         clock,
+        //         market_index,
+        //         pool_index,
+        //         // tails
+        //         typus_ecosystem_version,
+        //         typus_user_registry,
+        //         typus_leaderboard_registry,
+        //         tails_staking_registry,
+        //         competition_config,
+        //         // position related arguments
+        //         position_id,
+        //         option::none(),
+        //         ctx,
+        //     );
+        // } else {
+        //     manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
+        //         // for share objects
+        //         version,
+        //         registry,
+        //         pool_registry,
+        //         typus_oracle_c_token,
+        //         typus_oracle_trading_symbol,
+        //         clock,
+        //         market_index,
+        //         pool_index,
+        //         // tails
+        //         typus_ecosystem_version,
+        //         typus_user_registry,
+        //         typus_leaderboard_registry,
+        //         tails_staking_registry,
+        //         competition_config,
+        //         // other parameters
+        //         position_id,
+        //         10000,
+        //         ctx,
+        //     );
+        // };
+
+        // process
     }
 
     // (2)
+    #[allow(unused_field)]
     public struct ManagerUpdateProcessStatusAfterPositionEvent has copy, drop {
         market_index: u64,
         pool_index: u64,
@@ -2653,45 +2879,46 @@ module typus_perp::trading {
     //     mut process: RemoveLiquidityTokenProcess,
     //     ctx: &TxContext
     // ): RemoveLiquidityTokenProcess {
-    //     // safety check
-    //     admin::verify(version, ctx);
-    //     lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
-    //     lp_pool::check_remove_liquidity_token_process_status(&process, 0);
-    //     let result = get_liquidation_info<C_TOKEN, BASE_TOKEN>(
-    //     // for share objects
-    //         version,
-    //         registry,
-    //         pool_registry,
-    //         dov_registry,
-    //         typus_oracle_c_token,
-    //         typus_oracle_trading_symbol,
-    //         clock,
-    //         market_index,
-    //         pool_index,
-    //         true,
-    //         ctx
-    //     );
-    //     emit(ManagerUpdateProcessStatusAfterPositionEvent {
-    //         market_index,
-    //         pool_index,
-    //         liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
-    //         trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
-    //     });
-    //     if (result.length() == 0) {
-    //         lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, true);
-    //         let market = registry.markets.borrow(market_index);
-    //         let removed_symbol_markets = lp_pool::get_remove_liquidity_token_process_token(&process, true);
-    //         if (removed_symbol_markets.length() == market.symbols.length()) {
-    //             lp_pool::update_remove_liquidity_token_process_status(&mut process, 1);
-    //         };
-    //         return process
-    //     };
+    //     abort 0
+        // // safety check
+        // admin::verify(version, ctx);
+        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
+        // lp_pool::check_remove_liquidity_token_process_status(&process, 0);
+        // let result = get_liquidation_info<C_TOKEN, BASE_TOKEN>(
+        // // for share objects
+        //     version,
+        //     registry,
+        //     pool_registry,
+        //     dov_registry,
+        //     typus_oracle_c_token,
+        //     typus_oracle_trading_symbol,
+        //     clock,
+        //     market_index,
+        //     pool_index,
+        //     true,
+        //     ctx
+        // );
+        // emit(ManagerUpdateProcessStatusAfterPositionEvent {
+        //     market_index,
+        //     pool_index,
+        //     liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
+        //     trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
+        // });
+        // if (result.length() == 0) {
+        //     lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, true);
+        //     let market = registry.markets.borrow(market_index);
+        //     let removed_symbol_markets = lp_pool::get_remove_liquidity_token_process_token(&process, true);
+        //     if (removed_symbol_markets.length() == market.symbols.length()) {
+        //         lp_pool::update_remove_liquidity_token_process_status(&mut process, 1);
+        //     };
+        //     return process
+        // };
 
-    //     process
+        // process
     // }
 
     // (3) * n
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
+    #[allow(unused)]
     public fun manager_remove_order<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -2706,11 +2933,36 @@ module typus_perp::trading {
         process: RemoveLiquidityTokenProcess,
         ctx: &mut TxContext
     ): RemoveLiquidityTokenProcess {
-        deprecated();
-        process
+        abort 0
+        // // safety check
+        // admin::verify(version, ctx);
+        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
+        // lp_pool::check_remove_liquidity_token_process_status(&process, 1);
+        // {
+        //     let market = registry.markets.borrow(market_index);
+        //     assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
+        //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+        //     assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+        // };
+
+        // let margin = cancel_trading_order<C_TOKEN, BASE_TOKEN>(
+        //     version,
+        //     registry,
+        //     market_index,
+        //     order_id,
+        //     trigger_price,
+        //     option::some(order_user),
+        //     ctx,
+        // );
+        // let market = registry.markets.borrow_mut(market_index);
+        // let collateral_balance = margin.into_balance();
+        // return_to_user(&mut market.id, collateral_balance, order_user, ctx);
+
+        // process
     }
 
     // (4)
+    #[allow(unused_field)]
     public struct ManagerUpdateProcessStatusAfterOrderEvent has copy, drop {
         market_index: u64,
         pool_index: u64,
@@ -2746,12 +2998,12 @@ module typus_perp::trading {
     //         i = i + 1;
     //     };
 
-    //     emit(ManagerUpdateProcessStatusAfterOrderEvent {
-    //         market_index,
-    //         pool_index,
-    //         liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
-    //         trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
-    //     });
+        // emit(ManagerUpdateProcessStatusAfterOrderEvent {
+        //     market_index,
+        //     pool_index,
+        //     liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
+        //     trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
+        // });
 
     //     if (length == 0) {
     //         lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, false);
@@ -2789,6 +3041,7 @@ module typus_perp::trading {
         }
     }
 
+    /// [View Function] Gets the liquidation information for a position.
     public(package) fun get_liquidation_info<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -2924,6 +3177,7 @@ module typus_perp::trading {
         realized_value_for_lp_pool: u64,
         u64_padding: vector<u64> // [position_size, estimated_liquidation_price]
     }
+    /// [Authorized Function] Liquidates a position.
     public fun liquidate<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -3167,6 +3421,7 @@ module typus_perp::trading {
         remaining_value_for_lp_pool: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Settles receipt collateral.
     public fun settle_receipt_collateral<C_TOKEN, B_TOKEN>(
         // for share objects
         version: &mut Version,
@@ -3329,6 +3584,7 @@ module typus_perp::trading {
         cumulative_funding_rate_index: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the funding rate.
     public fun update_funding_rate<BASE_TOKEN>(
         // for share objects
         version: &Version,
@@ -3473,7 +3729,8 @@ module typus_perp::trading {
         result
     }
 
-    // authoriy function
+    /// [Authorized Function] Initializes the user account table.
+    /// TODO: can be removed, only use once.
     entry fun init_user_account_table(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -3486,7 +3743,7 @@ module typus_perp::trading {
         dynamic_field::add(market_id, string::utf8(K_USER_ACCOUNTS), object_table::new<address, UserAccount>(ctx));
     }
 
-    // user function
+    /// [User Function] Creates a new user account.
     public fun create_user_account(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -3508,7 +3765,8 @@ module typus_perp::trading {
         user_account_cap
     }
 
-    // user function
+    /// [User Function] Adds a delegate user to a user account.
+    /// Safe with `check_owner`
     entry fun add_delegate_user(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -3527,7 +3785,8 @@ module typus_perp::trading {
         user_account.add_delegate_user(user);
     }
 
-    // user function
+    /// [User Function] Removes a user account.
+    /// Safe with `UserAccountCap`
     entry fun remove_user_account(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -3543,6 +3802,8 @@ module typus_perp::trading {
         user_account::remove_user_account(market_id, owner, user_account_cap);
     }
 
+    /// Deposits collateral into a user account.
+    /// Safe with `check_owner`
     entry fun deposit_user_account<C_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -3561,6 +3822,8 @@ module typus_perp::trading {
         user_account.deposit(collateral.into_balance());
     }
 
+    /// Withdraws collateral from a user account.
+    /// Safe with `UserAccountCap`
     public fun withdraw_user_account<C_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -4535,6 +4798,7 @@ module typus_perp::trading {
     }
 
     // ======= View Functions =======
+    /// [View Function] Gets the user's orders.
     public(package) fun get_user_orders(
         version: &Version,
         registry: &MarketRegistry,
@@ -4568,28 +4832,30 @@ module typus_perp::trading {
                         k = k + 1;
                     };
                 };
-                let active_orders_vec_map = get_orders(symbol_market, false, order_type_tag);
-                let mut keys = active_orders_vec_map.keys();
-                // iter by order prices
-                while (keys.length() > 0) {
-                    let trigger_price = keys.pop_back();
-                    let active_orders_per_price = active_orders_vec_map.get(&trigger_price);
-                    let mut k = 0;
-                    let length = active_orders_per_price.length();
-                    while (k < length) {
-                        let order = &active_orders_per_price[k];
-                        if (position::get_order_user(order) == user) {
-                            user_orders.push_back(bcs::to_bytes(order));
-                        };
-                        k = k + 1;
-                    };
-                };
+                // ACTIVE OPTION COLLATERAL ORDER NOT ALLOWED
+                // let active_orders_vec_map = get_orders(symbol_market, false, order_type_tag);
+                // let mut keys = active_orders_vec_map.keys();
+                // // iter by order prices
+                // while (keys.length() > 0) {
+                //     let trigger_price = keys.pop_back();
+                //     let active_orders_per_price = active_orders_vec_map.get(&trigger_price);
+                //     let mut k = 0;
+                //     let length = active_orders_per_price.length();
+                //     while (k < length) {
+                //         let order = &active_orders_per_price[k];
+                //         if (position::get_order_user(order) == user) {
+                //             user_orders.push_back(bcs::to_bytes(order));
+                //         };
+                //         k = k + 1;
+                //     };
+                // };
                 order_type_tag = order_type_tag + 1;
             };
         };
         user_orders
     }
 
+    /// [View Function] Gets the user's positions.
     public(package) fun get_user_positions(
         version: &Version,
         registry: &MarketRegistry,
@@ -4615,6 +4881,7 @@ module typus_perp::trading {
         result
     }
 
+    /// [View Function] Gets all positions.
     public(package) fun get_all_positions<TOKEN>(
         version: &Version,
         registry: &MarketRegistry,
@@ -4659,6 +4926,7 @@ module typus_perp::trading {
         result
     }
 
+    /// [View Function] Gets active orders by order type tag.
     public(package) fun get_active_orders_by_order_tag<BASE_TOKEN>(
         version: &Version,
         registry: &MarketRegistry,
@@ -4689,6 +4957,7 @@ module typus_perp::trading {
         active_orders
     }
 
+    /// [View Function] Gets active orders by order type tag and collateral token.
     public(package) fun get_active_orders_by_order_tag_and_ctoken<C_TOKEN, BASE_TOKEN>(
         version: &Version,
         registry: &MarketRegistry,
@@ -4722,6 +4991,7 @@ module typus_perp::trading {
         active_orders
     }
 
+    /// [View Function] Gets the maximum amount of collateral that can be released from a position.
     public(package) fun get_max_releasing_collateral_amount<C_TOKEN, BASE_TOKEN>(
         version: &Version,
         registry: &MarketRegistry,
@@ -4772,6 +5042,7 @@ module typus_perp::trading {
         )
     }
 
+    /// [View Functio Only] Gets the estimated liquidation price and PnL for a position.
     public(package) fun get_estimated_liquidation_price_and_pnl<C_TOKEN, BASE_TOKEN>(
         version: &Version,
         registry: &mut MarketRegistry,
@@ -5042,6 +5313,7 @@ module typus_perp::trading {
     //     }
     // }
 
+    /// [View Function] Gets the BCS-serialized markets.
     public(package) fun get_markets_bcs(
         registry: &MarketRegistry,
         indexes: vector<u64>,
@@ -5062,6 +5334,8 @@ module typus_perp::trading {
         result
     }
 
+    /// Gets a mutable reference to the market ID.
+    /// WARNING: no authority check inside
     public(package) fun get_mut_market_id(
         registry: &mut MarketRegistry,
         market_index: u64,
@@ -5275,222 +5549,8 @@ module typus_perp::trading {
     }
     // ======== Test Only Functions ========
 
-    // #[test_only]
-    // public(package) fun test_init(ctx: &mut TxContext) {
-    //     init(ctx);
-    // }
-
-    // #[test_only]
-    // public(package) fun test_get_market(
-    //     registry: &MarketRegistry,
-    //     index: u64,
-    // ): &Markets {
-    //     registry.markets.borrow(index)
-    // }
-
-    // #[test_only]
-    // public(package) fun test_add_trading_symbol<BASE_TOKEN>(
-    //     registry: &mut MarketRegistry,
-    //     market_index: u64,
-    //     // market info
-    //     size_decimal: u64,
-    //     // market config
-    //     max_leverage_mbp: u64,
-    //     option_collateral_max_leverage_mbp: u64,
-    //     min_size: u64,
-    //     lot_size: u64,
-    //     trading_fee_config: vector<u64>,
-    //     basic_funding_rate: u64,
-    //     funding_interval_ts_ms: u64,
-    //     exp_multiplier: u64,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     let oracle_id = object::id_address(registry); // create a fake id
-    //     let market = registry.markets.borrow_mut(market_index);
-    //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-    //     assert!(!vector::contains(&market.symbols, &base_token), error::trading_symbol_existed());
-
-    //     // add into market.symbols
-    //     vector::push_back(&mut market.symbols, base_token);
-
-    //     // add into market.symbol_markets
-    //     let market_info = MarketInfo {
-    //         is_active: true,
-    //         size_decimal,
-    //         user_long_position_size: 0,
-    //         user_short_position_size: 0,
-    //         next_position_id: 0,
-    //         user_long_order_size: 0,
-    //         user_short_order_size: 0,
-    //         next_order_id: 0,
-    //         last_funding_ts_ms: clock::timestamp_ms(clock),
-    //         cumulative_funding_rate_index_sign: true,
-    //         cumulative_funding_rate_index: 0,
-    //         previous_last_funding_ts_ms: clock::timestamp_ms(clock),
-    //         previous_cumulative_funding_rate_index_sign: true,
-    //         previous_cumulative_funding_rate_index: 0,
-    //         u64_padding: vector::empty(),
-    //     };
-    //     let market_config = MarketConfig {
-    //         oracle_id,
-    //         max_leverage_mbp,
-    //         option_collateral_max_leverage_mbp,
-    //         min_size,
-    //         lot_size,
-    //         trading_fee_config,
-    //         basic_funding_rate,
-    //         funding_interval_ts_ms,
-    //         exp_multiplier,
-    //         u64_padding: vector::empty(),
-    //     };
-    //     let mut symbol_market = SymbolMarket {
-    //         id: object::new(ctx),
-    //         user_positions: keyed_big_vector::new<u64, Position>(1000, ctx),
-    //         token_collateral_orders: object::new(ctx),
-    //         option_collateral_orders: object::new(ctx),
-    //         market_info,
-    //         market_config,
-    //     };
-    //     dynamic_field::add(&mut symbol_market.token_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.token_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.token_collateral_orders, string::utf8(K_STOP_BUY_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.token_collateral_orders, string::utf8(K_STOP_SELL_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.option_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.option_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.option_collateral_orders, string::utf8(K_STOP_BUY_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     dynamic_field::add(&mut symbol_market.option_collateral_orders, string::utf8(K_STOP_SELL_ORDERS), vec_map::empty<u64, vector<TradingOrder>>());
-    //     object_table::add(&mut market.symbol_markets, base_token, symbol_market);
-    // }
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
 }
-
-// #[test_only]
-// module typus_perp::test_trading {
-//     // use std::type_name;
-
-//     use sui::clock::{Self, Clock};
-//     // use sui::coin::{Self, Coin};
-//     use sui::sui::SUI;
-//     use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared, sender};
-
-//     use typus_perp::admin::{Self, Version};
-//     // use typus_perp::math;
-//     use typus_perp::tlp::TLP;
-//     use typus_perp::trading::{Self, MarketRegistry};
-
-//     const ADMIN: address = @0xFFFF;
-//     // const USER_1: address = @0xBABE1;
-//     // const USER_2: address = @0xBABE2;
-//     const MARKET_INDEX: u64 = 0;
-//     const TRADING_FEE_PROTOCOL_SHARE_BP: u64 = 3000;
-//     // market info
-//     const SIZE_DECIMAL: u64 = 9;
-//     // market config
-//     // const oracle: &PriceInfoObject = ;
-//     const MAX_LEVERAGE_PCT: u64 = 10000;
-//     const MIN_SIZE: u64 = 1_0000_00000;
-//     const LOT_SIZE: u64 = 1_0000_00000;
-//     const TRADING_FEE_RATE: u64 = 0_0010_00000;
-//     const TRADING_FEE_DECIMAL: u64 = 9;
-//     const BASIC_FUNDING_RATE: u64 = 0_0001_00000;
-
-//     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
-//     const FUNDING_INTERVAL_TS_MS: u64 = 3_600_000;
-
-//     public struct USD has drop {}
-
-//     fun new_registry(scenario: &mut Scenario) {
-//         trading::test_init(ctx(scenario));
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_version(scenario: &mut Scenario) {
-//         admin::test_init(ctx(scenario));
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_clock(scenario: &mut Scenario): Clock {
-//         let mut clock = clock::create_for_testing(ctx(scenario));
-//         clock::set_for_testing(&mut clock, CURRENT_TS_MS);
-//         clock
-//     }
-
-//     fun registry(scenario: &Scenario): MarketRegistry {
-//         take_shared<MarketRegistry>(scenario)
-//     }
-
-//     fun version(scenario: &Scenario): Version {
-//         take_shared<Version>(scenario)
-//     }
-
-//     // fun mint_test_coin<T>(scenario: &mut Scenario, amount: u64): Coin<T> {
-//     //     coin::mint_for_testing<T>(amount, ctx(scenario))
-//     // }
-
-//     // fun update_clock(clock: &mut Clock, ts_ms: u64) {
-//     //     clock::set_for_testing(clock, ts_ms);
-//     // }
-
-//     fun test_new_markets_(scenario: &mut Scenario) {
-//         let mut registry = registry(scenario);
-//         let version = version(scenario);
-//         trading::new_markets<TLP, USD>(
-//             &version,
-//             &mut registry,
-//             TRADING_FEE_PROTOCOL_SHARE_BP,
-//             ctx(scenario)
-//         );
-//         return_shared(registry);
-//         return_shared(version);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_add_trading_symbol_<BASE_TOKEN>(scenario: &mut Scenario) {
-//         let mut registry = registry(scenario);
-//         let clock = new_clock(scenario);
-//         trading::test_add_trading_symbol<BASE_TOKEN>(
-//             &mut registry,
-//             MARKET_INDEX,
-//             // market info
-//             SIZE_DECIMAL,
-//             // market config
-//             MAX_LEVERAGE_PCT,
-//             MIN_SIZE,
-//             LOT_SIZE,
-//             TRADING_FEE_RATE,
-//             TRADING_FEE_DECIMAL,
-//             BASIC_FUNDING_RATE,
-//             FUNDING_INTERVAL_TS_MS,
-//             &clock,
-//             ctx(scenario)
-//         );
-//         assert!(
-//             trading::trading_symbol_exists<BASE_TOKEN>(
-//                 trading::test_get_market(&registry, MARKET_INDEX)
-//             ),
-//             0
-//         );
-//         return_shared(registry);
-//         clock::destroy_for_testing(clock);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     #[test]
-//     public(package) fun test_new_markets() {
-//         let mut scenario = begin(ADMIN);
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_markets_(&mut scenario);
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_add_incentive_token() {
-//         let mut scenario = begin(ADMIN);
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_markets_(&mut scenario);
-//         test_add_trading_symbol_<SUI>(&mut scenario);
-//         end(scenario);
-//     }
-// }

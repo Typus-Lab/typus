@@ -1,8 +1,12 @@
+/// The `symbol` module defines the `Symbol` struct, which represents a trading pair.
 module typus_perp::symbol {
     use std::type_name::{TypeName};
 
+    /// A struct that represents a trading pair.
     public struct Symbol has copy, store, drop {
+        /// The base token of the trading pair.
         base_token: TypeName,
+        /// The quote token of the trading pair.
         quote_token: TypeName,
     }
 
@@ -13,6 +17,7 @@ module typus_perp::symbol {
     //     }
     // }
 
+    /// Creates a new `Symbol` from `TypeName`s.
     public(package) fun create(base_token: TypeName, quote_token: TypeName): Symbol {
         Symbol {
             base_token,
@@ -20,10 +25,12 @@ module typus_perp::symbol {
         }
     }
 
+    /// Gets the base token of a `Symbol`.
     public(package) fun base_token(self: &Symbol): TypeName {
         self.base_token
     }
 
+    /// Gets the quote token of a `Symbol`.
     public(package) fun quote_token(self: &Symbol): TypeName {
         self.quote_token
     }

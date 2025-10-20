@@ -1,29 +1,39 @@
+/// The `user_account` module defines the `UserAccount` and `UserAccountCap` structs, and the logic for creating, updating, and using them.
 module typus_perp::user_account {
     use std::type_name::{Self, TypeName};
     use std::string::{Self};
     use sui::dynamic_field;
     use sui::object_table::{Self, ObjectTable};
-    use sui::balance::{Balance};
+    use sui::balance::{Self, Balance};
 
     use typus_perp::error;
 
     const K_USER_ACCOUNTS: vector<u8> = b"user_accounts";
     // user_accounts: ObjectTable<address, UserAccount>
 
+    /// A struct that represents a user account.
     public struct UserAccount has key, store {
         id: UID,
+        /// The address of the owner of the user account.
         owner: address,
+        /// A vector of the delegate users.
         delegate_user: vector<address>,
+        /// A vector of the symbols of the tokens in the user account.
         symbols: vector<TypeName>, // balances in df
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// A capability that allows a user to manage their account.
     public struct UserAccountCap has key, store {
         id: UID,
+        /// The address of the owner of the user account.
         owner: address, // to find the UserAccount in table
+        /// The ID of the user account.
         user_account_id: ID, // id of UserAccount
     }
 
+    /// Creates a new user account and capability.
     public(package) fun new_user_account(
         ctx: &mut TxContext,
     ): (UserAccount, UserAccountCap) {
@@ -44,6 +54,8 @@ module typus_perp::user_account {
         (user_account, user_account_cap)
     }
 
+    /// Removes a user account.
+    /// WARNING: no authority check inside
     public(package) fun remove_user_account(
         market_id: &mut UID,
         user: address,
@@ -72,6 +84,7 @@ module typus_perp::user_account {
     }
 
 
+    /// Checks if a user has an account.
     public(package) fun has_user_account(
         market_id: &UID,
         user: address,
@@ -80,7 +93,8 @@ module typus_perp::user_account {
         object_table::contains(user_accounts, user)
     }
 
-    // WARNING: no security check, only delegate_user or cranker can access
+    /// Gets a mutable reference to a user account.
+    /// WARNING: no security check, only delegate_user or cranker can access
     public(package) fun get_mut_user_account(
         market_id: &mut UID,
         user: address
@@ -90,7 +104,8 @@ module typus_perp::user_account {
         user_account
     }
 
-    // abort if not owner
+    /// Checks if the sender is the owner of the user account.
+    /// Abort if not owner
     public(package) fun check_owner(
         user_account: &UserAccount,
         ctx: &TxContext,
@@ -98,7 +113,8 @@ module typus_perp::user_account {
         assert!(user_account.owner == ctx.sender(), error::not_user_account_owner());
     }
 
-    // WARNING: no security check
+    /// Adds a delegate user to a user account.
+    /// WARNING: no authority check inside
     public(package) fun add_delegate_user(
         user_account: &mut UserAccount,
         user: address,
@@ -108,7 +124,8 @@ module typus_perp::user_account {
         }
     }
 
-    // WARNING: no security check
+    /// Deposits collateral into a user account.
+    /// WARNING: no authority check inside
     public(package) fun deposit<C_TOKEN>(
         user_account: &mut UserAccount,
         balance: Balance<C_TOKEN>,
@@ -123,22 +140,26 @@ module typus_perp::user_account {
         }
     }
 
+    /// Withdraws collateral from a user account.
+    /// WARNING: no authority check inside
     public(package) fun withdraw<C_TOKEN>(
         user_account: &mut UserAccount,
         mut amount: Option<u64>,
         user_account_cap: &UserAccountCap,
     ): Balance<C_TOKEN> {
         let token_name = type_name::with_defining_ids<C_TOKEN>();
-        assert!(user_account.symbols.contains(&token_name), error::no_balance());
 
         // check user_account_cap
         assert!(user_account_cap.user_account_id == object::id(user_account), error::not_user_account_cap());
 
         if (amount.is_none()) {
             let (exist, i) = user_account.symbols.index_of(&token_name);
-            assert!(exist, error::no_balance());
-            user_account.symbols.remove(i);
-            dynamic_field::remove(&mut user_account.id, token_name)
+            if (exist) {
+                user_account.symbols.remove(i);
+                dynamic_field::remove(&mut user_account.id, token_name)
+            } else {
+                balance::zero<C_TOKEN>()
+            }
         } else {
             let mut_balance: &mut Balance<C_TOKEN> = dynamic_field::borrow_mut(&mut user_account.id, token_name);
             let amount = amount.extract();
@@ -147,6 +168,7 @@ module typus_perp::user_account {
         }
     }
 
+    /// Gets the owner of a user account from a capability.
     public(package) fun get_user_account_owner(
         user_account_cap: &UserAccountCap,
     ): address {

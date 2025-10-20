@@ -1,3 +1,5 @@
+/// The `admin` module provides administrative functionalities for the Typus Perpetual Protocol.
+/// It includes version management, authority control, and fee handling.
 module typus_perp::admin {
     use std::type_name::{Self, TypeName};
     use std::ascii::String;
@@ -13,7 +15,7 @@ module typus_perp::admin {
     use typus_perp::error;
 
     // ======== Constants ========
-    const CVersion: u64 = 5;
+    const CVersion: u64 = 6;
     const ECOSYSTEM_MANAGER_CAP: vector<u8> = b"ecosystem_manager_cap";
 
     // ======== Manager Cap ========
@@ -32,50 +34,62 @@ module typus_perp::admin {
     // ======== Version ========
 
     #[allow(unused_field)]
+    /// A shared object that holds the version of the contract, fee pools, and the authority list.
     public struct Version has key {
         id: UID,
+        /// The version number.
         value: u64,
+        /// The fee pool for protocol fees.
         fee_pool: FeePool,
+        /// The fee pool for liquidator fees.
         liquidator_fee_pool: FeePool,
+        /// The list of authorized addresses.
         authority: VecSet<address>,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// Checks if the contract version is valid.
     public(package) fun version_check(version: &Version) {
         assert!(CVersion >= version.value, error::invalid_version());
     }
 
+    /// Upgrades the contract version.
+    /// WARNING: no authority check inside
     entry fun upgrade(version: &mut Version) {
         version_check(version);
         version.value = CVersion;
     }
 
     // ======== Init ========
+    // Due to the package size, we changed it to a test_only function
+    #[test_only]
+    fun init(ctx: &mut TxContext) {
+        transfer::share_object(Version {
+            id: object::new(ctx),
+            value: CVersion,
+            fee_pool: FeePool {
+                id: object::new(ctx),
+                fee_infos: vector[],
+            },
+            liquidator_fee_pool: FeePool {
+                id: object::new(ctx),
+                fee_infos: vector[],
+            },
+            authority: vec_set::singleton(tx_context::sender(ctx)),
+            u64_padding: vector[],
+        });
+    }
 
-    // fun init(ctx: &mut TxContext) {
-    //     transfer::share_object(Version {
-    //         id: object::new(ctx),
-    //         value: CVersion,
-    //         fee_pool: FeePool {
-    //             id: object::new(ctx),
-    //             fee_infos: vector[],
-    //         },
-    //         liquidator_fee_pool: FeePool {
-    //             id: object::new(ctx),
-    //             fee_infos: vector[],
-    //         },
-    //         authority: vec_set::singleton(tx_context::sender(ctx)),
-    //         u64_padding: vector[],
-    //     });
-    // }
-
-    // #[test_only]
-    // public(package) fun test_init(ctx: &mut TxContext) {
-    //     init(ctx);
-    // }
+    /// Initializes the contract for testing.
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
 
     // ======== Authority ========
 
+    /// [Authorized Function] Verifies if the sender is an authorized user.
     public(package) fun verify(
         version: &Version,
         ctx: &TxContext,
@@ -88,17 +102,18 @@ module typus_perp::admin {
         );
     }
 
+    // /// [Authorized Function] Adds an authorized user.
     // entry fun add_authorized_user(
     //     version: &mut Version,
     //     user_address: address,
     //     ctx: &TxContext,
     // ) {
     //     verify(version, ctx);
-
     //     assert!(!vec_set::contains(&version.authority, &user_address), error::authority_already_existed());
     //     vec_set::insert(&mut version.authority, user_address);
     // }
 
+    // /// [Authorized Function] Removes an authorized user.
     // entry fun remove_authorized_user(
     //     version: &mut Version,
     //     user_address: address,
@@ -108,24 +123,30 @@ module typus_perp::admin {
 
     //     assert!(vec_set::contains(&version.authority, &user_address), error::authority_doest_not_exist());
     //     vec_set::remove(&mut version.authority, &user_address);
-    //     assert!(vec_set::size(&version.authority) > 0, error::authority_empty());
+    //     assert!(vec_set::length(&version.authority) > 0, error::authority_empty());
     // }
 
     // ======== Tails Exp & Leaderboard ========
+    #[test_only]
+    use typus::ecosystem;
     use typus::ecosystem::{Version as TypusEcosystemVersion};
     use typus::leaderboard::{Self, TypusLeaderboardRegistry};
     use typus::user::{Self, TypusUserRegistry};
 
-    // TODO: can be remove after install
-    // entry fun install_ecosystem_manager_cap_entry(
-    //     version: &mut Version,
-    //     typus_ecosystem_version: &TypusEcosystemVersion,
-    //     ctx: &TxContext,
-    // ) {
-    //     verify(version, ctx);
-    //     let manager_cap = ecosystem::issue_manager_cap(typus_ecosystem_version, ctx);
-    //     dynamic_field::add(&mut version.id, std::string::utf8(ECOSYSTEM_MANAGER_CAP), manager_cap);
-    // }
+
+    #[test_only]
+    /// Due to the package size, we changed it to a test_only function
+    /// [Authorized Function] Installs the ecosystem manager cap.
+    /// TODO: can be remove after install
+    entry fun install_ecosystem_manager_cap_entry(
+        version: &mut Version,
+        typus_ecosystem_version: &TypusEcosystemVersion,
+        ctx: &TxContext,
+    ) {
+        verify(version, ctx);
+        let manager_cap = ecosystem::issue_manager_cap(typus_ecosystem_version, ctx);
+        dynamic_field::add(&mut version.id, std::string::utf8(ECOSYSTEM_MANAGER_CAP), manager_cap);
+    }
 
     public(package) fun add_tails_exp_and_leaderboard(
         version: &Version,
@@ -160,6 +181,7 @@ module typus_perp::admin {
         );
     }
 
+    /// Adds a score to the competition leaderboard.
     public(package) fun add_competition_leaderboard(
         version: &Version,
         typus_ecosystem_version: &TypusEcosystemVersion,
@@ -184,20 +206,30 @@ module typus_perp::admin {
 
     // ======== Fee Pool ========
 
+    /// A shared object that holds fee information.
     public struct FeePool has key, store {
         id: UID,
+        /// A vector of `FeeInfo` structs.
         fee_infos: vector<FeeInfo>,
     }
 
+    /// A struct that holds fee information for a specific token.
     public struct FeeInfo has copy, drop, store {
+        /// The type name of the token.
         token: TypeName,
+        /// The amount of fees collected.
         value: u64,
     }
 
+    /// An event that is emitted when fees are sent.
     public struct SendFeeEvent has copy, drop {
+        /// The type name of the token.
         token: TypeName,
+        /// The amount of fees sent.
         amount: u64,
     }
+    /// Sends the collected fees to the fee address.
+    /// Safe with constant address as receiver
     entry fun send_fee<TOKEN>(
         version: &mut Version,
         ctx: &mut TxContext,
@@ -227,6 +259,7 @@ module typus_perp::admin {
             i = i + 1;
         };
     }
+    /// Charges a protocol fee.
     public(package) fun charge_fee<TOKEN>(
         version: &mut Version,
         balance: Balance<TOKEN>,
@@ -262,14 +295,22 @@ module typus_perp::admin {
             amount,
         });
     }
+    /// An event that is emitted when protocol fees are charged.
     public struct ProtocolFeeEvent has copy, drop {
+        /// The type name of the token.
         token: TypeName,
+        /// The amount of fees charged.
         amount: u64,
     }
+    /// An event that is emitted when funds are put into the insurance fund.
     public struct PutInsuranceFundEvent has copy, drop {
+        /// The type name of the token.
         token: TypeName,
+        /// The amount of funds put into the insurance fund.
         amount: u64,
     }
+    /// Sends the liquidator fees to the fee address.
+    /// Safe with constant address as receiver
     entry fun send_liquidator_fee<TOKEN>(
         version: &mut Version,
         ctx: &mut TxContext,
@@ -297,6 +338,7 @@ module typus_perp::admin {
             i = i + 1;
         };
     }
+    /// Charges a liquidator fee.
     public(package) fun charge_liquidator_fee<TOKEN>(
         version: &mut Version,
         balance: Balance<TOKEN>,

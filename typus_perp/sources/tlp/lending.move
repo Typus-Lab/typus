@@ -1,3 +1,4 @@
+/// The `lending` module provides functions for interacting with the Scallop lending protocol.
 module typus_perp::lending {
     use sui::balance::Balance;
     use sui::clock::Clock;
@@ -10,6 +11,8 @@ module typus_perp::lending {
     use protocol::version::Version as ScallopVersion;
 
 
+    /// Deposits a token into the Scallop lending protocol.
+    /// WARNING: no authority check inside
     public(package) fun deposit_scallop_basic<C_TOKEN>(
         balance: Balance<C_TOKEN>,
         scallop_version: &ScallopVersion,
@@ -38,6 +41,8 @@ module typus_perp::lending {
         (market_coin, log)
     }
 
+    /// Withdraws a token from the Scallop lending protocol.
+    /// WARNING: no authority check inside
     public fun withdraw_scallop_basic<C_TOKEN>(
         market_coin: Coin<MarketCoin<C_TOKEN>>,
         scallop_version: &ScallopVersion,

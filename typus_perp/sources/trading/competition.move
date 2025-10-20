@@ -1,3 +1,4 @@
+/// The `competition` module defines the logic for trading competitions.
 module typus_perp::competition {
     use sui::clock::Clock;
     use std::ascii::String;
@@ -6,35 +7,42 @@ module typus_perp::competition {
     use typus::ecosystem::Version as TypusEcosystemVersion;
     use typus::leaderboard::TypusLeaderboardRegistry;
     use typus_perp::admin::{Self, Version};
-    // use typus_perp::error;
+    #[test_only]
+    use typus_perp::error;
 
     #[allow(unused_field)]
     public struct CompetitionConfig has key {
         id: UID,
+        /// The boost in basis points for each staking level.
         boost_bp: vector<u64>, // idx = max level, value = boost_bp (decimal = 4)
+        /// Whether the competition is active.
         is_active: bool,
+        /// The name of the program.
         program_name: String,
+        /// Padding for future use.
         u64_padding: vector<u64>
     }
 
-    // entry fun new_competition_config(
-    //     version: &Version,
-    //     boost_bp: vector<u64>,
-    //     program_name: String,
-    //     ctx: &mut TxContext
-    // ) {
-    //     // safety check
-    //     version.verify(ctx);
-    //     assert!(boost_bp.length() == 8, error::invalid_boost_bp_array_length());
-    //     let competition_config = CompetitionConfig {
-    //         id: object::new(ctx),
-    //         boost_bp,
-    //         is_active: true,
-    //         program_name,
-    //         u64_padding: vector::empty()
-    //     };
-    //     transfer::share_object(competition_config);
-    // }
+    // Due to the package size, we changed it to a test_only function
+    #[test_only]
+    entry fun new_competition_config(
+        version: &Version,
+        boost_bp: vector<u64>,
+        program_name: String,
+        ctx: &mut TxContext
+    ) {
+        // safety check
+        version.verify(ctx);
+        assert!(boost_bp.length() == 8, error::invalid_boost_bp_array_length());
+        let competition_config = CompetitionConfig {
+            id: object::new(ctx),
+            boost_bp,
+            is_active: true,
+            program_name,
+            u64_padding: vector::empty()
+        };
+        transfer::share_object(competition_config);
+    }
 
     // entry fun set_boost_bp(
     //     version: &Version,
@@ -49,6 +57,8 @@ module typus_perp::competition {
     //     competition_config.boost_bp = boost_bp;
     // }
 
+    /// Adds a score to the competition leaderboard.
+    /// WARNING: no authority check inside
     public(package) fun add_score(
         version: &Version,
         ecosystem_version: &TypusEcosystemVersion,
@@ -81,6 +91,18 @@ module typus_perp::competition {
                 clock,
                 ctx,
             );
+        };
+    }
+
+    #[test_only]
+    entry fun suspend_competition_config(
+        version: &Version,
+        competition_config: &mut CompetitionConfig,
+        ctx: &TxContext
+    ) {
+        version.verify(ctx);
+        if (competition_config.is_active) {
+            competition_config.is_active = false;
         };
     }
 }

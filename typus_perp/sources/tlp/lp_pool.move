@@ -1,3 +1,6 @@
+/// The `lp_pool` module is the heart of the TLP (Typus Liquidity Pool) logic.
+/// It defines the structures for liquidity pools, token pools, and their configurations.
+/// It also contains the entry functions for creating pools, adding liquidity, swapping, and redeeming.
 module typus_perp::lp_pool {
     use std::string::{Self, String};
     use std::type_name::{Self, TypeName};
@@ -34,89 +37,150 @@ module typus_perp::lp_pool {
     // const C_BUCKET_HARDCODE_LOCK_TIME: u64 = 4838400000;
 
     // ======== Structs ========
+    /// A registry for all liquidity pools.
     public struct Registry has key {
         id: UID,
+        /// The number of pools in the registry.
         num_pool: u64,
+        /// The UID of the liquidity pool registry.
         liquidity_pool_registry: UID,
     }
 
     const I_TOTAL_DEACTIVATING_SHARES: u64 = 0; // index of LiquidityPool.u64_padding
     const I_UNLOCK_COUNTDOWN_TS_MS: u64 = 1; // index of LiquidityPool.u64_padding
     const I_REBALANCE_COST_THRESHOLD_BP: u64 = 2; // index of LiquidityPool.u64_padding
+    /// The main struct for a liquidity pool.
     public struct LiquidityPool has key, store {
-        id: UID, // token balances are dynamic fields under this id with TypeName key
+        /// The UID of the object. Token balances are dynamic fields under this id with TypeName key.
+        id: UID,
+        /// The index of the pool.
         index: u64,
+        /// The type name of the LP token.
         lp_token_type: TypeName,
+        /// A vector of the type names of the liquidity tokens.
         liquidity_tokens: vector<TypeName>,
+        /// A vector of the token pools.
         token_pools: vector<TokenPool>,
+        /// Information about the liquidity pool.
         pool_info: LiquidityPoolInfo,
+        /// A vector of unsettled bid receipts from liquidations.
         liquidated_unsettled_receipts: vector<UnsettledBidReceipt>,
+        /// Padding for future use.
         u64_padding: vector<u64>,
+        /// Padding for future use.
         bcs_padding: vector<u8>,
     }
 
+    /// A struct for a token within a liquidity pool.
     public struct TokenPool has store {
+        /// The type name of the token.
         token_type: TypeName,
+        /// The configuration for the token pool.
         config: Config,
+        /// The state of the token pool.
         state: State,
     }
 
+    /// Information about a liquidity pool.
     public struct LiquidityPoolInfo has copy, drop, store {
+        /// The number of decimals for the LP token.
         lp_token_decimal: u64,
+        /// The total supply of LP tokens.
         total_share_supply: u64, // total TLP amount
+        /// The total value locked in the pool in USD.
         tvl_usd: u64,
+        /// Whether the pool is active.
         is_active: bool,
     }
 
+    /// Configuration for a token pool.
     public struct Config has copy, drop, store {
+        /// The address of the oracle.
         oracle_id: address,
+        /// The number of decimals for the liquidity token.
         liquidity_token_decimal: u64,
+        /// The spot-related configuration for the token pool.
         spot_config: SpotConfig,
+        /// The margin-related configuration for the token pool.
         margin_config: MarginConfig,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// Spot-related configuration for a token pool.
     public struct SpotConfig has copy, drop, store {
+        /// The minimum deposit amount.
         min_deposit: u64,
+        /// The maximum capacity of the pool.
         max_capacity: u64,
         // use these parameters to control TLP mint / burn fee
+        /// The target weight of the token in the pool in basis points.
         target_weight_bp: u64,
+        /// The basic mint fee in basis points.
         basic_mint_fee_bp: u64,
+        /// The additional mint fee in basis points.
         additional_mint_fee_bp: u64,
+        /// The basic burn fee in basis points.
         basic_burn_fee_bp: u64,
+        /// The additional burn fee in basis points.
         additional_burn_fee_bp: u64,
         // swap related parameters
+        /// The swap fee in basis points.
         swap_fee_bp: u64,
+        /// The protocol's share of the swap fee in basis points.
         swap_fee_protocol_share_bp: u64,
+        /// The protocol's share of the lending interest in basis points.
         lending_protocol_share_bp: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
     // tokens to borrow for open position
+    /// Margin-related configuration for a token pool.
     public struct MarginConfig has copy, drop, store {
         // borrow related parameters
+        /// The basic borrow rate at utilization 0.
         basic_borrow_rate_0: u64,
+        /// The basic borrow rate at utilization 1.
         basic_borrow_rate_1: u64,
+        /// The basic borrow rate at utilization 2.
         basic_borrow_rate_2: u64,
+        /// The utilization threshold 0 in basis points.
         utilization_threshold_bp_0: u64,
+        /// The utilization threshold 1 in basis points.
         utilization_threshold_bp_1: u64,
+        /// The borrow interval in milliseconds.
         borrow_interval_ts_ms: u64,
+        /// The maximum order reserve ratio in basis points.
         max_order_reserve_ratio_bp: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
+    /// State of a token pool.
     public struct State has copy, drop, store {
+        /// The amount of liquidity in the pool.
         liquidity_amount: u64,   // balance value
+        /// The value of the liquidity in USD.
         value_in_usd: u64,       // amount / decimals * price (USD)
+        /// The amount of liquidity reserved for open positions.
         reserved_amount: u64,      // = being used for opening position
+        /// The timestamp of the last update to the value_in_usd.
         update_ts_ms: u64, // update value_in_usd (for tvl health)
+        /// Whether the token pool is active.
         is_active: bool,
         // borrow related: use for recording margin trading borrow calculation
+        /// The timestamp of the last borrow rate calculation.
         last_borrow_rate_ts_ms: u64,
+        /// The cumulative borrow rate.
         cumulative_borrow_rate: u64,
+        /// The previous timestamp of the last borrow rate calculation.
         previous_last_borrow_rate_ts_ms: u64,
+        /// The previous cumulative borrow rate.
         previous_cumulative_borrow_rate: u64,
+        /// The current lending amount.
         current_lending_amount: vector<u64>, // index = I_LENDING_XXX, value = amount
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
@@ -131,46 +195,64 @@ module typus_perp::lp_pool {
     // 1: positions removed -> should call manager_remove_order
     // 2: orders removed -> should call flash_withdraw (switch status to 3) -> swap
     // 3: liquidity token swapped -> should call repay_liquidity (check d_tvl < 2%)
-    #[allow(unused_field)]
+    #[allow(unused)]
     public struct RemoveLiquidityTokenProcess {
+        /// The type name of the liquidity token being removed.
         liquidity_token: TypeName,
+        /// A vector of the base tokens of the removed positions.
         removed_positions_base_token: vector<TypeName>,
+        /// A vector of the base tokens of the removed orders.
         removed_orders_base_token: vector<TypeName>,
+        /// The address of the oracle for the removed token.
         removed_token_oracle_id: address,
+        /// The value of the removed liquidity in USD.
         removed_usd: u64,
+        /// The value of the repaid liquidity in USD.
         repaid_usd: u64,
+        /// The status of the removal process.
         status: u64,
     }
 
     // feature: redeem -> lock x ts_ms -> claim (burn)
     const K_DEACTIVATING_SHARES: vector<u8> = b"deactivating_shares";
+    /// A struct for deactivating shares.
     public struct DeactivatingShares<phantom TOKEN> has store {
+        /// The balance of the deactivating shares.
         balance: Balance<TOKEN>,
+        /// The timestamp of the redemption.
         redeem_ts_ms: u64,
+        /// The timestamp when the shares can be unlocked.
         unlock_ts_ms: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
     // feature: manager emergency borrow tokens to lp pool => create receipt (not record )
     // => manager uses receipt to get tokens back
+    /// A receipt for a manager's emergency deposit.
     public struct ManagerDepositReceiptV2 has key, store {
         id: UID,
+        /// The index of the pool.
         index: u64, // pool_index
+        /// The type name of the token.
         token_type: TypeName,
+        /// The amount of the deposit.
         amount: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>
     }
 
-    // fun init(ctx: &mut TxContext) {
-    //     let registry = Registry {
-    //         id: object::new(ctx),
-    //         num_pool: 0,
-    //         liquidity_pool_registry: object::new(ctx),
-    //     };
+    fun init(ctx: &mut TxContext) {
+        let registry = Registry {
+            id: object::new(ctx),
+            num_pool: 0,
+            liquidity_pool_registry: object::new(ctx),
+        };
 
-    //     transfer::share_object(registry);
-    // }
+        transfer::share_object(registry);
+    }
 
+    /// An event that is emitted when a new liquidity pool is created.
     public struct NewLiquidityPoolEvent has copy, drop {
         sender: address,
         index: u64,
@@ -178,6 +260,7 @@ module typus_perp::lp_pool {
         lp_token_decimal: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Creates a new liquidity pool.
     entry fun new_liquidity_pool<LP_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -218,23 +301,24 @@ module typus_perp::lp_pool {
         });
     }
 
-    entry fun create_deactivating_shares<TOKEN>(
-        version: &Version,
-        registry: &mut Registry,
-        index: u64,
-        ctx: &mut TxContext
-    ) {
+    // entry fun create_deactivating_shares<TOKEN>(
+    //     version: &Version,
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     ctx: &mut TxContext
+    // ) {
         // safety check
-        admin::verify(version, ctx);
+        // admin::verify(version, ctx);
 
-        let liquidity_pool = get_mut_liquidity_pool(registry, index);
-        assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-        assert!(!dynamic_field::exists_(&liquidity_pool.id, string::utf8(K_DEACTIVATING_SHARES)), error::deactivating_shares_already_existed());
+    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
+    //     assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
+    //     assert!(!dynamic_field::exists_(&liquidity_pool.id, string::utf8(K_DEACTIVATING_SHARES)), error::deactivating_shares_already_existed());
 
-        dynamic_field::add(&mut liquidity_pool.id, string::utf8(K_DEACTIVATING_SHARES), table::new<address, vector<DeactivatingShares<TOKEN>>>(ctx));
-        math::set_u64_vector_value(&mut liquidity_pool.u64_padding, I_TOTAL_DEACTIVATING_SHARES, 0);
-    }
+    //     dynamic_field::add(&mut liquidity_pool.id, string::utf8(K_DEACTIVATING_SHARES), table::new<address, vector<DeactivatingShares<TOKEN>>>(ctx));
+    //     math::set_u64_vector_value(&mut liquidity_pool.u64_padding, I_TOTAL_DEACTIVATING_SHARES, 0);
+    // }
 
+    /// An event that is emitted when the unlock countdown is updated.
     public struct UpdateUnlockCountdownTsMsEvent has copy, drop {
         sender: address,
         index: u64,
@@ -242,6 +326,7 @@ module typus_perp::lp_pool {
         new_unlock_countdown_ts_ms: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the unlock countdown.
     entry fun update_unlock_countdown_ts_ms(
         version: &Version,
         registry: &mut Registry,
@@ -265,6 +350,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when the rebalance cost threshold is updated.
     public struct UpdateRebalanceCostThresholdBpEvent has copy, drop {
         sender: address,
         index: u64,
@@ -272,6 +358,7 @@ module typus_perp::lp_pool {
         new_rebalance_cost_threshold_bp: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the rebalance cost threshold.
     entry fun update_rebalance_cost_threshold_bp(
         version: &Version,
         registry: &mut Registry,
@@ -296,6 +383,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a new liquidity token is added.
     public struct AddLiquidityTokenEvent has copy, drop {
         sender: address,
         index: u64,
@@ -304,6 +392,7 @@ module typus_perp::lp_pool {
         state: State,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Adds a new liquidity token to a pool.
     entry fun add_liquidity_token<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -393,17 +482,17 @@ module typus_perp::lp_pool {
             margin_config,
             u64_padding: vector::empty()
         };
-
         let current_ts_ms = clock::timestamp_ms(clock);
+        let last_borrow_rate_ts_ms = current_ts_ms / borrow_interval_ts_ms * borrow_interval_ts_ms;
         let state = State {
             liquidity_amount: 0,   // balance value
             value_in_usd: 0,       // amount / decimals * price (USD)
             reserved_amount: 0,
             update_ts_ms: current_ts_ms,
             is_active: true,
-            last_borrow_rate_ts_ms: current_ts_ms,
+            last_borrow_rate_ts_ms,
             cumulative_borrow_rate: 0,
-            previous_last_borrow_rate_ts_ms: current_ts_ms,
+            previous_last_borrow_rate_ts_ms: last_borrow_rate_ts_ms,
             previous_cumulative_borrow_rate: 0,
             current_lending_amount: vector::empty(),
             u64_padding: vector::empty()
@@ -426,6 +515,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when the spot configuration is updated.
     public struct UpdateSpotConfigEvent has copy, drop {
         sender: address,
         index: u64,
@@ -434,6 +524,7 @@ module typus_perp::lp_pool {
         new_spot_config: SpotConfig,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the spot configuration for a token.
     entry fun update_spot_config<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -502,6 +593,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a manager makes an emergency deposit.
     public struct ManagerEmergencyDepositEvent has copy, drop {
         sender: address,
         index: u64,
@@ -509,6 +601,7 @@ module typus_perp::lp_pool {
         amount: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Allows a manager to deposit tokens in an emergency.
     entry fun manager_emergency_deposit<TOKEN, LP_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -562,6 +655,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a manager makes an emergency withdrawal.
     public struct ManagerEmergencyWithdrawEvent has copy, drop {
         sender: address,
         index: u64,
@@ -569,6 +663,7 @@ module typus_perp::lp_pool {
         amount: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Allows a manager to withdraw tokens in an emergency.
     entry fun manager_emergency_withdraw<TOKEN, LP_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -623,6 +718,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when the margin configuration is updated.
     public struct UpdateMarginConfigEvent has copy, drop {
         sender: address,
         index: u64,
@@ -631,6 +727,7 @@ module typus_perp::lp_pool {
         new_margin_config: MarginConfig,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Updates the margin configuration for a token.
     entry fun update_margin_config<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -686,6 +783,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when LP tokens are minted.
     public struct MintLpEvent has copy, drop {
         sender: address,
         index: u64,
@@ -697,6 +795,7 @@ module typus_perp::lp_pool {
         minted_lp_amount: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Mints LP tokens.
     public fun mint_lp<TOKEN, LP_TOKEN>(
         version: &mut Version,
         registry: &mut Registry,
@@ -744,7 +843,6 @@ module typus_perp::lp_pool {
 
         // calculation
         let (deposit_amount_usd, mint_fee_usd, mint_amount) = calculate_mint_lp(registry, index, token_type, price, price_decimal, deposit_amount);
-
         // deal with coin & balance
         // liquidity_amount, value_in_usd, total_share_supply -> tvl
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
@@ -779,6 +877,7 @@ module typus_perp::lp_pool {
         lp_coin
     }
 
+    /// An event that is emitted when the borrow information is updated.
     public struct UpdateBorrowInfoEvent has copy, drop {
         index: u64,
         liquidity_token_type: TypeName,
@@ -789,6 +888,7 @@ module typus_perp::lp_pool {
         last_cumulative_borrow_rate: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Updates the borrow information for all tokens in a pool.
     public fun update_borrow_info(
         version: &Version,
         registry: &mut Registry,
@@ -860,6 +960,7 @@ module typus_perp::lp_pool {
         };
     }
 
+    /// An event that is emitted when a swap is made.
     public struct SwapEvent has copy, drop {
         sender: address,
         index: u64,
@@ -874,6 +975,7 @@ module typus_perp::lp_pool {
         oracle_price_to_token: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Swaps one token for another.
     public fun swap<F_TOKEN, T_TOKEN>(
         version: &mut Version,
         registry: &mut Registry,
@@ -1018,6 +1120,7 @@ module typus_perp::lp_pool {
         coin::from_balance(to_balance, ctx)
     }
 
+    /// An event that is emitted when LP tokens are redeemed.
     public struct RedeemEvent has copy, drop {
         sender: address,
         index: u64,
@@ -1027,6 +1130,7 @@ module typus_perp::lp_pool {
         unlock_ts_ms: u64,
         u64_padding: vector<u64>
     }
+    /// [User Function] Redeems LP tokens for underlying assets.
     public fun redeem<LP_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1089,6 +1193,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// [User Function] Claims underlying assets from redeemed LP tokens.
     public fun claim<LP_TOKEN, C_TOKEN>(
         version: &mut Version,
         registry: &mut Registry,
@@ -1177,11 +1282,13 @@ module typus_perp::lp_pool {
         )
     }
 
+    /// An event that is emitted when a pool is suspended.
     public struct SuspendPoolEvent has copy, drop {
         sender: address,
         index: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Suspends a liquidity pool.
     entry fun suspend_pool(
         version: &Version,
         registry: &mut Registry,
@@ -1201,11 +1308,13 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a pool is resumed.
     public struct ResumePoolEvent has copy, drop {
         sender: address,
         index: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Resumes a liquidity pool.
     entry fun resume_pool(
         version: &Version,
         registry: &mut Registry,
@@ -1225,12 +1334,14 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a token pool is suspended.
     public struct SuspendTokenPoolEvent has copy, drop {
         sender: address,
         index: u64,
         liquidity_token: TypeName,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Suspends a token pool.
     entry fun suspend_token_pool<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1255,12 +1366,14 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a token pool is resumed.
     public struct ResumeTokenPoolEvent has copy, drop {
         sender: address,
         index: u64,
         liquidity_token: TypeName,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Resumes a token pool.
     entry fun resume_token_pool<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1285,6 +1398,7 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// An event that is emitted when a manager deposits to a lending protocol.
     public struct DepositLendingEvent has copy, drop {
         index: u64,
         lending_index: u64, // index of current_lending_amount
@@ -1297,6 +1411,7 @@ module typus_perp::lp_pool {
         latest_liquidity_amount: u64,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Manager deposits to Scallop.
     entry fun manager_deposit_scallop<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1304,7 +1419,7 @@ module typus_perp::lp_pool {
         scallop_version: &ScallopVersion,
         scallop_market: &mut protocol::market::Market,
         clock: &Clock,
-        mut lending_amount: Option<u64>, // none => deposit all
+        lending_amount: Option<u64>, // none => deposit all
         ctx: &mut TxContext,
     ) {
         // safety check
@@ -1351,7 +1466,7 @@ module typus_perp::lp_pool {
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
-        mut lending_amount: Option<u64>, // none => deposit all
+        lending_amount: Option<u64>, // none => deposit all
         ctx: &mut TxContext,
     ) {
         // safety check
@@ -1391,6 +1506,7 @@ module typus_perp::lp_pool {
         };
     }
 
+    /// An event that is emitted when a manager withdraws from a lending protocol.
     public struct WithdrawLendingEvent has copy, drop {
         index: u64,
         lending_index: u64,
@@ -1408,6 +1524,7 @@ module typus_perp::lp_pool {
         reward_protocol_share: u64, // charged fee
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Manager withdraws from Scallop.
     entry fun manager_withdraw_scallop<TOKEN>(
         version: &mut Version,
         registry: &mut Registry,
@@ -1478,7 +1595,7 @@ module typus_perp::lp_pool {
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
-        ctx: &mut TxContext,
+        ctx: &TxContext,
     ) {
         // safety check
         admin::verify(version, ctx);
@@ -1515,7 +1632,6 @@ module typus_perp::lp_pool {
                 incentive_v2,
                 incentive_v3,
                 clock,
-                ctx,
             );
             emit(WithdrawLendingEvent {
                 index,
@@ -1547,7 +1663,7 @@ module typus_perp::lp_pool {
         rule_ids: vector<address>,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
-        ctx: &mut TxContext,
+        ctx: &TxContext,
     ) {
         // safety check
         admin::verify(version, ctx);
@@ -1727,13 +1843,13 @@ module typus_perp::lp_pool {
     // }
 
     // ====== Remove Liquidity Token Process ======
-    #[allow(unused_field)]
+    #[allow(unused)]
     public struct StartRemoveLiquidityTokenProcessEvent has copy, drop {
         index: u64,
         liquidity_token: TypeName,
         u64_padding: vector<u64>
     }
-    #[allow(unused_variable, unused_type_parameter)]
+    #[allow(unused)]
     public fun start_remove_liquidity_token_process<TOKEN>(
         version: &Version,
         registry: &Registry,
@@ -1764,8 +1880,7 @@ module typus_perp::lp_pool {
         //     status: 0,
         // }
     }
-
-    #[allow(unused_field)]
+    #[allow(unused)]
     public struct ManagerFlashRemoveLiquidityEvent has copy, drop {
         index: u64,
         liquidity_token: TypeName,
@@ -1775,7 +1890,7 @@ module typus_perp::lp_pool {
         removed_usd: u64,
         u64_padding: vector<u64>
     }
-    #[allow(unused_variable, unused_type_parameter, unused_let_mut)]
+    #[allow(unused)]
     public fun manager_flash_remove_liquidity<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1822,8 +1937,7 @@ module typus_perp::lp_pool {
         // });
         // (balance, process)
     }
-
-    #[allow(unused_field)]
+    #[allow(unused)]
     public struct ManagerFlashRepayLiquidityEvent has copy, drop {
         index: u64,
         liquidity_token: TypeName,
@@ -1833,7 +1947,7 @@ module typus_perp::lp_pool {
         repaid_usd: u64,
         u64_padding: vector<u64>
     }
-    #[allow(unused_variable, unused_type_parameter, unused_let_mut)]
+    #[allow(unused)]
     public fun manager_flash_repay_liquidity<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1885,8 +1999,7 @@ module typus_perp::lp_pool {
         // update_tvl(version, liquidity_pool, token_type, oracle, clock);
         // process
     }
-
-    #[allow(unused_field)]
+    #[allow(unused)]
     public struct CompleteRemoveLiquidityTokenProcessEvent has copy, drop {
         index: u64,
         liquidity_token: TypeName,
@@ -1894,7 +2007,7 @@ module typus_perp::lp_pool {
         repaid_usd: u64,
         u64_padding: vector<u64>
     }
-    #[allow(unused_variable, unused_type_parameter)]
+    #[allow(unused)]
     public fun complete_remove_liquidity_token_process<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -1938,11 +2051,13 @@ module typus_perp::lp_pool {
         // });
     }
 
+    /// An event that is emitted when a manager removes a liquidity token.
     public struct ManagerRemoveLiquidityTokenEvent has copy, drop {
         index: u64,
         liquidity_token: TypeName,
         u64_padding: vector<u64>
     }
+    /// [Authorized Function] Manager removes a liquidity token.
     entry fun manager_remove_liquidity_token<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -2000,48 +2115,6 @@ module typus_perp::lp_pool {
         token_pool.state.is_active
     }
 
-    // public(package) fun update_remove_liquidity_token_process_status(
-    //     process: &mut RemoveLiquidityTokenProcess,
-    //     target_status_code: u64,
-    // ) {
-    //     process.status = target_status_code;
-    // }
-    // public(package) fun check_remove_liquidity_token_process_status(
-    //     process: &RemoveLiquidityTokenProcess,
-    //     status_code: u64,
-    // ) {
-    //     let error_code = if (process.status == 0) {
-    //         error::process_should_remove_position()
-    //     } else if (process.status == 1) {
-    //         error::process_should_remove_order()
-    //     } else if (process.status == 2) {
-    //         error::process_should_swap()
-    //     } else if (process.status == 3) {
-    //         error::process_should_repay_liquidity()
-    //     } else { abort error::unsupported_process_status_code() };
-    //     assert!(process.status == status_code, error_code);
-    // }
-    // public(package) fun update_remove_liquidity_token_process_token<TOKEN>(
-    //     process: &mut RemoveLiquidityTokenProcess,
-    //     update_position_token: bool,
-    // ) {
-    //     if (update_position_token) {
-    //         process.removed_positions_base_token.push_back(type_name::with_defining_ids<TOKEN>());
-    //     } else {
-    //         process.removed_orders_base_token.push_back(type_name::with_defining_ids<TOKEN>());
-    //     };
-    // }
-    // public(package) fun get_remove_liquidity_token_process_token(
-    //     process: &RemoveLiquidityTokenProcess,
-    //     update_position_token: bool,
-    // ): vector<TypeName> {
-    //     if (update_position_token) {
-    //         process.removed_positions_base_token
-    //     } else {
-    //         process.removed_orders_base_token
-    //     }
-    // }
-
     // ====== Rebalance Process ======
     // hot potato for controlling rebalance process
     public struct RebalanceProcess {
@@ -2070,6 +2143,8 @@ module typus_perp::lp_pool {
         to_token_liquidity_amount: u64,
         u64_padding: vector<u64>
     }
+
+    /// [Authorized Function] Manager take the liquidity token A to swap.
     public fun rebalance<A_TOKEN, B_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -2163,6 +2238,8 @@ module typus_perp::lp_pool {
         to_token_liquidity_amount: u64,
         u64_padding: vector<u64>
     }
+
+    /// [Authorized Function] Manager swap back the liquidity token from A to B.
     public fun complete_rebalancing<A_TOKEN, B_TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -2260,6 +2337,8 @@ module typus_perp::lp_pool {
         lp_pool_tvl_usd: u64,
         u64_padding: vector<u64>
     }
+
+    /// [User Function] Update the liquidity value with oracle.
     public fun update_liquidity_value<TOKEN>(
         version: &Version,
         registry: &mut Registry,
@@ -2299,6 +2378,8 @@ module typus_perp::lp_pool {
         });
     }
 
+    /// [View Function] Get the liquidity pool token amounts.
+    /// Return [total_share_supply, tvl_usd, token_types, amounts, usds]
     public fun get_pool_liquidity(
         version: &Version,
         registry: &Registry,
@@ -2390,7 +2471,7 @@ module typus_perp::lp_pool {
         add_reserve: bool,
         d_reserve: u64
     ) {
-        assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
+        // assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
         let token_type = type_name::with_defining_ids<C_TOKEN>();
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
@@ -2906,7 +2987,6 @@ module typus_perp::lp_pool {
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
-        ctx: &mut TxContext,
     ): vector<u64> {
         let navi_account_cap = dynamic_field::borrow_mut(&mut liquidity_pool.id, K_NAVI_ACCOUNT_CAP);
         oracle::oracle_pro::update_single_price(
@@ -3013,6 +3093,7 @@ module typus_perp::lp_pool {
         log
     }
 
+    /// An event that is emitted when LP tokens are burned.
     public struct BurnLpEvent has copy, drop {
         sender: address,
         index: u64,
@@ -3544,656 +3625,50 @@ module typus_perp::lp_pool {
         result
     }
 
-    // #[test_only]
-    // public(package) fun test_init(ctx: &mut TxContext) {
-    //     init(ctx);
-    // }
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
 
-    // #[test_only]
-    // public(package) fun test_get_mut_liquidity_pool(registry: &mut Registry, index: u64): &mut LiquidityPool {
-    //     get_mut_liquidity_pool(registry, index)
-    // }
+    #[test_only]
+    public(package) fun test_get_mut_liquidity_pool(registry: &mut Registry, index: u64): &mut LiquidityPool {
+        get_mut_liquidity_pool(registry, index)
+    }
 
-    // #[test_only]
-    // public(package) fun test_get_spot_config<TOKEN>(registry: &Registry, index: u64): SpotConfig {
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     let liquidity_pool = get_liquidity_pool(registry, index);
-    //     let token_pool = get_token_pool(liquidity_pool, &token_type);
-    //     token_pool.config.spot_config
-    // }
+    #[test_only]
+    public(package) fun test_get_spot_config<TOKEN>(registry: &Registry, index: u64): SpotConfig {
+        let token_type = type_name::with_defining_ids<TOKEN>();
+        let liquidity_pool = get_liquidity_pool(registry, index);
+        let token_pool = get_token_pool(liquidity_pool, &token_type);
+        token_pool.config.spot_config
+    }
 
-    // #[test_only]
-    // public(package) fun test_get_margin_config<TOKEN>(registry: &Registry, index: u64): MarginConfig {
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     let liquidity_pool = get_liquidity_pool(registry, index);
-    //     let token_pool = get_token_pool(liquidity_pool, &token_type);
-    //     token_pool.config.margin_config
-    // }
+    #[test_only]
+    public(package) fun test_get_margin_config<TOKEN>(registry: &Registry, index: u64): MarginConfig {
+        let token_type = type_name::with_defining_ids<TOKEN>();
+        let liquidity_pool = get_liquidity_pool(registry, index);
+        let token_pool = get_token_pool(liquidity_pool, &token_type);
+        token_pool.config.margin_config
+    }
 
-    // #[test_only]
-    // public(package) fun test_check_target_weight_bp<TOKEN>(registry: &Registry, index: u64, target_weight_bp: u64): bool {
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     let liquidity_pool = get_liquidity_pool(registry, index);
-    //     let token_pool = get_token_pool(liquidity_pool, &token_type);
-    //     token_pool.config.spot_config.target_weight_bp == target_weight_bp
-    // }
+    #[test_only]
+    public(package) fun test_check_target_weight_bp<TOKEN>(registry: &Registry, index: u64, target_weight_bp: u64): bool {
+        let token_type = type_name::with_defining_ids<TOKEN>();
+        let liquidity_pool = get_liquidity_pool(registry, index);
+        let token_pool = get_token_pool(liquidity_pool, &token_type);
+        token_pool.config.spot_config.target_weight_bp == target_weight_bp
+    }
 
-    // #[test_only]
-    // public(package) fun test_check_basic_borrow_rate<TOKEN>(registry: &Registry, index: u64, basic_borrow_rate: u64): bool {
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     let liquidity_pool = get_liquidity_pool(registry, index);
-    //     let token_pool = get_token_pool(liquidity_pool, &token_type);
-    //     std::debug::print(&token_pool.config.margin_config.basic_borrow_rate_0);
-    //     std::debug::print(&basic_borrow_rate);
-    //     token_pool.config.margin_config.basic_borrow_rate_0 == basic_borrow_rate
-    // }
-
-    // #[test_only]
-    // public(package) fun add_liquidity_token_without_oracle<TOKEN>(
-    //     version: &Version,
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     token_decimal: u64,
-    //     // spot config
-    //     target_weight_bp: u64,
-    //     min_deposit: u64,
-    //     max_capacity: u64,
-    //     basic_mint_fee_bp: u64,
-    //     additional_mint_fee_bp: u64,
-    //     basic_burn_fee_bp: u64,
-    //     additional_burn_fee_bp: u64,
-    //     swap_fee_bp: u64,
-    //     swap_fee_protocol_share_bp: u64,
-    //     enable_lending: u64,
-    //     // margin config
-    //     basic_borrow_rate_0: u64,
-    //     basic_borrow_rate_1: u64,
-    //     basic_borrow_rate_2: u64,
-    //     utilization_threshold_bp_0: u64,
-    //     utilization_threshold_bp_1: u64,
-    //     borrow_interval_ts_ms: u64,
-    //     max_order_reserve_ratio_bp: u64,
-    //     clock: &Clock,
-    //     ctx: &TxContext
-    // ) {
-    //     // safety check
-    //     admin::verify(version, ctx);
-
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     if (!vector::contains(&liquidity_pool.liquidity_tokens, &token_type)) {
-    //         vector::push_back(&mut liquidity_pool.liquidity_tokens, token_type);
-
-    //         let spot_config = SpotConfig {
-    //             min_deposit,
-    //             max_capacity,
-    //             target_weight_bp,
-    //             basic_mint_fee_bp,
-    //             additional_mint_fee_bp,
-    //             basic_burn_fee_bp,
-    //             additional_burn_fee_bp,
-    //             swap_fee_bp,
-    //             swap_fee_protocol_share_bp,
-    //             enable_lending,
-    //             u64_padding: vector::empty(),
-    //         };
-
-    //         let margin_config = MarginConfig {
-    //             // borrow related parameters
-    //             basic_borrow_rate_0,
-    //             basic_borrow_rate_1,
-    //             basic_borrow_rate_2,
-    //             utilization_threshold_bp_0,
-    //             utilization_threshold_bp_1,
-    //             borrow_interval_ts_ms,
-    //             max_order_reserve_ratio_bp,
-    //             u64_padding: vector::empty(),
-    //         };
-
-    //         let config = Config {
-    //             oracle_id: @0x111111,
-    //             liquidity_token_decimal: token_decimal,
-    //             spot_config,
-    //             margin_config,
-    //             u64_padding: vector::empty()
-    //         };
-
-    //         let current_ts_ms = clock::timestamp_ms(clock);
-    //         let state = State {
-    //             liquidity_amount: 0,   // balance value
-    //             value_in_usd: 0,       // amount / decimals * price (USD)
-    //             reserved_amount: 0,
-    //             update_ts_ms: current_ts_ms,
-    //             is_active: true,
-    //             last_borrow_rate_ts_ms: current_ts_ms,
-    //             cumulative_borrow_rate: 0,
-    //             previous_last_borrow_rate_ts_ms: current_ts_ms,
-    //             previous_cumulative_borrow_rate: 0,
-    //             u64_padding: vector::empty()
-    //         };
-
-    //         let token_pool = TokenPool { token_type, config, state };
-    //         vector::push_back(&mut liquidity_pool.token_pools, token_pool);
-
-    //         if (!dynamic_field::exists_(&liquidity_pool.id, token_type)) {
-    //             dynamic_field::add(&mut liquidity_pool.id, token_type, balance::zero<TOKEN>());
-    //         };
-    //     };
-    // }
-
-    // #[test_only]
-    // public(package) fun test_add_liquidity_amount<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     liquidity_amount: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
-    //     token_pool.state.liquidity_amount = token_pool.state.liquidity_amount + liquidity_amount;
-    // }
-
-    // #[test_only]
-    // public(package) fun test_add_total_share_supply(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     total_share_supply: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     liquidity_pool.pool_info.total_share_supply
-    //         = liquidity_pool.pool_info.total_share_supply + total_share_supply;
-    // }
-
-    // #[test_only]
-    // public(package) fun test_reduce_liquidity_amount<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     liquidity_amount: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
-    //     token_pool.state.liquidity_amount = token_pool.state.liquidity_amount - liquidity_amount;
-    // }
-
-    // #[test_only]
-    // public(package) fun test_reduce_total_share_supply(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     total_share_supply: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     liquidity_pool.pool_info.total_share_supply
-    //         = liquidity_pool.pool_info.total_share_supply - total_share_supply;
-    // }
-
-    // #[test_only]
-    // public(package) fun test_update_value_in_usd<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     value_in_usd: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
-    //     token_pool.state.value_in_usd = value_in_usd;
-    // }
-
-    // #[test_only]
-    // public(package) fun test_update_tvl(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     tvl_usd: u64,
-    // ) {
-    //     let liquidity_pool = get_mut_liquidity_pool(registry, index);
-    //     liquidity_pool.pool_info.tvl_usd = tvl_usd;
-    // }
+    #[test_only]
+    public(package) fun test_check_basic_borrow_rate<TOKEN>(registry: &Registry, index: u64, basic_borrow_rate: u64): bool {
+        let token_type = type_name::with_defining_ids<TOKEN>();
+        let liquidity_pool = get_liquidity_pool(registry, index);
+        let token_pool = get_token_pool(liquidity_pool, &token_type);
+        std::debug::print(&token_pool.config.margin_config.basic_borrow_rate_0);
+        std::debug::print(&basic_borrow_rate);
+        token_pool.config.margin_config.basic_borrow_rate_0 == basic_borrow_rate
+    }
 
     // ======= Deprecated =======
 }
 
-
-// #[test_only]
-// module typus_perp::test_lp_pool {
-//     use std::type_name;
-//     use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared};
-//     use sui::clock::{Self, Clock};
-//     use sui::sui::SUI;
-
-//     use typus_perp::lp_pool::{Self, Registry};
-//     use typus_perp::admin::{Self, Version};
-//     use typus_perp::tlp::TLP;
-//     use typus_perp::math::amount_to_usd;
-
-//     const ADMIN: address = @0xFFFF;
-//     const CURRENT_TS_MS: u64 = 0;
-//     const LP_TOKEN_DECIMAL: u64 = 9;
-//     const SUI_PRICE: u64 = 10_0000_0000;
-//     const SUI_PRICE_DECIMAL: u64 = 8;
-
-//     // spot config
-//     const TOKEN_DECIMAL: u64 = 9;
-//     const TARGET_WEIGHT_BP: u64 = 5000;
-//     const MIN_DEPOSIT: u64 = 1_0000_00000;
-//     const MAX_CAPACITY: u64 = 1_000_000_000_0000_00000;
-//     const BASIC_MINT_FEE_BP: u64 = 10;
-//     const ADDITIONAL_MINT_FEE_BP: u64 = 5;
-//     const BASIC_BURN_FEE_BP: u64 = 10;
-//     const ADDITIONAL_BASIC_BURN_FEE_BP: u64 = 5;
-//     const SWAP_FEE_BP: u64 = 5;
-//     const SWAP_FEE_PROTOCOL_SHARE_BP: u64 = 3000;
-
-//     // margin config
-//     const BASIC_BORROW_RATE_0: u64 = 100;
-//     const BASIC_BORROW_RATE_1: u64 = 100;
-//     const BASIC_BORROW_RATE_2: u64 = 200;
-//     const UTILITY_THRESHOLD_BP_0: u64 = 3000;
-//     const UTILITY_THRESHOLD_BP_1: u64 = 6000;
-//     const FUNDING_INTERVAL_TS_MS: u64 = 10000;
-//     const MAX_ORDER_RESERVE_RATIO_BP: u64 = 1000;
-
-//     public struct FeePool has key, store {
-//         id: UID,
-//         fee_infos: vector<u64>,
-//     }
-
-//     fun new_registry(scenario: &mut Scenario) {
-//         lp_pool::test_init(ctx(scenario));
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_version(scenario: &mut Scenario) {
-//         admin::test_init(ctx(scenario));
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun new_clock(scenario: &mut Scenario): Clock {
-//         let mut clock = clock::create_for_testing(ctx(scenario));
-//         clock::set_for_testing(&mut clock, CURRENT_TS_MS);
-//         clock
-//     }
-
-//     // fun update_clock(clock: &mut Clock, ts_ms: u64) {
-//     //     clock::set_for_testing(clock, ts_ms);
-//     // }
-
-//     fun registry(scenario: &Scenario): Registry {
-//         take_shared<Registry>(scenario)
-//     }
-
-//     fun version(scenario: &Scenario): Version {
-//         take_shared<Version>(scenario)
-//     }
-
-//     fun test_new_liquidity_pool_<LP_TOKEN>(scenario: &mut Scenario) {
-//         let mut registry = registry(scenario);
-//         let version = version(scenario);
-//         lp_pool::new_liquidity_pool<LP_TOKEN>(
-//             &version,
-//             &mut registry,
-//             LP_TOKEN_DECIMAL,
-//             ctx(scenario)
-//         );
-//         return_shared(registry);
-//         return_shared(version);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_add_liquidity_token_<TOKEN>(scenario: &mut Scenario, index: u64) {
-//         let mut registry = registry(scenario);
-//         let version = version(scenario);
-//         let clock = new_clock(scenario);
-//         lp_pool::add_liquidity_token_without_oracle<TOKEN>(
-//             &version,
-//             &mut registry,
-//             index,
-//             // config
-//             TOKEN_DECIMAL,
-//             // spot config
-//             TARGET_WEIGHT_BP,
-//             MIN_DEPOSIT,
-//             MAX_CAPACITY,
-//             BASIC_MINT_FEE_BP,
-//             ADDITIONAL_MINT_FEE_BP,
-//             BASIC_BURN_FEE_BP,
-//             ADDITIONAL_BASIC_BURN_FEE_BP,
-//             SWAP_FEE_BP,
-//             SWAP_FEE_PROTOCOL_SHARE_BP,
-//             0,
-//             BASIC_BORROW_RATE_0,
-//             BASIC_BORROW_RATE_1,
-//             BASIC_BORROW_RATE_2,
-//             UTILITY_THRESHOLD_BP_0,
-//             UTILITY_THRESHOLD_BP_1,
-//             FUNDING_INTERVAL_TS_MS,
-//             MAX_ORDER_RESERVE_RATIO_BP,
-//             &clock,
-//             ctx(scenario)
-//         );
-//         return_shared(registry);
-//         return_shared(version);
-//         clock::destroy_for_testing(clock);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun simulate_deposit<TOKEN>(
-//         scenario: &mut Scenario,
-//         index: u64,
-//         price: u64,
-//         price_decimal: u64,
-//         deposit_amount: u64,
-//     ) {
-//         let mut registry = registry(scenario);
-//         let (_deposit_amount_usd, _mint_fee_usd, mint_amount) = lp_pool::calculate_mint_lp(
-//             &registry,
-//             index,
-//             type_name::with_defining_ids<TOKEN>(),
-//             price,
-//             price_decimal,
-//             deposit_amount,
-//         );
-
-//         lp_pool::test_add_liquidity_amount<TOKEN>(&mut registry, index, deposit_amount);
-//         next_tx(scenario, ADMIN);
-//         lp_pool::test_add_total_share_supply(&mut registry, index, mint_amount);
-//         next_tx(scenario, ADMIN);
-//         let liquidity_value_in_usd = math::amount_to_usd(
-//             lp_pool::get_liquidity_amount(&registry, index, type_name::with_defining_ids<TOKEN>()),
-//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::with_defining_ids<TOKEN>()),
-//             price,
-//             price_decimal
-//         );
-//         lp_pool::test_update_value_in_usd<TOKEN>(&mut registry, index, liquidity_value_in_usd);
-//         next_tx(scenario, ADMIN);
-//         lp_pool::test_update_tvl(&mut registry, index, liquidity_value_in_usd);
-//         return_shared(registry);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun simulate_withdraw<TOKEN>(
-//         scenario: &mut Scenario,
-//         index: u64,
-//         price: u64,
-//         price_decimal: u64,
-//         burn_amount: u64,
-//     ) {
-//         let mut registry = registry(scenario);
-//         let (_burn_amount_usd, _burn_fee_usd, withdraw_token_amount, _burn_fee_token_amount) = lp_pool::calculate_burn_lp(
-//             &registry,
-//             index,
-//             type_name::with_defining_ids<TOKEN>(),
-//             price,
-//             price_decimal,
-//             burn_amount,
-//         );
-
-//         lp_pool::test_reduce_liquidity_amount<TOKEN>(&mut registry, index, withdraw_token_amount);
-//         next_tx(scenario, ADMIN);
-//         lp_pool::test_reduce_total_share_supply(&mut registry, index, burn_amount);
-//         next_tx(scenario, ADMIN);
-//         let liquidity_value_in_usd = math::amount_to_usd(
-//             lp_pool::get_liquidity_amount(&registry, index, type_name::with_defining_ids<TOKEN>()),
-//             lp_pool::get_liquidity_token_decimal(&registry, index, type_name::with_defining_ids<TOKEN>()),
-//             price,
-//             price_decimal
-//         );
-//         lp_pool::test_update_value_in_usd<TOKEN>(&mut registry, index, liquidity_value_in_usd);
-//         next_tx(scenario, ADMIN);
-//         lp_pool::test_update_tvl(&mut registry, index, liquidity_value_in_usd);
-//         return_shared(registry);
-//         next_tx(scenario, ADMIN);
-//     }
-
-//     fun test_calculate_mint_lp_<TOKEN>(
-//         scenario: &mut Scenario,
-//         index: u64,
-//         price: u64,
-//         price_decimal: u64,
-//         deposit_amount: u64,
-//     ): (u64, u64, u64) {
-//         let registry = registry(scenario);
-
-//         let (deposit_amount_usd, mint_fee_usd, mint_amount) = lp_pool::calculate_mint_lp(
-//             &registry,
-//             index,
-//             type_name::with_defining_ids<TOKEN>(),
-//             price,
-//             price_decimal,
-//             deposit_amount,
-//         );
-
-//         return_shared(registry);
-//         next_tx(scenario, ADMIN);
-//         (deposit_amount_usd, mint_fee_usd, mint_amount)
-//     }
-
-//     fun test_calculate_burn_lp_<TOKEN>(
-//         scenario: &mut Scenario,
-//         index: u64,
-//         price: u64,
-//         price_decimal: u64,
-//         burn_amount: u64,
-//     ): (u64, u64, u64) {
-//         let registry = registry(scenario);
-
-//         let (burn_amount_usd, burn_fee_usd, withdraw_token_amount, _burn_fee_token_amount) = lp_pool::calculate_burn_lp(
-//             &registry,
-//             index,
-//             type_name::with_defining_ids<TOKEN>(),
-//             price,
-//             price_decimal,
-//             burn_amount,
-//         );
-
-//         return_shared(registry);
-//         next_tx(scenario, ADMIN);
-//         (burn_amount_usd, burn_fee_usd, withdraw_token_amount)
-//     }
-
-//     // ======= Tests =======
-
-//     #[test]
-//     public(package) fun test_new_liquidity_pool() {
-//         let mut scenario = begin(ADMIN);
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_add_liquidity_token() {
-//         let mut scenario = begin(ADMIN);
-//         let index = 0;
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         test_add_liquidity_token_<SUI>(&mut scenario, index);
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_update_spot_config() {
-//         let mut scenario = begin(ADMIN);
-//         let index = 0;
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         test_add_liquidity_token_<SUI>(&mut scenario, index);
-
-//         let target_weight_bp = option::some(8000);
-
-//         {
-//             let mut registry = registry(&scenario);
-//             let version = version(&scenario);
-//             lp_pool::update_spot_config<SUI>(
-//                 &version,
-//                 &mut registry,
-//                 index,
-//                 target_weight_bp,
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 option::none(),
-//                 ctx(&mut scenario)
-//             );
-
-//             return_shared(registry);
-//             return_shared(version);
-
-//             next_tx(&mut scenario, ADMIN);
-//         };
-
-//         {
-//             let registry = registry(&scenario);
-//             let target_weight_bp = target_weight_bp.borrow();
-//             assert!(lp_pool::test_check_target_weight_bp<SUI>(&registry, index, *target_weight_bp), 0);
-//             return_shared(registry);
-//             next_tx(&mut scenario, ADMIN);
-//         };
-
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_update_margin_config() {
-//         let mut scenario = begin(ADMIN);
-//         let index = 0;
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         test_add_liquidity_token_<SUI>(&mut scenario, index);
-
-//         let basic_borrow_rate_0 = option::some(1000);
-//         let basic_borrow_rate_1 = option::some(1000);
-//         let basic_borrow_rate_2 = option::some(1000);
-//         let utilization_threshold_bp_0 = option::some(1000);
-//         let utilization_threshold_bp_1 = option::some(1000);
-
-//         {
-//             let mut registry = registry(&scenario);
-//             let version = version(&scenario);
-//             lp_pool::update_margin_config<SUI>(
-//                 &version,
-//                 &mut registry,
-//                 index,
-//                 basic_borrow_rate_0,
-//                 basic_borrow_rate_1,
-//                 basic_borrow_rate_2,
-//                 utilization_threshold_bp_0,
-//                 utilization_threshold_bp_1,
-//                 option::none(),
-//                 option::none(),
-//                 ctx(&mut scenario)
-//             );
-
-//             return_shared(registry);
-//             return_shared(version);
-
-//             next_tx(&mut scenario, ADMIN);
-//         };
-
-//         {
-//             let registry = registry(&scenario);
-//             let basic_borrow_rate_0 = basic_borrow_rate_0.borrow();
-//             assert!(lp_pool::test_check_basic_borrow_rate<SUI>(&registry, index, *basic_borrow_rate_0), 0);
-//             return_shared(registry);
-//             next_tx(&mut scenario, ADMIN);
-//         };
-
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_calculate_mint_lp() {
-//         let mut scenario = begin(ADMIN);
-//         let index = 0;
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         test_add_liquidity_token_<SUI>(&mut scenario, index);
-
-//         let (price, price_decimal) = (SUI_PRICE, SUI_PRICE_DECIMAL);
-
-//         let deposit_amount = 1000000_0000_00000;
-
-//         // deposited liquidity usd = 1000000 * 10 = 10000000 => 500000_0000_0000
-
-//         let (deposit_amount_usd, mint_fee_usd, mint_amount)
-//             = test_calculate_mint_lp_<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         simulate_deposit<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         assert!(10000000000000000 == deposit_amount_usd, 0);
-//         assert!(20000000000000 == mint_fee_usd, 1);
-//         assert!(10000000000000000 == mint_amount, 2);
-
-//         let (deposit_amount_usd, mint_fee_usd, mint_amount)
-//             = test_calculate_mint_lp_<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         simulate_deposit<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         assert!(10000000000000000 == deposit_amount_usd, 0);
-//         assert!(20000000000000 == mint_fee_usd, 1);
-//         assert!(9980000000000000 == mint_amount, 2);
-
-//         end(scenario);
-//     }
-
-//     #[test]
-//     public(package) fun test_calculate_burn_lp() {
-//         let mut scenario = begin(ADMIN);
-//         let index = 0;
-//         new_registry(&mut scenario);
-//         new_version(&mut scenario);
-//         test_new_liquidity_pool_<TLP>(&mut scenario);
-//         test_add_liquidity_token_<SUI>(&mut scenario, index);
-
-//         let (price, price_decimal) = (SUI_PRICE, SUI_PRICE_DECIMAL);
-
-//         let deposit_amount = 1000000_0000_00000;
-
-//         // deposited liquidity usd = 1000000 * 10 = 10000000 => 500000_0000_0000
-
-//         let (deposit_amount_usd, mint_fee_usd, mint_amount)
-//             = test_calculate_mint_lp_<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         simulate_deposit<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         assert!(10000000000000000 == deposit_amount_usd, 0);
-//         assert!(20000000000000 == mint_fee_usd, 1);
-//         assert!(10000000000000000 == mint_amount, 2);
-
-//         let (deposit_amount_usd, mint_fee_usd, mint_amount)
-//             = test_calculate_mint_lp_<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         simulate_deposit<SUI>(&mut scenario, index, price, price_decimal, deposit_amount);
-
-//         assert!(10000000000000000 == deposit_amount_usd, 0);
-//         assert!(20000000000000 == mint_fee_usd, 1);
-//         assert!(9980000000000000 == mint_amount, 2);
-
-//         let burn_amount = mint_amount;
-//         let (burn_amount_usd, burn_fee_usd, withdraw_token_amount)
-//             = test_calculate_burn_lp_<SUI>(&mut scenario, index, price, price_decimal, burn_amount);
-
-
-//         // collateral token amount = 20000000000000000
-//         // total lp minted amount = 19980000000000000
-//         // burn amount = 9980000000000000
-//         // => burn_amount_usd = 20000000000000000 * (9980000000000000 / 19980000000000000) = 9,989,989,989,989,989
-//         // => burn_fee_usd = burn_amount_usd / 1000 = 9,989,989,989,989
-//         // => withdraw_token_amount = (burn_amount_usd - burn_fee_usd) / price = (9,989,989,989,989,989 - 9,989,989,989,989) / 10
-
-//         assert!(9989989989989989 == burn_amount_usd, 0);
-//         assert!(9989989989989 == burn_fee_usd, 1);
-//         assert!(9980000000000000 == withdraw_token_amount, 2);
-
-//         simulate_withdraw<SUI>(&mut scenario, index, price, price_decimal, burn_amount);
-
-//         end(scenario);
-//     }
-// }
