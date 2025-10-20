@@ -1,0 +1,8 @@
+[package]
+name = "typus_token"
+version = "1.0.0"
+edition = "2024.beta"
+published-at = "0xf82dc05634970553615eef6112a1ac4fb7bf10272bf6cbe0f80ef44a6c489385"
+
+[addresses]
+typus_token = "0xf82dc05634970553615eef6112a1ac4fb7bf10272bf6cbe0f80ef44a6c489385"
