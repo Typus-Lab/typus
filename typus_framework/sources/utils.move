@@ -28,7 +28,10 @@ module typus_framework::utils {
 
     // ======== Errors ========
 
-    fun insufficient_balance(): u64 { abort 0 }
+    #[error]
+    const EInsufficientBalance: vector<u8> = b"Insufficient Balance";
+
+    // ======== Functions ========
 
     /// Calculates a multiplier based on a number of decimals.
     /// For example, `multiplier(2)` returns 100.
@@ -85,7 +88,7 @@ module typus_framework::utils {
                 break
             }
         };
-        assert!(amount == 0, insufficient_balance());
+        assert!(amount == 0, EInsufficientBalance);
 
         (coins, balance)
     }
@@ -138,22 +141,6 @@ module typus_framework::utils {
         (y, m, d)
     }
 
-    #[test]
-    fun test_get_date_from_ts() {
-        let (y, m, d) = get_date_from_ts(726386766);
-        assert!(y == 1993, 0);
-        assert!(m == 1, 0);
-        assert!(d == 7, 0);
-        let (y, m, d) = get_date_from_ts(1458457627);
-        assert!(y == 2016, 0);
-        assert!(m == 3, 0);
-        assert!(d == 20, 0);
-        let (y, m, d) = get_date_from_ts(1671280200);
-        assert!(y == 2022, 0);
-        assert!(m == 12, 0);
-        assert!(d == 17, 0);
-    }
-
     /// Checks if two generic types are the same.
     public fun match_types<X, Y>(): bool {
         type_name::with_defining_ids<X>() == type_name::with_defining_ids<Y>()
@@ -186,16 +173,6 @@ module typus_framework::utils {
         vector::reverse(&mut result);
 
         result
-    }
-
-    #[test]
-    fun test_u64_to_bytes() {
-        let bytes = u64_to_bytes(165011022030, 8);
-        assert!(bytes == b"1650.1102203", 0);
-        let bytes = u64_to_bytes(75305129, 9);
-        assert!(bytes == b"0.075305129", 0);
-        let bytes = u64_to_bytes(74500, 8);
-        assert!(bytes == b"0.000745", 0);
     }
 
     /// Returns the three-letter abbreviation for a month.

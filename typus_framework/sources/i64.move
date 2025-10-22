@@ -167,21 +167,21 @@ module typus_framework::i64 {
                 // B is positive
                 let bits = a.bits * b.bits;
                 assert!(bits >> 63 == 0, E_ARITHMETIC_OVERFLOW);
-                return I64 { bits } // Return positive
+                I64 { bits } // Return positive
             } else {
                 // B is negative
-                return I64 { bits: (1 << 63) + (a.bits * (b.bits - (1 << 63))) } // Return negative
+                I64 { bits: (1 << 63) + (a.bits * (b.bits - (1 << 63))) } // Return negative
             }
         } else {
             // A is negative
             if (b.bits >> 63 == 0) {
                 // B is positive
-                return I64 { bits: (1 << 63) + (b.bits * (a.bits - (1 << 63))) } // Return negative
+                I64 { bits: (1 << 63) + (b.bits * (a.bits - (1 << 63))) } // Return negative
             } else {
                 // B is negative
                 let bits = (a.bits - (1 << 63)) * (b.bits - (1 << 63));
                 assert!(bits >> 63 == 0, E_ARITHMETIC_OVERFLOW);
-                return I64 { bits } // Return positive
+                I64 { bits } // Return positive
             }
         }
     }
@@ -192,19 +192,19 @@ module typus_framework::i64 {
             // A is positive
             if (b.bits >> 63 == 0) {
                 // B is positive
-                return I64 { bits: a.bits / b.bits } // Return positive
+                I64 { bits: a.bits / b.bits } // Return positive
             } else {
                 // B is negative
-                return I64 { bits: (1 << 63) | (a.bits / (b.bits - (1 << 63))) } // Return negative
+                I64 { bits: (1 << 63) | (a.bits / (b.bits - (1 << 63))) } // Return negative
             }
         } else {
             // A is negative
             if (b.bits >> 63 == 0) {
                 // B is positive
-                return I64 { bits: (1 << 63) | ((a.bits - (1 << 63)) / b.bits) } // Return negative
+                I64 { bits: (1 << 63) | ((a.bits - (1 << 63)) / b.bits) } // Return negative
             } else {
                 // B is negative
-                return I64 { bits: (a.bits - (1 << 63)) / (b.bits - (1 << 63)) } // Return positive
+                I64 { bits: (a.bits - (1 << 63)) / (b.bits - (1 << 63)) } // Return positive
             }
         }
     }
