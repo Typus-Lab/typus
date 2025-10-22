@@ -3518,1606 +3518,1606 @@ module typus_framework::vault {
     }
 }
 
-#[test_only]
-module typus_framework::test_vault {
-    use std::string;
-
-    use sui::address;
-    use sui::balance;
-    use sui::coin::{Self, Coin};
-    use sui::sui::SUI;
-    use sui::test_scenario::{Self, Scenario, begin, end, ctx, next_tx, take_shared, return_shared, return_to_sender, take_from_address_by_id};
-
-    use typus_framework::vault::{Self, DepositVault, BidVault, RefundVault, TypusDepositReceipt, TypusBidReceipt};
-    use typus_framework::balance_pool::{Self, BalancePool};
-
-    const ADMIN: address = @0xFFFF;
-    const SHARED: address = @0xAAAFFFF;
-    const USER_1: address = @0xBABE1;
-    const USER_2: address = @0xBABE2;
-    const USER_3: address = @0xBABE3;
-
-    const FEE_SHARE_BP: u64 = 100;
-
-    public struct USDC has drop {}
-
-    public struct Registry has key, store {
-        id: UID,
-    }
-
-    fun new_registry(scenario: &mut Scenario) {
-        transfer::public_share_object(Registry {
-            id: object::new(ctx(scenario)),
-        });
-        next_tx(scenario, ADMIN);
-    }
-
-    fun registry(scenario: &Scenario): Registry {
-        take_shared<Registry>(scenario)
-    }
-
-    fun new_fee_pool(scenario: &mut Scenario): address {
-        next_tx(scenario, ADMIN);
-        transfer::public_share_object<BalancePool>(
-            balance_pool::new(vector::singleton(ADMIN), ctx(scenario))
-        );
-        next_tx(scenario, ADMIN);
-        fee_pool_address(scenario)
-    }
-
-    fun fee_pool(scenario: &Scenario): BalancePool {
-        take_shared<BalancePool>(scenario)
-    }
-
-    fun fee_pool_address(scenario: &Scenario): address {
-        let fee_pool = take_shared<BalancePool>(scenario);
-        let id_address = object::id_address(&fee_pool);
-        return_shared(fee_pool);
-        id_address
-    }
-
-    fun new_shared_balance_pool(scenario: &mut Scenario) {
-        next_tx(scenario, ADMIN);
-        let mut fee_pool = fee_pool(scenario);
-        balance_pool::new_shared_balance_pool(
-            &mut fee_pool,
-            address::to_bytes(SHARED),
-            vector::singleton(SHARED),
-            ctx(scenario)
-        );
-        return_shared(fee_pool);
-    }
-
-    fun new_refund_vault(scenario: &mut Scenario) {
-        next_tx(scenario, ADMIN);
-        transfer::public_share_object<RefundVault>(
-            vault::new_refund_vault<USDC>(ctx(scenario))
-        );
-    }
-
-    fun refund_vault(scenario: &Scenario): RefundVault {
-        take_shared<RefundVault>(scenario)
-    }
-
-    #[test]
-    public fun test_new_deposit_vault(): DepositVault  {
-        let mut scenario = begin(ADMIN);
-        new_registry(&mut scenario);
-        let vault = new_deposit_vault<SUI, USDC>(0, &mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun new_deposit_vault<D_TOKEN, B_TOKEN>(index: u64, scenario: &mut Scenario): DepositVault {
-        let vault = vault::new_deposit_vault<D_TOKEN, B_TOKEN>(
-            index,
-            1000,
-            string::utf8(b"test_metadata"),
-            ctx(scenario),
-        );
-        vault
-    }
-
-    #[test]
-    public fun test_deposit_success(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let vault = deposit_success(&mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun deposit_success(scenario: &mut Scenario): DepositVault {
-        new_registry(scenario);
-        let mut vault = new_deposit_vault<SUI, USDC>(0, scenario);
-
-        // let lot_size = 1_0000_00000;
-        let init_amount = 8_0000_00000;
-        let add_amount = 2_0000_00000;
-        // deposit for the first time
-        next_tx(scenario, USER_1);
-        let coin = coin::mint_for_testing<SUI>(init_amount, ctx(scenario));
-        let receipts = vector::empty();
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), init_amount, receipts, ctx(scenario));
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == init_amount, 1);
-        // deposit for second time
-        next_tx(scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        let coin = coin::mint_for_testing<SUI>(add_amount, ctx(scenario));
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), add_amount, receipts, ctx(scenario));
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == init_amount + add_amount, 2);
-
-        next_tx(scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let user1_share = vault::get_warmup_deposit_share(&vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(user1_share == init_amount + add_amount, 3);
-
-        next_tx(scenario, ADMIN);
-        vault
-    }
-
-    #[test]
-    #[expected_failure]
-    public fun test_deposit_fail_with_deposit_disabled(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = deposit_success(&mut scenario);
-
-        vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
-
-        let _lot_size = 1_000000000;
-        let deposit_amount = 10_000000000;
-        let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(&mut scenario));
-        // try to deposit
-        next_tx(&mut scenario, USER_1);
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, vector::empty(), ctx(&mut scenario));
-
-        next_tx(&mut scenario, ADMIN);
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    #[expected_failure]
-    public fun test_deposit_failure_with_insufficient_fund(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = deposit_success(&mut scenario);
-
-        let balance = 1000;
-        let coin = coin::mint_for_testing<SUI>(balance, ctx(&mut scenario));
-
-        // try to deposit more than the balance
-        let _lot_size = 1_000000000;
-        let deposit_amount = balance + 1;
-        next_tx(&mut scenario, USER_1);
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, vector::empty(), ctx(&mut scenario));
-
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_withdraw_success(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = deposit_success(&mut scenario);
-
-        let coin = coin::mint_for_testing<SUI>(10000000000, ctx(&mut scenario));
-        next_tx(&mut scenario, USER_1);
-
-        let deposit_amount = 10000000000;
-        let withdraw_amount_first = 5000000000;
-        let withdraw_share_first = withdraw_amount_first;
-
-        // withdraw for the first time
-        let warmup_1 = vault::warmup_balance<SUI>(&vault);
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::withdraw<SUI>(&mut vault, receipts, option::some(withdraw_share_first), ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, USER_1);
-        let warmup_2 = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup_1 - warmup_2 == withdraw_amount_first, 1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let user1_share = vault::get_warmup_deposit_share(&vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(user1_share == deposit_amount - withdraw_amount_first, 2);
-
-        // withdraw for the second time
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::withdraw<SUI>(&mut vault, receipts, option::none(), ctx(&mut scenario));
-
-        // check
-        let warmup_3 = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup_2 - warmup_3 == deposit_amount - withdraw_amount_first, 3);
-        assert!(warmup_3 == 0, 4);
-        assert!(option::is_none(&test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1)), 5);
-
-        coin::burn_for_testing(coin);
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_withdraw_success_with_larger_amount(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = deposit_success(&mut scenario);
-        let deposit_amount = 10000000000;
-        let withdraw_amount = deposit_amount + 1;
-
-        // withdraw with amount larger than previous deposit amount
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::withdraw<SUI>(&mut vault, receipts, option::some(withdraw_amount), ctx(&mut scenario));
-
-        // check result: no warmup balance, object not exist
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == 0, 1);
-        assert!(option::is_none(&test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1)), 2);
-
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_withdraw_empty(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = deposit_success(&mut scenario);
-
-        // activate warmup: tranfser balance from warmup to active
-        vault::activate<SUI>(&mut vault, true, ctx(&mut scenario));
-
-        // try to withdraw when fund had been moved into active sub vault
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        let amount = vault::withdraw<SUI>(&mut vault, receipts, option::none(), ctx(&mut scenario));
-        assert!(amount == 0, 1);
-
-        next_tx(&mut scenario, ADMIN);
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_unsubscribe(): DepositVault  {
-        let mut scenario = begin(ADMIN);
-        let vault = unsubscribe(&mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun unsubscribe(scenario: &mut Scenario): DepositVault  {
-        let mut vault = deposit_success(scenario);
-
-        // activate warmup: tranfser balance from warmup to active
-        vault::activate<SUI>(&mut vault, true, ctx(scenario));
-
-        next_tx(scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::unsubscribe<SUI>(&mut vault, receipts, option::none(), ctx(scenario));
-
-        // check
-        next_tx(scenario, USER_1);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == 0, 0);
-        assert!(active == 0, 1);
-        assert!(deactivating == 10000000000, 2);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
-        next_tx(scenario, ADMIN);
-        vault
-    }
-
-    #[test]
-    public fun test_unsubscribe_half(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let vault = unsubscribe_half(&mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun unsubscribe_half(scenario: &mut Scenario): DepositVault {
-        let mut vault = deposit_success(scenario);
-        next_tx(scenario, USER_1);
-        // activate warmup: tranfser balance from warmup to active
-        vault::activate<SUI>(&mut vault, true, ctx(scenario));
-
-        next_tx(scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::unsubscribe<SUI>(&mut vault, receipts, option::some(5000000000), ctx(scenario));
-
-        // check
-        next_tx(scenario, USER_1);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == 0, 0);
-        assert!(active == 5000000000, 1);
-        assert!(deactivating == 5000000000, 2);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
-
-        next_tx(scenario, ADMIN);
-        vault
-    }
-
-    #[test]
-    public fun test_unsubscribe_partially_multi_users(): DepositVault  {
-        let mut scenario = begin(ADMIN);
-        let vault = unsubscribe_partially_multi_users(&mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun unsubscribe_partially_multi_users(scenario: &mut Scenario): DepositVault  {
-        new_registry(scenario);
-        let mut vault = new_deposit_vault<SUI, SUI>(0, scenario);
-
-        next_tx(scenario, USER_1);
-        let deposit_amount = 5_000000000;
-        let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
-        let receipts = vector::empty();
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
-
-        next_tx(scenario, USER_2);
-        let deposit_amount = 10_000000000;
-        let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
-        let receipts = vector::empty();
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
-
-        next_tx(scenario, ADMIN);
-        vault::activate<SUI>(&mut vault, true, ctx(scenario));
-        next_tx(scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::unsubscribe<SUI>(&mut vault, receipts, option::some(2_500000000), ctx(scenario));
-
-        next_tx(scenario, USER_2);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_2, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::unsubscribe<SUI>(&mut vault, receipts, option::some(2_000000000), ctx(scenario));
-
-        next_tx(scenario, USER_3);
-        let deposit_amount = 10_000000000;
-        let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
-        let receipts = vector::empty();
-        let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
-
-        // check
-        next_tx(scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(warmup == 10_000000000, 0);
-        assert!(active == 10_500000000, 1);
-        assert!(deactivating == 4_500000000, 2);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
-        assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
-        assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 8);
-
-        next_tx(scenario, ADMIN);
-        vault
-    }
-
-    // Refund with next
-    //     For one user, refund deactivating_share first, then active_share
-    //     For the vault. proportionally refund from active and deactivating
-    #[test]
-    public fun test_refund_the_same_user_w_next(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = unsubscribe_half(&mut scenario);
-
-        let refund_amount = 6_0000_00000;
-        vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let inactive = vault::inactive_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(active == 4_0000_00000, 0);
-        assert!(deactivating == 0, 1);
-        assert!(inactive == 5_0000_00000, 2);
-        assert!(warmup == 1_0000_00000, 3);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_refund_proportionally_w_next(): DepositVault {
-        let mut scenario = begin(ADMIN);
-
-        // before refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
-        let mut vault = unsubscribe_partially_multi_users(&mut scenario);
-
-        // user 1 - (2.5, 2.5) => (2.5, 0.5)
-        // user 2 - (8.0, 2.0) => (6.0, 0.0)
-        // user 3 - (0.0, 0.0) => (0.0, 0.0)
-
-        // after refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
-        let refund_amount = 6_0000_00000; // 40% refund
-        vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let inactive = vault::inactive_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(active == 8_5000_00000, 0);
-        assert!(deactivating == 0_5000_00000, 1);
-        assert!(inactive == 4_0000_00000, 2);
-        assert!(warmup == 12_0000_00000, 3);
-
-        // check user 1
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-        // check user 2
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-        // check user 3
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
-        assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(!vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-
-        end(scenario);
-        vault
-    }
-
-    // Refund without next - active => inactive
-    #[test]
-    public fun test_refund_wo_next(): DepositVault  {
-        let mut scenario = begin(ADMIN);
-        let mut vault = unsubscribe_half(&mut scenario);
-
-        let refund_amount = 6_0000_00000;
-        vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
-        vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let inactive = vault::inactive_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(active == 4_0000_00000, 0);
-        assert!(deactivating == 0, 1);
-        assert!(inactive == 6_0000_00000, 2);
-        assert!(warmup == 0, 3);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_refund_proportionally_wo_next(): DepositVault {
-        let mut scenario = begin(ADMIN);
-
-        // before refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
-        let mut vault = unsubscribe_partially_multi_users(&mut scenario);
-
-        // after unsubscribe => after activate => after refund
-        // user 1 - (2.5, 2.5, 0.0, 0.0) => (2.5, 2.5, 0.0, 0.0) => (2.5, 0.5, 2.0, 0.0)
-        // user 2 - (8.0, 2.0, 0.0, 0.0) => (8.0, 2.0, 0.0, 0.0) => (6.0, 0.0, 4.0, 0.0)
-        // user 3 - (0.0, 0.0, 0.0, 10.0) => (10.0, 0.0, 0.0, 0.0) => (6.0, 0.0, 4.0, 0.0)
-
-        // after refund - active: 14_500000000, deactivating: 0_500000000, inactive: 10_000000000, warmup: 0
-        let refund_amount = 10_0000_00000; // 40% refund
-        vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
-        vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let inactive = vault::inactive_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(active == 14_5000_00000, 0);
-        assert!(deactivating == 0_5000_00000, 1);
-        assert!(inactive == 10_0000_00000, 2);
-        assert!(warmup == 0, 3);
-
-        // check user 1
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-        // check user 2
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-        // check user 3
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_claim_success(): DepositVault {
-        let mut scenario = begin(ADMIN);
-        let mut vault = unsubscribe_half(&mut scenario); // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        let registry = registry(&scenario);
-
-        // refund shares 6_0000_00000 -> active 4_0000_00000, deactivating -> 0_0000_00000, warmup 1_0000_00000, inactive 5_0000_00000
-        next_tx(&mut scenario, ADMIN);
-        let refund_amount = 6_0000_00000; // 40% refund
-        vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
-
-        // inactive 5_0000_00000 -> 0
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::claim<SUI>(&mut vault, receipts, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&vault);
-        let deactivating = vault::deactivating_balance<SUI>(&vault);
-        let inactive = vault::inactive_balance<SUI>(&vault);
-        let warmup = vault::warmup_balance<SUI>(&vault);
-        assert!(active == 4_0000_00000, 0);
-        assert!(deactivating == 0, 1);
-        assert!(inactive == 0, 2);
-        assert!(warmup == 1_0000_00000, 3);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
-        assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
-        assert!(!vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
-        assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
-
-        return_shared(registry);
-        end(scenario);
-        vault
-    }
-
-    #[test]
-    public fun test_new_bid_vault(): BidVault  {
-        let mut scenario = begin(ADMIN);
-        let vault = new_bid_vault<SUI, USDC>(&mut scenario);
-        end(scenario);
-        vault
-    }
-
-    fun new_bid_vault<D_TOKEN, B_TOKEN>(scenario: &mut Scenario): BidVault  {
-        let vault = vault::new_bid_vault<D_TOKEN, B_TOKEN>(
-            0,
-            string::utf8(b"test_metadata"),
-            ctx(scenario),
-        );
-        vault
-    }
-
-    #[test]
-    public fun test_delivery(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = delivery(&mut scenario);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun delivery(scenario: &mut Scenario): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        let mut deposit_vault = unsubscribe_half(scenario);
-        let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
-
-        // start auction => activate warmup: tranfser balance from warmup to active
-        // => already activate in unsubscribe_half => nothing to do
-
-        // from auction, assume option price = 10 USDC
-        // 100% filled => refund_shares = 0
-        next_tx(scenario, USER_1);
-        let refund_shares = 0;
-        let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
-        vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
-        next_tx(scenario, ADMIN);
-        // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        // let receipt_shares = vec_map::empty();
-        // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
-
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(scenario),
-        );
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            premium_balance,
-            balance::zero<USDC>(),
-            ctx(scenario),
-        );
-
-        // check
-        next_tx(scenario, ADMIN);
-        let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(premium_balance_value == 10_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(premium_share == 10_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_0000_00000, 0);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_delivery_partially_filled(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = delivery_partially_filled(&mut scenario, 1000);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun delivery_partially_filled(scenario: &mut Scenario, filled_rate_bp: u64): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        let mut deposit_vault = unsubscribe_half(scenario);
-        let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
-
-        let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
-
-        // start auction => activate warmup: tranfser balance from warmup to active
-        // => already activate in unsubscribe_half => nothing to do
-
-        // from auction, assume option price = 10 USDC
-        // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
-        next_tx(scenario, USER_1);
-        let refund_shares = {
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-            let (active, deactivating) = (
-                vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
-                vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
-            );
-            (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64)
-        };
-        let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
-        vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
-        next_tx(scenario, ADMIN);
-        // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        // let receipt_shares = vec_map::empty();
-        // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
-
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(scenario),
-        );
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            premium_balance,
-            balance::zero<USDC>(),
-            ctx(scenario),
-        );
-
-
-        // check
-        next_tx(scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        assert!(
-            active
-                == if (refund_shares <= deactivating_before_delivery) {
-                    active_before_delivery
-                } else {
-                    active_before_delivery - (refund_shares - deactivating_before_delivery)
-                },
-            0
-        );
-        assert!(
-            deactivating
-                == if (refund_shares <= deactivating_before_delivery) {
-                    deactivating_before_delivery - refund_shares
-                } else {
-                    0
-                },
-            1
-        );
-        assert!(inactive == deactivating_before_delivery - deactivating, 2);
-        assert!(warmup == active_before_delivery - active, 3);
-        let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(premium_balance_value == 10_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(premium_share == 10_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_0000_00000, 0);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_delivery_with_incentive(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = delivery_with_incentive(&mut scenario, 1000, 200);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun delivery_with_incentive(scenario: &mut Scenario, filled_rate_bp: u64, incentive_rate_bp: u64): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        let mut deposit_vault = unsubscribe_half(scenario);
-        let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
-
-        let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
-
-        // start auction => activate warmup: tranfser balance from warmup to active
-        // => already activate in unsubscribe_half => nothing to do
-
-        // from auction, assume option price = 10 USDC
-        // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
-        next_tx(scenario, USER_1);
-        let (refund_shares, incentive_amount) = {
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-            let (active, deactivating) = (
-                vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
-                vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
-            );
-            let refund_shares = (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
-            let incentive_amount
-                = (((active + deactivating - refund_shares) as u128) * (incentive_rate_bp as u128) / 10000 as u64);
-            (refund_shares, incentive_amount)
-        };
-        let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
-        vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
-        next_tx(scenario, ADMIN);
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(scenario),
-        );
-
-        next_tx(scenario, ADMIN);
-        let incentive_balance = balance::create_for_testing<USDC>(incentive_amount);
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            premium_balance,
-            incentive_balance,
-            ctx(scenario),
-        );
-
-        // check
-        next_tx(scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        assert!(
-            active
-                == if (refund_shares <= deactivating_before_delivery) {
-                    active_before_delivery
-                } else {
-                    active_before_delivery - (refund_shares - deactivating_before_delivery)
-                },
-            0
-        );
-        assert!(
-            deactivating
-                == if (refund_shares <= deactivating_before_delivery) {
-                    deactivating_before_delivery - refund_shares
-                } else {
-                    0
-                },
-            1
-        );
-        assert!(inactive == deactivating_before_delivery - deactivating, 2);
-        assert!(warmup == active_before_delivery - active, 3);
-        let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(premium_balance_value == 10_0000_00000 + incentive_amount, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(premium_share == 10_0000_00000 + incentive_amount, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_0000_00000, 0);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_delivery_with_bidder_refund(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = delivery_with_bidder_refund(&mut scenario, 1000, 200, 1_0000_00000);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun delivery_with_bidder_refund(scenario: &mut Scenario, filled_rate_bp: u64, incentive_rate_bp: u64, refund_amount: u64): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        let mut deposit_vault = unsubscribe_half(scenario);
-        let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
-        new_refund_vault(scenario);
-        next_tx(scenario, ADMIN);
-        let mut refund_vault = refund_vault(scenario);
-
-        let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
-
-        // start auction => activate warmup: tranfser balance from warmup to active
-        // => already activate in unsubscribe_half => nothing to do
-
-        // from auction, assume option price = 10 USDC
-        // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
-        next_tx(scenario, USER_1);
-        let (refund_shares, incentive_amount) = {
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-            let (active, deactivating) = (
-                vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
-                vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
-            );
-            let refund_shares = (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
-            let incentive_amount
-                = (((active + deactivating - refund_shares) as u128) * (incentive_rate_bp as u128) / 10000 as u64);
-            (refund_shares, incentive_amount)
-        };
-        let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
-        vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
-        next_tx(scenario, ADMIN);
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(scenario),
-        );
-
-        // delivery depositor
-        next_tx(scenario, ADMIN);
-        let incentive_balance = balance::create_for_testing<USDC>(incentive_amount);
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            premium_balance,
-            incentive_balance,
-            ctx(scenario),
-        );
-
-        // delivery bidder (refund)
-        next_tx(scenario, ADMIN);
-        vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/10), USER_1);
-        vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/5), USER_2);
-        vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/2), USER_3);
-
-        // USER_1, USER_2 take refund, USER_3 keeps
-        next_tx(scenario, USER_1);
-        vault::take_refund<USDC>(&mut refund_vault, ctx(scenario));
-        next_tx(scenario, USER_2);
-        vault::take_refund<USDC>(&mut refund_vault, ctx(scenario));
-
-        // check delivery
-        next_tx(scenario, ADMIN);
-        {
-            let active = vault::active_balance<SUI>(&deposit_vault);
-            let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-            let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-            let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-            assert!(
-                active
-                    == if (refund_shares <= deactivating_before_delivery) {
-                        active_before_delivery
-                    } else {
-                        active_before_delivery - (refund_shares - deactivating_before_delivery)
-                    },
-                0
-            );
-            assert!(
-                deactivating
-                    == if (refund_shares <= deactivating_before_delivery) {
-                        deactivating_before_delivery - refund_shares
-                    } else {
-                        0
-                    },
-                1
-            );
-            assert!(inactive == deactivating_before_delivery - deactivating, 2);
-            assert!(warmup == active_before_delivery - active, 3);
-            let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
-            assert!(premium_balance_value == 10_0000_00000 + incentive_amount, 0);
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-            let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-            assert!(premium_share == 10_0000_00000 + incentive_amount, 0);
-
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-            let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-            assert!(bid_share == 1_0000_00000, 0);
-        };
-
-        // check refund
-        {
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_1));
-            let received_refund_coin = take_from_address_by_id<Coin<USDC>>(scenario, USER_1, most_recent_id_for_address);
-            assert!(coin::value(&received_refund_coin) == refund_amount / 10, 0);
-            transfer::public_transfer(received_refund_coin, USER_1);
-            let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_2));
-            let received_refund_coin = take_from_address_by_id<Coin<USDC>>(scenario, USER_2, most_recent_id_for_address);
-            assert!(coin::value(&received_refund_coin) == refund_amount / 5, 0);
-            transfer::public_transfer(received_refund_coin, USER_2);
-            let refund_vault_balance = vault::refund_vault_balance<USDC>(&refund_vault);
-            assert!(refund_vault_balance == refund_amount / 2, 0);
-        };
-
-        return_shared(refund_vault);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_settle_1(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = settle_otm(&mut scenario);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun settle_otm(scenario: &mut Scenario): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        // delivery premium 10_0000_00000 -> bid share 1_0000_00000
-        let (mut deposit_vault, mut bid_vault) = delivery(scenario);
-
-        next_tx(scenario, ADMIN);
-        let settled_share_price = 1_00000000; // share price decimal: 8
-        vault::settle<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            settled_share_price,
-            8,              // share_price_decimal
-            ctx(scenario)
-        );
-        // check
-        next_tx(scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 5_0000_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 5_0000_00000, 0);
-        assert!(premium == 10_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 5_0000_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 5_0000_00000, 0);
-        assert!(premium_share == 10_0000_00000, 0);
-
-        let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault);
-        assert!(bid_vault_balance == 0, 0);
-        // CHECK: shares
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_0000_00000, 0);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_settle_2(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = settle_itm(&mut scenario);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    fun settle_itm(scenario: &mut Scenario): (DepositVault, BidVault) {
-        // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
-        // delivery premium 10_0000_00000 -> bid share 1_0000_00000
-        let (mut deposit_vault, mut bid_vault) = delivery(scenario);
-
-        next_tx(scenario, ADMIN);
-        let settled_share_price = 0_70000000; // share price decimal: 8
-        vault::settle<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault,
-            settled_share_price,
-            8,              // share_price_decimal
-            ctx(scenario)
-        );
-
-        // check
-        next_tx(scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 3_5000_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 3_5000_00000, 0);
-        assert!(premium == 10_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 3_5000_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 3_5000_00000, 0);
-        assert!(premium_share == 10_0000_00000, 0);
-
-        let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault);
-        assert!(bid_vault_balance == 3_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_0000_00000, 0);
-
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_harvest(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        new_fee_pool(&mut scenario);
-        next_tx(&mut scenario, ADMIN);
-        let mut fee_pool = fee_pool(&scenario);
-        let (mut deposit_vault, bid_vault) = delivery(&mut scenario);
-        next_tx(&mut scenario, USER_1);
-
-        let premium_before_harvest = vault::premium_balance<USDC>(&deposit_vault);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::harvest_v2<USDC>(&mut fee_pool, &mut deposit_vault, receipts, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(premium == 0, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(premium_share == 0, 1);
-
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_1));
-        let received_premium_coin = take_from_address_by_id<Coin<USDC>>(&scenario, USER_1, most_recent_id_for_address);
-        let fee = ((premium_before_harvest as u128) * (vault::fee_bp(&deposit_vault) as u128) / 10000 as u64);
-        assert!(coin::value<USDC>(&received_premium_coin) == premium_before_harvest - fee, 2);
-        return_to_sender<Coin<USDC>>(&scenario, received_premium_coin);
-
-        // fee pool harvest by ADMIN
-        next_tx(&mut scenario, ADMIN);
-        balance_pool::take<USDC>(&mut fee_pool, option::none(), ctx(&mut scenario));
-        next_tx(&mut scenario, ADMIN);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(ADMIN));
-        let received_fee_coin = take_from_address_by_id<Coin<USDC>>(&scenario, ADMIN, most_recent_id_for_address);
-        assert!(coin::value<USDC>(&received_fee_coin) == fee, 2);
-        return_to_sender<Coin<USDC>>(&scenario, received_fee_coin);
-
-        return_shared(fee_pool);
-
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    #[test]
-    public fun test_harvest_with_shared_fee_pool(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        new_fee_pool(&mut scenario);
-        new_shared_balance_pool(&mut scenario);
-        next_tx(&mut scenario, ADMIN);
-        let mut fee_pool = fee_pool(&scenario);
-        let (mut deposit_vault, bid_vault) = delivery(&mut scenario);
-        vault::update_fee_share(&mut deposit_vault, FEE_SHARE_BP, option::some(address::to_bytes(SHARED)), ctx(&mut scenario));
-        next_tx(&mut scenario, USER_1);
-
-        let premium_before_harvest = vault::premium_balance<USDC>(&deposit_vault);
-
-        // harvest
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        let receipts = vector::singleton(deposit_receipt);
-        vault::harvest_v2<USDC>(&mut fee_pool, &mut deposit_vault, receipts, ctx(&mut scenario));
-
-        // check
-        next_tx(&mut scenario, ADMIN);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(premium == 0, 0);
-
-        // fee pool harvest by SHARED (check shared fee pool correct)
-        next_tx(&mut scenario, SHARED);
-        let shared_fee_pool = vault::test_get_shared_fee_pool(&deposit_vault);
-        balance_pool::take_shared<USDC>(&mut fee_pool, *option::borrow(&shared_fee_pool), option::none(), ctx(&mut scenario));
-        next_tx(&mut scenario, SHARED);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(SHARED));
-        let received_fee_coin = take_from_address_by_id<Coin<USDC>>(&scenario, SHARED, most_recent_id_for_address);
-        let fee = ((premium_before_harvest as u128) * (vault::fee_bp(&deposit_vault) as u128) / 10000 as u64);
-        let shared_fee = ((fee as u128) * (vault::fee_share_bp(&deposit_vault) as u128) / 10000 as u64);
-        assert!(coin::value<USDC>(&received_fee_coin) == shared_fee, 2);
-        return_to_sender<Coin<USDC>>(&scenario, received_fee_coin);
-
-        return_shared(fee_pool);
-
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-
-    // #[test]
-    // public fun test_compound(): (DepositVault, BidVault) {
-    //     let scenario = begin(ADMIN);
-    //     let deposit_amount = 10_0000_00000;
-    //     let filled_rate_bp = 7000;
-
-    //     let deposit_vault = new_deposit_vault<SUI, SUI>(0, &mut scenario);
-    //     let bid_vault = new_bid_vault<SUI, SUI>(&mut scenario);
-
-    //     // deposit
-    //     next_tx(&mut scenario, USER_1);
-    //     let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(&mut scenario));
-    //     let receipts = vector::empty();
-    //     vault::deposit<SUI>(&mut deposit_vault, vector::singleton(coin), deposit_amount, receipts, ctx(&mut scenario));
-
-    //     // activate
-    //     next_tx(&mut scenario, ADMIN);
-    //     vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
-
-    //     // create a bid receipt with premium
-    //     next_tx(&mut scenario, ADMIN);
-    //     let premium_balance = balance::create_for_testing<SUI>(10_0000_00000);
-    //     vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(&mut scenario));
-    //     next_tx(&mut scenario, ADMIN);
-    //     // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-    //     // let receipt_shares = vec_map::empty();
-    //     // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
-
-    //     // delivery with the bid receipt
-    //     let refund_shares = ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
-    //     vault::recoup<SUI>(
-    //         &mut deposit_vault,
-    //         refund_shares,
-    //         ctx(&mut scenario),
-    //     );
-    //     vault::delivery_b<SUI, SUI>(
-    //         &mut deposit_vault,
-    //         &mut bid_vault,
-    //         premium_balance,
-    //         balance::zero<SUI>(),
-    //         ctx(&mut scenario),
-    //     );
-
-    //     let premium_before_compound = vault::premium_balance<SUI>(&deposit_vault);
-
-    //     // compound - premium => warmup
-    //     next_tx(&mut scenario, USER_1);
-    //     let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-    //     let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
-    //     let receipts = vector::singleton(deposit_receipt);
-    //     vault::compound_v2<SUI>(&mut deposit_vault, receipts, ctx(&mut scenario));
-
-    //     // check
-    //     next_tx(&mut scenario, ADMIN);
-    //     let active = vault::active_balance<SUI>(&deposit_vault);
-    //     let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-    //     let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-    //     let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-    //     let premium = vault::premium_balance<SUI>(&deposit_vault);
-    //     assert!(active == ((deposit_amount as u128) * (filled_rate_bp as u128) / 10000 as u64), 0);
-    //     assert!(deactivating == 0, 1);
-    //     assert!(inactive == 0, 2);
-    //     assert!(
-    //         warmup
-    //             == premium_before_compound
-    //                 + ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64),
-    //         3
-    //     );
-    //     assert!(premium == 0, 4);
-    //     next_tx(&mut scenario, ADMIN);
-    //     let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-    //     let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-    //     let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-    //     let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-    //     let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-    //     let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-    //     assert!(active_share == ((deposit_amount as u128) * (filled_rate_bp as u128) / 10000 as u64), 5);
-    //     assert!(deactivating_share == 0, 5);
-    //     assert!(inactive_share == 0, 5);
-    //     assert!(
-    //         warmup_share
-    //             == premium_before_compound
-    //                 + ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64),
-    //         3
-    //     );
-    //     assert!(premium_share == 0, 5);
-
-    //     end(scenario);
-    //     (deposit_vault, bid_vault)
-    // }
-
-    #[test]
-    public fun test_third_rounds(): (DepositVault, BidVault, BidVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        // round 0
-        let (mut deposit_vault, bid_vault_round_0) = settle_otm(&mut scenario);
-        next_tx(&mut scenario, ADMIN);
-
-        // active = 5_0000_00000, deactivating = 0, inactive = 5_0000_00000, premium = 10_0000_00000
-
-        // round 1
-        vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
-        let mut bid_vault_round_1 = new_bid_vault<SUI, USDC>(&mut scenario);
-
-        // from auction, assume option price = 5 USDC
-        // create a bid receipt with premium
-        next_tx(&mut scenario, USER_1);
-        let premium_balance = balance::create_for_testing<USDC>(5_0000_00000);
-        vault::new_bid(&mut bid_vault_round_1, 1_5000_00000, ctx(&mut scenario));
-        next_tx(&mut scenario, ADMIN);
-        // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        // let receipt_shares = vec_map::empty();
-        // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_5000_00000);
-
-        // delivery with the bid receipt
-        let filled_rate_bp = 7000;
-        let refund_shares = (5_0000_00000 * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(&mut scenario),
-        );
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault_round_1,
-            premium_balance,
-            balance::zero<USDC>(),
-            ctx(&mut scenario),
-        );
-
-        // check: active = 3_5000_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 1_5000_00000, premium = 15_0000_00000
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 3_5000_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 5_0000_00000, 0);
-        assert!(warmup == 1_5000_00000, 0);
-        assert!(premium == 15_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 3_5000_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 5_0000_00000, 0);
-        assert!(warmup_share == 1_5000_00000, 0);
-        assert!(premium_share == 15_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault_round_1, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_5000_00000, 0);
-
-        // settle
-        let settled_share_price = 0_90000000; // share price decimal: 8
-        vault::settle<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault_round_1,
-            settled_share_price,
-            8,              // share_price_decimal
-            ctx(&mut scenario)
-        );
-
-        // check: active = 3_1500_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 1_5000_00000, premium = 15_0000_00000
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 3_1500_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 5_0000_00000, 0);
-        assert!(warmup == 1_5000_00000, 0);
-        assert!(premium == 15_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 3_1500_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 5_0000_00000, 0);
-        assert!(warmup_share == 1_5000_00000, 0);
-        assert!(premium_share == 15_0000_00000, 0);
-        let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault_round_1);
-        assert!(bid_vault_balance == 0_3500_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share = vault::get_bid_share(&bid_vault_round_1, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_5000_00000, 0);
-
-        // round 2
-        // activate
-        vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
-        let mut bid_vault_round_2 = new_bid_vault<SUI, USDC>(&mut scenario);
-
-        // active = 4_6500_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0, premium = 15_0000_00000
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        assert!(active == 4_6500_00000, 0);
-        assert!(warmup == 0, 0);
-
-        // from auction, assume option price = 5 USDC
-        // create a bid receipt with premium
-        next_tx(&mut scenario, USER_2);
-        let premium_balance = balance::create_for_testing<USDC>(8_0000_00000);
-        vault::new_bid(&mut bid_vault_round_2, 1_2000_00000, ctx(&mut scenario));
-        next_tx(&mut scenario, ADMIN);
-        // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
-        // let receipt_shares = vec_map::empty();
-        // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_2000_00000);
-
-        // delivery with the bid receipt
-        let filled_rate_bp = 9000;
-        let refund_shares = (4_6500_00000 * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
-        vault::recoup<SUI>(
-            &mut deposit_vault,
-            refund_shares,
-            ctx(&mut scenario),
-        );
-        vault::delivery_b<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault_round_2,
-            premium_balance,
-            balance::zero<USDC>(),
-            ctx(&mut scenario),
-        );
-
-        // active = 4_1850_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0_4650_00000, premium = 23_0000_00000
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 4_1850_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 5_0000_00000, 0);
-        assert!(warmup == 0_4650_00000, 0);
-        assert!(premium == 23_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 4_1850_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 5_0000_00000, 0);
-        assert!(warmup_share == 0_4650_00000, 0);
-        assert!(premium_share == 23_0000_00000, 0);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
-        let bid_share = vault::get_bid_share(&bid_vault_round_2, object::id_to_address(&most_recent_id_for_address));
-        assert!(bid_share == 1_2000_00000, 0);
-
-        // settle
-        let settled_share_price = 0_50000000; // share price decimal: 8
-        vault::settle<SUI, USDC>(
-            &mut deposit_vault,
-            &mut bid_vault_round_2,
-            settled_share_price,
-            8,              // share_price_decimal
-            ctx(&mut scenario)
-        );
-
-        // check: active = 2_0925_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0_4650_00000, premium = 23_0000_00000, bidder = 2_0925_00000
-        next_tx(&mut scenario, ADMIN);
-        let active = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive = vault::inactive_balance<SUI>(&deposit_vault);
-        let warmup = vault::warmup_balance<SUI>(&deposit_vault);
-        let premium = vault::premium_balance<USDC>(&deposit_vault);
-        assert!(active == 2_0925_00000, 0);
-        assert!(deactivating == 0, 0);
-        assert!(inactive == 5_0000_00000, 0);
-        assert!(warmup == 0_4650_00000, 0);
-        assert!(premium == 23_0000_00000, 0);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        assert!(active_share == 2_0925_00000, 0);
-        assert!(deactivating_share == 0, 0);
-        assert!(inactive_share == 5_0000_00000, 0);
-        assert!(warmup_share == 0_4650_00000, 0);
-        assert!(premium_share == 23_0000_00000, 0);
-
-        // exercise round 2 for USER_2
-        next_tx(&mut scenario, USER_2);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
-        let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_2, most_recent_id_for_address);
-        vault::exercise_v2<SUI>(&mut bid_vault_round_2, vector::singleton(bid_receipt), ctx(&mut scenario));
-        next_tx(&mut scenario, USER_2);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_2));
-        let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_2, most_recent_id_for_address);
-        assert!(coin::value(&payoff_coin) == 2_0925_00000, 0);
-        transfer::public_transfer(payoff_coin, USER_2);
-
-        // exercise round 1 for USER_1
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        vault::exercise_v2<SUI>(&mut bid_vault_round_1, vector::singleton(bid_receipt), ctx(&mut scenario));
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_1));
-        let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_1, most_recent_id_for_address);
-        assert!(coin::value(&payoff_coin) == 3500_00000, 0);
-        transfer::public_transfer(payoff_coin, USER_1);
-
-        next_tx(&mut scenario, ADMIN);
-        end(scenario);
-        (deposit_vault, bid_vault_round_0, bid_vault_round_1, bid_vault_round_2)
-    }
-
-    #[test]
-    public fun test_exercise_v2(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        // round 0
-        let (deposit_vault, mut bid_vault_round_0) = settle_itm(&mut scenario);
-        next_tx(&mut scenario, ADMIN);
-
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_1, most_recent_id_for_address);
-        vault::exercise_v2<SUI>(&mut bid_vault_round_0, vector::singleton(bid_receipt), ctx(&mut scenario));
-        next_tx(&mut scenario, USER_1);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_1));
-        let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_1, most_recent_id_for_address);
-        assert!(coin::value(&payoff_coin) == 3_0000_00000, 0);
-        transfer::public_transfer(payoff_coin, USER_1);
-
-        next_tx(&mut scenario, ADMIN);
-        end(scenario);
-
-        (deposit_vault, bid_vault_round_0)
-    }
-
-    #[test]
-    public fun test_terminate(): (DepositVault, BidVault) {
-        let mut scenario = begin(ADMIN);
-        let (deposit_vault, bid_vault) = test_terminate_(&mut scenario);
-        end(scenario);
-        (deposit_vault, bid_vault)
-    }
-    public fun test_terminate_(scenario: &mut Scenario): (DepositVault, BidVault) {
-        let (mut deposit_vault, bid_vault) = settle_itm(scenario);
-
-        // before terminating
-        next_tx(scenario, ADMIN);
-        let active_before = vault::active_balance<SUI>(&deposit_vault);
-        let deactivating_before = vault::deactivating_balance<SUI>(&deposit_vault);
-        let inactive_before = vault::inactive_balance<SUI>(&deposit_vault);
-        let premium_before = vault::premium_balance<USDC>(&deposit_vault);
-        let warmup_before = vault::warmup_balance<SUI>(&deposit_vault);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share_before = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share_before = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share_before = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share_before = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share_before = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-
-        assert!(active_before == active_share_before, 0); // make sure 1:1
-        assert!(deactivating_before == deactivating_share_before, 0); // make sure 1:1
-        assert!(inactive_before == inactive_share_before, 0); // make sure 1:1
-        assert!(premium_before == premium_share_before, 0); // make sure 1:1
-        assert!(warmup_before == warmup_share_before, 0); // make sure 1:1
-
-        let bid_vault_balance_before = vault::bid_vault_balance<SUI>(&bid_vault);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share_before = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-
-        // terminate
-        next_tx(scenario, ADMIN);
-        vault::terminate<SUI>(&mut deposit_vault, ctx(scenario));
-
-        // afte terminating
-        next_tx(scenario, ADMIN);
-        // dynamic fields of active, deactivating, and warmup balance were removed by function terminate
-        let inactive_after = vault::inactive_balance<SUI>(&deposit_vault);
-        let premium_after = vault::premium_balance<USDC>(&deposit_vault);
-
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
-        let active_share_after = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let deactivating_share_after = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let inactive_share_after = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let premium_share_after = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-        let warmup_share_after = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
-
-        assert!(inactive_after == inactive_share_after, 0); // make sure 1:1
-        assert!(premium_after == premium_share_after, 0); // make sure 1:1
-
-        let bid_vault_balance_after = vault::bid_vault_balance<SUI>(&bid_vault);
-        let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
-        let bid_share_after = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
-
-        assert!(inactive_after == inactive_before + active_before + deactivating_before + warmup_before, 0);
-        assert!(active_share_after == 0, 0);
-        assert!(deactivating_share_after == 0, 0);
-        assert!(warmup_share_after == 0, 0);
-
-        assert!(premium_after == premium_before, 0); // nothing changes
-        assert!(premium_share_after == premium_share_before, 0); // nothing changes
-
-        assert!(bid_vault_balance_after == bid_vault_balance_before, 0); // nothing changes
-        assert!(bid_share_after == bid_share_before, 0); // nothing changes
-
-        (deposit_vault, bid_vault)
-    }
-}
+// #[test_only]
+// module typus_framework::test_vault {
+//     use std::string;
+
+//     use sui::address;
+//     use sui::balance;
+//     use sui::coin::{Self, Coin};
+//     use sui::sui::SUI;
+//     use sui::test_scenario::{Self, Scenario, begin, end, ctx, next_tx, take_shared, return_shared, return_to_sender, take_from_address_by_id};
+
+//     use typus_framework::vault::{Self, DepositVault, BidVault, RefundVault, TypusDepositReceipt, TypusBidReceipt};
+//     use typus_framework::balance_pool::{Self, BalancePool};
+
+//     const ADMIN: address = @0xFFFF;
+//     const SHARED: address = @0xAAAFFFF;
+//     const USER_1: address = @0xBABE1;
+//     const USER_2: address = @0xBABE2;
+//     const USER_3: address = @0xBABE3;
+
+//     const FEE_SHARE_BP: u64 = 100;
+
+//     public struct USDC has drop {}
+
+//     public struct Registry has key, store {
+//         id: UID,
+//     }
+
+//     fun new_registry(scenario: &mut Scenario) {
+//         transfer::public_share_object(Registry {
+//             id: object::new(ctx(scenario)),
+//         });
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun registry(scenario: &Scenario): Registry {
+//         take_shared<Registry>(scenario)
+//     }
+
+//     fun new_fee_pool(scenario: &mut Scenario): address {
+//         next_tx(scenario, ADMIN);
+//         transfer::public_share_object<BalancePool>(
+//             balance_pool::new(vector::singleton(ADMIN), ctx(scenario))
+//         );
+//         next_tx(scenario, ADMIN);
+//         fee_pool_address(scenario)
+//     }
+
+//     fun fee_pool(scenario: &Scenario): BalancePool {
+//         take_shared<BalancePool>(scenario)
+//     }
+
+//     fun fee_pool_address(scenario: &Scenario): address {
+//         let fee_pool = take_shared<BalancePool>(scenario);
+//         let id_address = object::id_address(&fee_pool);
+//         return_shared(fee_pool);
+//         id_address
+//     }
+
+//     fun new_shared_balance_pool(scenario: &mut Scenario) {
+//         next_tx(scenario, ADMIN);
+//         let mut fee_pool = fee_pool(scenario);
+//         balance_pool::new_shared_balance_pool(
+//             &mut fee_pool,
+//             address::to_bytes(SHARED),
+//             vector::singleton(SHARED),
+//             ctx(scenario)
+//         );
+//         return_shared(fee_pool);
+//     }
+
+//     fun new_refund_vault(scenario: &mut Scenario) {
+//         next_tx(scenario, ADMIN);
+//         transfer::public_share_object<RefundVault>(
+//             vault::new_refund_vault<USDC>(ctx(scenario))
+//         );
+//     }
+
+//     fun refund_vault(scenario: &Scenario): RefundVault {
+//         take_shared<RefundVault>(scenario)
+//     }
+
+//     #[test]
+//     public fun test_new_deposit_vault(): DepositVault  {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         let vault = new_deposit_vault<SUI, USDC>(0, &mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun new_deposit_vault<D_TOKEN, B_TOKEN>(index: u64, scenario: &mut Scenario): DepositVault {
+//         let vault = vault::new_deposit_vault<D_TOKEN, B_TOKEN>(
+//             index,
+//             1000,
+//             string::utf8(b"test_metadata"),
+//             ctx(scenario),
+//         );
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_deposit_success(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let vault = deposit_success(&mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun deposit_success(scenario: &mut Scenario): DepositVault {
+//         new_registry(scenario);
+//         let mut vault = new_deposit_vault<SUI, USDC>(0, scenario);
+
+//         // let lot_size = 1_0000_00000;
+//         let init_amount = 8_0000_00000;
+//         let add_amount = 2_0000_00000;
+//         // deposit for the first time
+//         next_tx(scenario, USER_1);
+//         let coin = coin::mint_for_testing<SUI>(init_amount, ctx(scenario));
+//         let receipts = vector::empty();
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), init_amount, receipts, ctx(scenario));
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == init_amount, 1);
+//         // deposit for second time
+//         next_tx(scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         let coin = coin::mint_for_testing<SUI>(add_amount, ctx(scenario));
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), add_amount, receipts, ctx(scenario));
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == init_amount + add_amount, 2);
+
+//         next_tx(scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let user1_share = vault::get_warmup_deposit_share(&vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(user1_share == init_amount + add_amount, 3);
+
+//         next_tx(scenario, ADMIN);
+//         vault
+//     }
+
+//     #[test]
+//     #[expected_failure]
+//     public fun test_deposit_fail_with_deposit_disabled(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = deposit_success(&mut scenario);
+
+//         vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
+
+//         let _lot_size = 1_000000000;
+//         let deposit_amount = 10_000000000;
+//         let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(&mut scenario));
+//         // try to deposit
+//         next_tx(&mut scenario, USER_1);
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, vector::empty(), ctx(&mut scenario));
+
+//         next_tx(&mut scenario, ADMIN);
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     #[expected_failure]
+//     public fun test_deposit_failure_with_insufficient_fund(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = deposit_success(&mut scenario);
+
+//         let balance = 1000;
+//         let coin = coin::mint_for_testing<SUI>(balance, ctx(&mut scenario));
+
+//         // try to deposit more than the balance
+//         let _lot_size = 1_000000000;
+//         let deposit_amount = balance + 1;
+//         next_tx(&mut scenario, USER_1);
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, vector::empty(), ctx(&mut scenario));
+
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_withdraw_success(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = deposit_success(&mut scenario);
+
+//         let coin = coin::mint_for_testing<SUI>(10000000000, ctx(&mut scenario));
+//         next_tx(&mut scenario, USER_1);
+
+//         let deposit_amount = 10000000000;
+//         let withdraw_amount_first = 5000000000;
+//         let withdraw_share_first = withdraw_amount_first;
+
+//         // withdraw for the first time
+//         let warmup_1 = vault::warmup_balance<SUI>(&vault);
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::withdraw<SUI>(&mut vault, receipts, option::some(withdraw_share_first), ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, USER_1);
+//         let warmup_2 = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup_1 - warmup_2 == withdraw_amount_first, 1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let user1_share = vault::get_warmup_deposit_share(&vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(user1_share == deposit_amount - withdraw_amount_first, 2);
+
+//         // withdraw for the second time
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::withdraw<SUI>(&mut vault, receipts, option::none(), ctx(&mut scenario));
+
+//         // check
+//         let warmup_3 = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup_2 - warmup_3 == deposit_amount - withdraw_amount_first, 3);
+//         assert!(warmup_3 == 0, 4);
+//         assert!(option::is_none(&test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1)), 5);
+
+//         coin::burn_for_testing(coin);
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_withdraw_success_with_larger_amount(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = deposit_success(&mut scenario);
+//         let deposit_amount = 10000000000;
+//         let withdraw_amount = deposit_amount + 1;
+
+//         // withdraw with amount larger than previous deposit amount
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::withdraw<SUI>(&mut vault, receipts, option::some(withdraw_amount), ctx(&mut scenario));
+
+//         // check result: no warmup balance, object not exist
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == 0, 1);
+//         assert!(option::is_none(&test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1)), 2);
+
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_withdraw_empty(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = deposit_success(&mut scenario);
+
+//         // activate warmup: tranfser balance from warmup to active
+//         vault::activate<SUI>(&mut vault, true, ctx(&mut scenario));
+
+//         // try to withdraw when fund had been moved into active sub vault
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         let amount = vault::withdraw<SUI>(&mut vault, receipts, option::none(), ctx(&mut scenario));
+//         assert!(amount == 0, 1);
+
+//         next_tx(&mut scenario, ADMIN);
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_unsubscribe(): DepositVault  {
+//         let mut scenario = begin(ADMIN);
+//         let vault = unsubscribe(&mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun unsubscribe(scenario: &mut Scenario): DepositVault  {
+//         let mut vault = deposit_success(scenario);
+
+//         // activate warmup: tranfser balance from warmup to active
+//         vault::activate<SUI>(&mut vault, true, ctx(scenario));
+
+//         next_tx(scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::unsubscribe<SUI>(&mut vault, receipts, option::none(), ctx(scenario));
+
+//         // check
+//         next_tx(scenario, USER_1);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == 0, 0);
+//         assert!(active == 0, 1);
+//         assert!(deactivating == 10000000000, 2);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
+//         next_tx(scenario, ADMIN);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_unsubscribe_half(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let vault = unsubscribe_half(&mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun unsubscribe_half(scenario: &mut Scenario): DepositVault {
+//         let mut vault = deposit_success(scenario);
+//         next_tx(scenario, USER_1);
+//         // activate warmup: tranfser balance from warmup to active
+//         vault::activate<SUI>(&mut vault, true, ctx(scenario));
+
+//         next_tx(scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::unsubscribe<SUI>(&mut vault, receipts, option::some(5000000000), ctx(scenario));
+
+//         // check
+//         next_tx(scenario, USER_1);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == 0, 0);
+//         assert!(active == 5000000000, 1);
+//         assert!(deactivating == 5000000000, 2);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
+
+//         next_tx(scenario, ADMIN);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_unsubscribe_partially_multi_users(): DepositVault  {
+//         let mut scenario = begin(ADMIN);
+//         let vault = unsubscribe_partially_multi_users(&mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun unsubscribe_partially_multi_users(scenario: &mut Scenario): DepositVault  {
+//         new_registry(scenario);
+//         let mut vault = new_deposit_vault<SUI, SUI>(0, scenario);
+
+//         next_tx(scenario, USER_1);
+//         let deposit_amount = 5_000000000;
+//         let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
+//         let receipts = vector::empty();
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
+
+//         next_tx(scenario, USER_2);
+//         let deposit_amount = 10_000000000;
+//         let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
+//         let receipts = vector::empty();
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
+
+//         next_tx(scenario, ADMIN);
+//         vault::activate<SUI>(&mut vault, true, ctx(scenario));
+//         next_tx(scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::unsubscribe<SUI>(&mut vault, receipts, option::some(2_500000000), ctx(scenario));
+
+//         next_tx(scenario, USER_2);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(scenario, USER_2, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::unsubscribe<SUI>(&mut vault, receipts, option::some(2_000000000), ctx(scenario));
+
+//         next_tx(scenario, USER_3);
+//         let deposit_amount = 10_000000000;
+//         let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(scenario));
+//         let receipts = vector::empty();
+//         let _share = vault::deposit(&mut vault, vector::singleton(coin), deposit_amount, receipts, ctx(scenario));
+
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(warmup == 10_000000000, 0);
+//         assert!(active == 10_500000000, 1);
+//         assert!(deactivating == 4_500000000, 2);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 3);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
+//         assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
+//         assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 8);
+
+//         next_tx(scenario, ADMIN);
+//         vault
+//     }
+
+//     // Refund with next
+//     //     For one user, refund deactivating_share first, then active_share
+//     //     For the vault. proportionally refund from active and deactivating
+//     #[test]
+//     public fun test_refund_the_same_user_w_next(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = unsubscribe_half(&mut scenario);
+
+//         let refund_amount = 6_0000_00000;
+//         vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let inactive = vault::inactive_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(active == 4_0000_00000, 0);
+//         assert!(deactivating == 0, 1);
+//         assert!(inactive == 5_0000_00000, 2);
+//         assert!(warmup == 1_0000_00000, 3);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_refund_proportionally_w_next(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+
+//         // before refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
+//         let mut vault = unsubscribe_partially_multi_users(&mut scenario);
+
+//         // user 1 - (2.5, 2.5) => (2.5, 0.5)
+//         // user 2 - (8.0, 2.0) => (6.0, 0.0)
+//         // user 3 - (0.0, 0.0) => (0.0, 0.0)
+
+//         // after refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
+//         let refund_amount = 6_0000_00000; // 40% refund
+//         vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let inactive = vault::inactive_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(active == 8_5000_00000, 0);
+//         assert!(deactivating == 0_5000_00000, 1);
+//         assert!(inactive == 4_0000_00000, 2);
+//         assert!(warmup == 12_0000_00000, 3);
+
+//         // check user 1
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+//         // check user 2
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+//         // check user 3
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
+//         assert!(!vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(!vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+
+//         end(scenario);
+//         vault
+//     }
+
+//     // Refund without next - active => inactive
+//     #[test]
+//     public fun test_refund_wo_next(): DepositVault  {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = unsubscribe_half(&mut scenario);
+
+//         let refund_amount = 6_0000_00000;
+//         vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
+//         vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let inactive = vault::inactive_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(active == 4_0000_00000, 0);
+//         assert!(deactivating == 0, 1);
+//         assert!(inactive == 6_0000_00000, 2);
+//         assert!(warmup == 0, 3);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_refund_proportionally_wo_next(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+
+//         // before refund - active: 10_500000000, deactivating: 4_500000000, warmup: 10_000000000
+//         let mut vault = unsubscribe_partially_multi_users(&mut scenario);
+
+//         // after unsubscribe => after activate => after refund
+//         // user 1 - (2.5, 2.5, 0.0, 0.0) => (2.5, 2.5, 0.0, 0.0) => (2.5, 0.5, 2.0, 0.0)
+//         // user 2 - (8.0, 2.0, 0.0, 0.0) => (8.0, 2.0, 0.0, 0.0) => (6.0, 0.0, 4.0, 0.0)
+//         // user 3 - (0.0, 0.0, 0.0, 10.0) => (10.0, 0.0, 0.0, 0.0) => (6.0, 0.0, 4.0, 0.0)
+
+//         // after refund - active: 14_500000000, deactivating: 0_500000000, inactive: 10_000000000, warmup: 0
+//         let refund_amount = 10_0000_00000; // 40% refund
+//         vault::activate<SUI>(&mut vault, false, ctx(&mut scenario));
+//         vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let inactive = vault::inactive_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(active == 14_5000_00000, 0);
+//         assert!(deactivating == 0_5000_00000, 1);
+//         assert!(inactive == 10_0000_00000, 2);
+//         assert!(warmup == 0, 3);
+
+//         // check user 1
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+//         // check user 2
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_2));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+//         // check user 3
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_3));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(!vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_claim_success(): DepositVault {
+//         let mut scenario = begin(ADMIN);
+//         let mut vault = unsubscribe_half(&mut scenario); // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         let registry = registry(&scenario);
+
+//         // refund shares 6_0000_00000 -> active 4_0000_00000, deactivating -> 0_0000_00000, warmup 1_0000_00000, inactive 5_0000_00000
+//         next_tx(&mut scenario, ADMIN);
+//         let refund_amount = 6_0000_00000; // 40% refund
+//         vault::recoup<SUI>(&mut vault, refund_amount, ctx(&mut scenario));
+
+//         // inactive 5_0000_00000 -> 0
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::claim<SUI>(&mut vault, receipts, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&vault);
+//         let inactive = vault::inactive_balance<SUI>(&vault);
+//         let warmup = vault::warmup_balance<SUI>(&vault);
+//         assert!(active == 4_0000_00000, 0);
+//         assert!(deactivating == 0, 1);
+//         assert!(inactive == 0, 2);
+//         assert!(warmup == 1_0000_00000, 3);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         assert!(vault::is_active_user(&vault, object::id_to_address(&most_recent_id_for_address)), 4);
+//         assert!(!vault::is_deactivating_user(&vault, object::id_to_address(&most_recent_id_for_address)), 5);
+//         assert!(!vault::is_inactive_user(&vault, object::id_to_address(&most_recent_id_for_address)), 6);
+//         assert!(vault::is_warmup_user(&vault, object::id_to_address(&most_recent_id_for_address)), 7);
+
+//         return_shared(registry);
+//         end(scenario);
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_new_bid_vault(): BidVault  {
+//         let mut scenario = begin(ADMIN);
+//         let vault = new_bid_vault<SUI, USDC>(&mut scenario);
+//         end(scenario);
+//         vault
+//     }
+
+//     fun new_bid_vault<D_TOKEN, B_TOKEN>(scenario: &mut Scenario): BidVault  {
+//         let vault = vault::new_bid_vault<D_TOKEN, B_TOKEN>(
+//             0,
+//             string::utf8(b"test_metadata"),
+//             ctx(scenario),
+//         );
+//         vault
+//     }
+
+//     #[test]
+//     public fun test_delivery(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = delivery(&mut scenario);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun delivery(scenario: &mut Scenario): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         let mut deposit_vault = unsubscribe_half(scenario);
+//         let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
+
+//         // start auction => activate warmup: tranfser balance from warmup to active
+//         // => already activate in unsubscribe_half => nothing to do
+
+//         // from auction, assume option price = 10 USDC
+//         // 100% filled => refund_shares = 0
+//         next_tx(scenario, USER_1);
+//         let refund_shares = 0;
+//         let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
+//         vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//         // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         // let receipt_shares = vec_map::empty();
+//         // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
+
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(scenario),
+//         );
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             premium_balance,
+//             balance::zero<USDC>(),
+//             ctx(scenario),
+//         );
+
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(premium_balance_value == 10_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(premium_share == 10_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_0000_00000, 0);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_delivery_partially_filled(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = delivery_partially_filled(&mut scenario, 1000);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun delivery_partially_filled(scenario: &mut Scenario, filled_rate_bp: u64): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         let mut deposit_vault = unsubscribe_half(scenario);
+//         let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
+
+//         let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
+
+//         // start auction => activate warmup: tranfser balance from warmup to active
+//         // => already activate in unsubscribe_half => nothing to do
+
+//         // from auction, assume option price = 10 USDC
+//         // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
+//         next_tx(scenario, USER_1);
+//         let refund_shares = {
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//             let (active, deactivating) = (
+//                 vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
+//                 vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
+//             );
+//             (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64)
+//         };
+//         let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
+//         vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//         // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         // let receipt_shares = vec_map::empty();
+//         // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
+
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(scenario),
+//         );
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             premium_balance,
+//             balance::zero<USDC>(),
+//             ctx(scenario),
+//         );
+
+
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         assert!(
+//             active
+//                 == if (refund_shares <= deactivating_before_delivery) {
+//                     active_before_delivery
+//                 } else {
+//                     active_before_delivery - (refund_shares - deactivating_before_delivery)
+//                 },
+//             0
+//         );
+//         assert!(
+//             deactivating
+//                 == if (refund_shares <= deactivating_before_delivery) {
+//                     deactivating_before_delivery - refund_shares
+//                 } else {
+//                     0
+//                 },
+//             1
+//         );
+//         assert!(inactive == deactivating_before_delivery - deactivating, 2);
+//         assert!(warmup == active_before_delivery - active, 3);
+//         let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(premium_balance_value == 10_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(premium_share == 10_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_0000_00000, 0);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_delivery_with_incentive(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = delivery_with_incentive(&mut scenario, 1000, 200);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun delivery_with_incentive(scenario: &mut Scenario, filled_rate_bp: u64, incentive_rate_bp: u64): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         let mut deposit_vault = unsubscribe_half(scenario);
+//         let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
+
+//         let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
+
+//         // start auction => activate warmup: tranfser balance from warmup to active
+//         // => already activate in unsubscribe_half => nothing to do
+
+//         // from auction, assume option price = 10 USDC
+//         // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
+//         next_tx(scenario, USER_1);
+//         let (refund_shares, incentive_amount) = {
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//             let (active, deactivating) = (
+//                 vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
+//                 vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
+//             );
+//             let refund_shares = (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
+//             let incentive_amount
+//                 = (((active + deactivating - refund_shares) as u128) * (incentive_rate_bp as u128) / 10000 as u64);
+//             (refund_shares, incentive_amount)
+//         };
+//         let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
+//         vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(scenario),
+//         );
+
+//         next_tx(scenario, ADMIN);
+//         let incentive_balance = balance::create_for_testing<USDC>(incentive_amount);
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             premium_balance,
+//             incentive_balance,
+//             ctx(scenario),
+//         );
+
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         assert!(
+//             active
+//                 == if (refund_shares <= deactivating_before_delivery) {
+//                     active_before_delivery
+//                 } else {
+//                     active_before_delivery - (refund_shares - deactivating_before_delivery)
+//                 },
+//             0
+//         );
+//         assert!(
+//             deactivating
+//                 == if (refund_shares <= deactivating_before_delivery) {
+//                     deactivating_before_delivery - refund_shares
+//                 } else {
+//                     0
+//                 },
+//             1
+//         );
+//         assert!(inactive == deactivating_before_delivery - deactivating, 2);
+//         assert!(warmup == active_before_delivery - active, 3);
+//         let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(premium_balance_value == 10_0000_00000 + incentive_amount, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(premium_share == 10_0000_00000 + incentive_amount, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_0000_00000, 0);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_delivery_with_bidder_refund(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = delivery_with_bidder_refund(&mut scenario, 1000, 200, 1_0000_00000);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun delivery_with_bidder_refund(scenario: &mut Scenario, filled_rate_bp: u64, incentive_rate_bp: u64, refund_amount: u64): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         let mut deposit_vault = unsubscribe_half(scenario);
+//         let mut bid_vault = new_bid_vault<SUI, USDC>(scenario);
+//         new_refund_vault(scenario);
+//         next_tx(scenario, ADMIN);
+//         let mut refund_vault = refund_vault(scenario);
+
+//         let active_before_delivery = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating_before_delivery = vault::deactivating_balance<SUI>(&deposit_vault);
+
+//         // start auction => activate warmup: tranfser balance from warmup to active
+//         // => already activate in unsubscribe_half => nothing to do
+
+//         // from auction, assume option price = 10 USDC
+//         // 100% filled => refund_shares = (active + deactivating shares) * filled_rate_bp / 10000
+//         next_tx(scenario, USER_1);
+//         let (refund_shares, incentive_amount) = {
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//             let (active, deactivating) = (
+//                 vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address)),
+//                 vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address))
+//             );
+//             let refund_shares = (((active + deactivating) as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
+//             let incentive_amount
+//                 = (((active + deactivating - refund_shares) as u128) * (incentive_rate_bp as u128) / 10000 as u64);
+//             (refund_shares, incentive_amount)
+//         };
+//         let premium_balance = balance::create_for_testing<USDC>(10_0000_00000);
+//         vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(scenario),
+//         );
+
+//         // delivery depositor
+//         next_tx(scenario, ADMIN);
+//         let incentive_balance = balance::create_for_testing<USDC>(incentive_amount);
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             premium_balance,
+//             incentive_balance,
+//             ctx(scenario),
+//         );
+
+//         // delivery bidder (refund)
+//         next_tx(scenario, ADMIN);
+//         vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/10), USER_1);
+//         vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/5), USER_2);
+//         vault::put_refund<USDC>(&mut refund_vault, balance::create_for_testing<USDC>(refund_amount/2), USER_3);
+
+//         // USER_1, USER_2 take refund, USER_3 keeps
+//         next_tx(scenario, USER_1);
+//         vault::take_refund<USDC>(&mut refund_vault, ctx(scenario));
+//         next_tx(scenario, USER_2);
+//         vault::take_refund<USDC>(&mut refund_vault, ctx(scenario));
+
+//         // check delivery
+//         next_tx(scenario, ADMIN);
+//         {
+//             let active = vault::active_balance<SUI>(&deposit_vault);
+//             let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//             let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//             let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//             assert!(
+//                 active
+//                     == if (refund_shares <= deactivating_before_delivery) {
+//                         active_before_delivery
+//                     } else {
+//                         active_before_delivery - (refund_shares - deactivating_before_delivery)
+//                     },
+//                 0
+//             );
+//             assert!(
+//                 deactivating
+//                     == if (refund_shares <= deactivating_before_delivery) {
+//                         deactivating_before_delivery - refund_shares
+//                     } else {
+//                         0
+//                     },
+//                 1
+//             );
+//             assert!(inactive == deactivating_before_delivery - deactivating, 2);
+//             assert!(warmup == active_before_delivery - active, 3);
+//             let premium_balance_value = vault::premium_balance<USDC>(&deposit_vault);
+//             assert!(premium_balance_value == 10_0000_00000 + incentive_amount, 0);
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//             let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//             assert!(premium_share == 10_0000_00000 + incentive_amount, 0);
+
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//             let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//             assert!(bid_share == 1_0000_00000, 0);
+//         };
+
+//         // check refund
+//         {
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_1));
+//             let received_refund_coin = take_from_address_by_id<Coin<USDC>>(scenario, USER_1, most_recent_id_for_address);
+//             assert!(coin::value(&received_refund_coin) == refund_amount / 10, 0);
+//             transfer::public_transfer(received_refund_coin, USER_1);
+//             let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_2));
+//             let received_refund_coin = take_from_address_by_id<Coin<USDC>>(scenario, USER_2, most_recent_id_for_address);
+//             assert!(coin::value(&received_refund_coin) == refund_amount / 5, 0);
+//             transfer::public_transfer(received_refund_coin, USER_2);
+//             let refund_vault_balance = vault::refund_vault_balance<USDC>(&refund_vault);
+//             assert!(refund_vault_balance == refund_amount / 2, 0);
+//         };
+
+//         return_shared(refund_vault);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_settle_1(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = settle_otm(&mut scenario);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun settle_otm(scenario: &mut Scenario): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         // delivery premium 10_0000_00000 -> bid share 1_0000_00000
+//         let (mut deposit_vault, mut bid_vault) = delivery(scenario);
+
+//         next_tx(scenario, ADMIN);
+//         let settled_share_price = 1_00000000; // share price decimal: 8
+//         vault::settle<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             settled_share_price,
+//             8,              // share_price_decimal
+//             ctx(scenario)
+//         );
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 5_0000_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 5_0000_00000, 0);
+//         assert!(premium == 10_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 5_0000_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 5_0000_00000, 0);
+//         assert!(premium_share == 10_0000_00000, 0);
+
+//         let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault);
+//         assert!(bid_vault_balance == 0, 0);
+//         // CHECK: shares
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_0000_00000, 0);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_settle_2(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = settle_itm(&mut scenario);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     fun settle_itm(scenario: &mut Scenario): (DepositVault, BidVault) {
+//         // deposit 10_0000_00000 -> unsubscribe 5_0000_00000
+//         // delivery premium 10_0000_00000 -> bid share 1_0000_00000
+//         let (mut deposit_vault, mut bid_vault) = delivery(scenario);
+
+//         next_tx(scenario, ADMIN);
+//         let settled_share_price = 0_70000000; // share price decimal: 8
+//         vault::settle<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault,
+//             settled_share_price,
+//             8,              // share_price_decimal
+//             ctx(scenario)
+//         );
+
+//         // check
+//         next_tx(scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 3_5000_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 3_5000_00000, 0);
+//         assert!(premium == 10_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 3_5000_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 3_5000_00000, 0);
+//         assert!(premium_share == 10_0000_00000, 0);
+
+//         let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault);
+//         assert!(bid_vault_balance == 3_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_0000_00000, 0);
+
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_harvest(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         new_fee_pool(&mut scenario);
+//         next_tx(&mut scenario, ADMIN);
+//         let mut fee_pool = fee_pool(&scenario);
+//         let (mut deposit_vault, bid_vault) = delivery(&mut scenario);
+//         next_tx(&mut scenario, USER_1);
+
+//         let premium_before_harvest = vault::premium_balance<USDC>(&deposit_vault);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::harvest_v2<USDC>(&mut fee_pool, &mut deposit_vault, receipts, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(premium == 0, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(premium_share == 0, 1);
+
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(USER_1));
+//         let received_premium_coin = take_from_address_by_id<Coin<USDC>>(&scenario, USER_1, most_recent_id_for_address);
+//         let fee = ((premium_before_harvest as u128) * (vault::fee_bp(&deposit_vault) as u128) / 10000 as u64);
+//         assert!(coin::value<USDC>(&received_premium_coin) == premium_before_harvest - fee, 2);
+//         return_to_sender<Coin<USDC>>(&scenario, received_premium_coin);
+
+//         // fee pool harvest by ADMIN
+//         next_tx(&mut scenario, ADMIN);
+//         balance_pool::take<USDC>(&mut fee_pool, option::none(), ctx(&mut scenario));
+//         next_tx(&mut scenario, ADMIN);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(ADMIN));
+//         let received_fee_coin = take_from_address_by_id<Coin<USDC>>(&scenario, ADMIN, most_recent_id_for_address);
+//         assert!(coin::value<USDC>(&received_fee_coin) == fee, 2);
+//         return_to_sender<Coin<USDC>>(&scenario, received_fee_coin);
+
+//         return_shared(fee_pool);
+
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     #[test]
+//     public fun test_harvest_with_shared_fee_pool(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         new_fee_pool(&mut scenario);
+//         new_shared_balance_pool(&mut scenario);
+//         next_tx(&mut scenario, ADMIN);
+//         let mut fee_pool = fee_pool(&scenario);
+//         let (mut deposit_vault, bid_vault) = delivery(&mut scenario);
+//         vault::update_fee_share(&mut deposit_vault, FEE_SHARE_BP, option::some(address::to_bytes(SHARED)), ctx(&mut scenario));
+//         next_tx(&mut scenario, USER_1);
+
+//         let premium_before_harvest = vault::premium_balance<USDC>(&deposit_vault);
+
+//         // harvest
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         let receipts = vector::singleton(deposit_receipt);
+//         vault::harvest_v2<USDC>(&mut fee_pool, &mut deposit_vault, receipts, ctx(&mut scenario));
+
+//         // check
+//         next_tx(&mut scenario, ADMIN);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(premium == 0, 0);
+
+//         // fee pool harvest by SHARED (check shared fee pool correct)
+//         next_tx(&mut scenario, SHARED);
+//         let shared_fee_pool = vault::test_get_shared_fee_pool(&deposit_vault);
+//         balance_pool::take_shared<USDC>(&mut fee_pool, *option::borrow(&shared_fee_pool), option::none(), ctx(&mut scenario));
+//         next_tx(&mut scenario, SHARED);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<USDC>>(SHARED));
+//         let received_fee_coin = take_from_address_by_id<Coin<USDC>>(&scenario, SHARED, most_recent_id_for_address);
+//         let fee = ((premium_before_harvest as u128) * (vault::fee_bp(&deposit_vault) as u128) / 10000 as u64);
+//         let shared_fee = ((fee as u128) * (vault::fee_share_bp(&deposit_vault) as u128) / 10000 as u64);
+//         assert!(coin::value<USDC>(&received_fee_coin) == shared_fee, 2);
+//         return_to_sender<Coin<USDC>>(&scenario, received_fee_coin);
+
+//         return_shared(fee_pool);
+
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+
+//     // #[test]
+//     // public fun test_compound(): (DepositVault, BidVault) {
+//     //     let scenario = begin(ADMIN);
+//     //     let deposit_amount = 10_0000_00000;
+//     //     let filled_rate_bp = 7000;
+
+//     //     let deposit_vault = new_deposit_vault<SUI, SUI>(0, &mut scenario);
+//     //     let bid_vault = new_bid_vault<SUI, SUI>(&mut scenario);
+
+//     //     // deposit
+//     //     next_tx(&mut scenario, USER_1);
+//     //     let coin = coin::mint_for_testing<SUI>(deposit_amount, ctx(&mut scenario));
+//     //     let receipts = vector::empty();
+//     //     vault::deposit<SUI>(&mut deposit_vault, vector::singleton(coin), deposit_amount, receipts, ctx(&mut scenario));
+
+//     //     // activate
+//     //     next_tx(&mut scenario, ADMIN);
+//     //     vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
+
+//     //     // create a bid receipt with premium
+//     //     next_tx(&mut scenario, ADMIN);
+//     //     let premium_balance = balance::create_for_testing<SUI>(10_0000_00000);
+//     //     vault::new_bid(&mut bid_vault, 1_0000_00000, ctx(&mut scenario));
+//     //     next_tx(&mut scenario, ADMIN);
+//     //     // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//     //     // let receipt_shares = vec_map::empty();
+//     //     // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_0000_00000);
+
+//     //     // delivery with the bid receipt
+//     //     let refund_shares = ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
+//     //     vault::recoup<SUI>(
+//     //         &mut deposit_vault,
+//     //         refund_shares,
+//     //         ctx(&mut scenario),
+//     //     );
+//     //     vault::delivery_b<SUI, SUI>(
+//     //         &mut deposit_vault,
+//     //         &mut bid_vault,
+//     //         premium_balance,
+//     //         balance::zero<SUI>(),
+//     //         ctx(&mut scenario),
+//     //     );
+
+//     //     let premium_before_compound = vault::premium_balance<SUI>(&deposit_vault);
+
+//     //     // compound - premium => warmup
+//     //     next_tx(&mut scenario, USER_1);
+//     //     let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//     //     let deposit_receipt = take_from_address_by_id<TypusDepositReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//     //     let receipts = vector::singleton(deposit_receipt);
+//     //     vault::compound_v2<SUI>(&mut deposit_vault, receipts, ctx(&mut scenario));
+
+//     //     // check
+//     //     next_tx(&mut scenario, ADMIN);
+//     //     let active = vault::active_balance<SUI>(&deposit_vault);
+//     //     let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//     //     let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//     //     let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//     //     let premium = vault::premium_balance<SUI>(&deposit_vault);
+//     //     assert!(active == ((deposit_amount as u128) * (filled_rate_bp as u128) / 10000 as u64), 0);
+//     //     assert!(deactivating == 0, 1);
+//     //     assert!(inactive == 0, 2);
+//     //     assert!(
+//     //         warmup
+//     //             == premium_before_compound
+//     //                 + ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64),
+//     //         3
+//     //     );
+//     //     assert!(premium == 0, 4);
+//     //     next_tx(&mut scenario, ADMIN);
+//     //     let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//     //     let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//     //     let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//     //     let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//     //     let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//     //     let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//     //     assert!(active_share == ((deposit_amount as u128) * (filled_rate_bp as u128) / 10000 as u64), 5);
+//     //     assert!(deactivating_share == 0, 5);
+//     //     assert!(inactive_share == 0, 5);
+//     //     assert!(
+//     //         warmup_share
+//     //             == premium_before_compound
+//     //                 + ((deposit_amount as u128) * (10000 - (filled_rate_bp as u128)) / 10000 as u64),
+//     //         3
+//     //     );
+//     //     assert!(premium_share == 0, 5);
+
+//     //     end(scenario);
+//     //     (deposit_vault, bid_vault)
+//     // }
+
+//     #[test]
+//     public fun test_third_rounds(): (DepositVault, BidVault, BidVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         // round 0
+//         let (mut deposit_vault, bid_vault_round_0) = settle_otm(&mut scenario);
+//         next_tx(&mut scenario, ADMIN);
+
+//         // active = 5_0000_00000, deactivating = 0, inactive = 5_0000_00000, premium = 10_0000_00000
+
+//         // round 1
+//         vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
+//         let mut bid_vault_round_1 = new_bid_vault<SUI, USDC>(&mut scenario);
+
+//         // from auction, assume option price = 5 USDC
+//         // create a bid receipt with premium
+//         next_tx(&mut scenario, USER_1);
+//         let premium_balance = balance::create_for_testing<USDC>(5_0000_00000);
+//         vault::new_bid(&mut bid_vault_round_1, 1_5000_00000, ctx(&mut scenario));
+//         next_tx(&mut scenario, ADMIN);
+//         // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         // let receipt_shares = vec_map::empty();
+//         // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_5000_00000);
+
+//         // delivery with the bid receipt
+//         let filled_rate_bp = 7000;
+//         let refund_shares = (5_0000_00000 * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(&mut scenario),
+//         );
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault_round_1,
+//             premium_balance,
+//             balance::zero<USDC>(),
+//             ctx(&mut scenario),
+//         );
+
+//         // check: active = 3_5000_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 1_5000_00000, premium = 15_0000_00000
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 3_5000_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 5_0000_00000, 0);
+//         assert!(warmup == 1_5000_00000, 0);
+//         assert!(premium == 15_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 3_5000_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 5_0000_00000, 0);
+//         assert!(warmup_share == 1_5000_00000, 0);
+//         assert!(premium_share == 15_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault_round_1, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_5000_00000, 0);
+
+//         // settle
+//         let settled_share_price = 0_90000000; // share price decimal: 8
+//         vault::settle<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault_round_1,
+//             settled_share_price,
+//             8,              // share_price_decimal
+//             ctx(&mut scenario)
+//         );
+
+//         // check: active = 3_1500_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 1_5000_00000, premium = 15_0000_00000
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 3_1500_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 5_0000_00000, 0);
+//         assert!(warmup == 1_5000_00000, 0);
+//         assert!(premium == 15_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 3_1500_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 5_0000_00000, 0);
+//         assert!(warmup_share == 1_5000_00000, 0);
+//         assert!(premium_share == 15_0000_00000, 0);
+//         let bid_vault_balance = vault::bid_vault_balance<SUI>(&bid_vault_round_1);
+//         assert!(bid_vault_balance == 0_3500_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share = vault::get_bid_share(&bid_vault_round_1, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_5000_00000, 0);
+
+//         // round 2
+//         // activate
+//         vault::activate<SUI>(&mut deposit_vault, true, ctx(&mut scenario));
+//         let mut bid_vault_round_2 = new_bid_vault<SUI, USDC>(&mut scenario);
+
+//         // active = 4_6500_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0, premium = 15_0000_00000
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         assert!(active == 4_6500_00000, 0);
+//         assert!(warmup == 0, 0);
+
+//         // from auction, assume option price = 5 USDC
+//         // create a bid receipt with premium
+//         next_tx(&mut scenario, USER_2);
+//         let premium_balance = balance::create_for_testing<USDC>(8_0000_00000);
+//         vault::new_bid(&mut bid_vault_round_2, 1_2000_00000, ctx(&mut scenario));
+//         next_tx(&mut scenario, ADMIN);
+//         // let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
+//         // let receipt_shares = vec_map::empty();
+//         // vec_map::insert(&mut receipt_shares, object::id_to_address(&most_recent_id_for_address), 1_2000_00000);
+
+//         // delivery with the bid receipt
+//         let filled_rate_bp = 9000;
+//         let refund_shares = (4_6500_00000 * (10000 - (filled_rate_bp as u128)) / 10000 as u64);
+//         vault::recoup<SUI>(
+//             &mut deposit_vault,
+//             refund_shares,
+//             ctx(&mut scenario),
+//         );
+//         vault::delivery_b<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault_round_2,
+//             premium_balance,
+//             balance::zero<USDC>(),
+//             ctx(&mut scenario),
+//         );
+
+//         // active = 4_1850_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0_4650_00000, premium = 23_0000_00000
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 4_1850_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 5_0000_00000, 0);
+//         assert!(warmup == 0_4650_00000, 0);
+//         assert!(premium == 23_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 4_1850_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 5_0000_00000, 0);
+//         assert!(warmup_share == 0_4650_00000, 0);
+//         assert!(premium_share == 23_0000_00000, 0);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
+//         let bid_share = vault::get_bid_share(&bid_vault_round_2, object::id_to_address(&most_recent_id_for_address));
+//         assert!(bid_share == 1_2000_00000, 0);
+
+//         // settle
+//         let settled_share_price = 0_50000000; // share price decimal: 8
+//         vault::settle<SUI, USDC>(
+//             &mut deposit_vault,
+//             &mut bid_vault_round_2,
+//             settled_share_price,
+//             8,              // share_price_decimal
+//             ctx(&mut scenario)
+//         );
+
+//         // check: active = 2_0925_00000, deactivating = 0, inactive = 5_0000_00000, warmup = 0_4650_00000, premium = 23_0000_00000, bidder = 2_0925_00000
+//         next_tx(&mut scenario, ADMIN);
+//         let active = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive = vault::inactive_balance<SUI>(&deposit_vault);
+//         let warmup = vault::warmup_balance<SUI>(&deposit_vault);
+//         let premium = vault::premium_balance<USDC>(&deposit_vault);
+//         assert!(active == 2_0925_00000, 0);
+//         assert!(deactivating == 0, 0);
+//         assert!(inactive == 5_0000_00000, 0);
+//         assert!(warmup == 0_4650_00000, 0);
+//         assert!(premium == 23_0000_00000, 0);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         assert!(active_share == 2_0925_00000, 0);
+//         assert!(deactivating_share == 0, 0);
+//         assert!(inactive_share == 5_0000_00000, 0);
+//         assert!(warmup_share == 0_4650_00000, 0);
+//         assert!(premium_share == 23_0000_00000, 0);
+
+//         // exercise round 2 for USER_2
+//         next_tx(&mut scenario, USER_2);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_2));
+//         let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_2, most_recent_id_for_address);
+//         vault::exercise_v2<SUI>(&mut bid_vault_round_2, vector::singleton(bid_receipt), ctx(&mut scenario));
+//         next_tx(&mut scenario, USER_2);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_2));
+//         let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_2, most_recent_id_for_address);
+//         assert!(coin::value(&payoff_coin) == 2_0925_00000, 0);
+//         transfer::public_transfer(payoff_coin, USER_2);
+
+//         // exercise round 1 for USER_1
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         vault::exercise_v2<SUI>(&mut bid_vault_round_1, vector::singleton(bid_receipt), ctx(&mut scenario));
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_1));
+//         let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_1, most_recent_id_for_address);
+//         assert!(coin::value(&payoff_coin) == 3500_00000, 0);
+//         transfer::public_transfer(payoff_coin, USER_1);
+
+//         next_tx(&mut scenario, ADMIN);
+//         end(scenario);
+//         (deposit_vault, bid_vault_round_0, bid_vault_round_1, bid_vault_round_2)
+//     }
+
+//     #[test]
+//     public fun test_exercise_v2(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         // round 0
+//         let (deposit_vault, mut bid_vault_round_0) = settle_itm(&mut scenario);
+//         next_tx(&mut scenario, ADMIN);
+
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_receipt = take_from_address_by_id<TypusBidReceipt>(&scenario, USER_1, most_recent_id_for_address);
+//         vault::exercise_v2<SUI>(&mut bid_vault_round_0, vector::singleton(bid_receipt), ctx(&mut scenario));
+//         next_tx(&mut scenario, USER_1);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<Coin<SUI>>(USER_1));
+//         let payoff_coin = take_from_address_by_id<Coin<SUI>>(&scenario, USER_1, most_recent_id_for_address);
+//         assert!(coin::value(&payoff_coin) == 3_0000_00000, 0);
+//         transfer::public_transfer(payoff_coin, USER_1);
+
+//         next_tx(&mut scenario, ADMIN);
+//         end(scenario);
+
+//         (deposit_vault, bid_vault_round_0)
+//     }
+
+//     #[test]
+//     public fun test_terminate(): (DepositVault, BidVault) {
+//         let mut scenario = begin(ADMIN);
+//         let (deposit_vault, bid_vault) = test_terminate_(&mut scenario);
+//         end(scenario);
+//         (deposit_vault, bid_vault)
+//     }
+//     public fun test_terminate_(scenario: &mut Scenario): (DepositVault, BidVault) {
+//         let (mut deposit_vault, bid_vault) = settle_itm(scenario);
+
+//         // before terminating
+//         next_tx(scenario, ADMIN);
+//         let active_before = vault::active_balance<SUI>(&deposit_vault);
+//         let deactivating_before = vault::deactivating_balance<SUI>(&deposit_vault);
+//         let inactive_before = vault::inactive_balance<SUI>(&deposit_vault);
+//         let premium_before = vault::premium_balance<USDC>(&deposit_vault);
+//         let warmup_before = vault::warmup_balance<SUI>(&deposit_vault);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share_before = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share_before = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share_before = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share_before = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share_before = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+
+//         assert!(active_before == active_share_before, 0); // make sure 1:1
+//         assert!(deactivating_before == deactivating_share_before, 0); // make sure 1:1
+//         assert!(inactive_before == inactive_share_before, 0); // make sure 1:1
+//         assert!(premium_before == premium_share_before, 0); // make sure 1:1
+//         assert!(warmup_before == warmup_share_before, 0); // make sure 1:1
+
+//         let bid_vault_balance_before = vault::bid_vault_balance<SUI>(&bid_vault);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share_before = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+
+//         // terminate
+//         next_tx(scenario, ADMIN);
+//         vault::terminate<SUI>(&mut deposit_vault, ctx(scenario));
+
+//         // afte terminating
+//         next_tx(scenario, ADMIN);
+//         // dynamic fields of active, deactivating, and warmup balance were removed by function terminate
+//         let inactive_after = vault::inactive_balance<SUI>(&deposit_vault);
+//         let premium_after = vault::premium_balance<USDC>(&deposit_vault);
+
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusDepositReceipt>(USER_1));
+//         let active_share_after = vault::get_active_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let deactivating_share_after = vault::get_deactivating_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let inactive_share_after = vault::get_inactive_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let premium_share_after = vault::get_premium_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+//         let warmup_share_after = vault::get_warmup_deposit_share(&deposit_vault, object::id_to_address(&most_recent_id_for_address));
+
+//         assert!(inactive_after == inactive_share_after, 0); // make sure 1:1
+//         assert!(premium_after == premium_share_after, 0); // make sure 1:1
+
+//         let bid_vault_balance_after = vault::bid_vault_balance<SUI>(&bid_vault);
+//         let most_recent_id_for_address = option::extract(&mut test_scenario::most_recent_id_for_address<TypusBidReceipt>(USER_1));
+//         let bid_share_after = vault::get_bid_share(&bid_vault, object::id_to_address(&most_recent_id_for_address));
+
+//         assert!(inactive_after == inactive_before + active_before + deactivating_before + warmup_before, 0);
+//         assert!(active_share_after == 0, 0);
+//         assert!(deactivating_share_after == 0, 0);
+//         assert!(warmup_share_after == 0, 0);
+
+//         assert!(premium_after == premium_before, 0); // nothing changes
+//         assert!(premium_share_after == premium_share_before, 0); // nothing changes
+
+//         assert!(bid_vault_balance_after == bid_vault_balance_before, 0); // nothing changes
+//         assert!(bid_share_after == bid_share_before, 0); // nothing changes
+
+//         (deposit_vault, bid_vault)
+//     }
+// }
