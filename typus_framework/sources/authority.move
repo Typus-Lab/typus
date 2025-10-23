@@ -84,35 +84,6 @@ module typus_framework::authority {
         whitelist
     }
 
-    /// Removes all authorized users from the whitelist.
-    /// This is an authorized function.
-    public fun remove_all(
-        authority: &mut Authority,
-        ctx: &TxContext,
-    ): vector<address> {
-        verify(authority, ctx);
-        let mut whitelist = vector::empty();
-        while (linked_table::length(&authority.whitelist) > 0) {
-            let (user_address, _) = linked_table::pop_front(&mut authority.whitelist);
-            vector::push_back(
-                &mut whitelist,
-                user_address,
-            );
-        };
-        whitelist
-    }
-
-    /// Destroys an empty `Authority` object.
-    /// This is an authorized function.
-    public fun destroy_empty(
-        authority: Authority,
-        ctx: &TxContext,
-    ) {
-        verify(&authority, ctx);
-        let Authority { whitelist } = authority;
-        linked_table::destroy_empty(whitelist);
-    }
-
     /// Destroys an `Authority` object and its whitelist.
     /// This is an authorized function.
     public fun destroy(
@@ -126,4 +97,16 @@ module typus_framework::authority {
         };
         linked_table::destroy_empty(whitelist);
     }
+
+    #[deprecated]
+    public fun remove_all(
+        _authority: &mut Authority,
+        _ctx: &TxContext,
+    ): vector<address> { abort 0 }
+
+    #[deprecated]
+    public fun destroy_empty(
+        _authority: Authority,
+        _ctx: &TxContext,
+    ) { abort 0 }
 }
