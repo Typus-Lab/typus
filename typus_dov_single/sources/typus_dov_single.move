@@ -898,7 +898,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): address {
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        let navi_account_cap = navi::new_navi_account_cap(ctx);
+        let navi_account_cap = lending_core::lending::create_account(ctx);
         let navi_account_cap_id = object::id_address(&navi_account_cap);
         dynamic_field::add(&mut additional_config.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
 
@@ -927,7 +927,7 @@ module typus_dov::typus_dov_single {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
         if (!dynamic_field::exists_(&additional_config.id, K_NAVI_ACCOUNT_CAP)) {
-            let navi_account_cap = navi::new_navi_account_cap(ctx);
+            let navi_account_cap = lending_core::lending::create_account(ctx);
             dynamic_field::add(&mut additional_config.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
         };
         let navi_account_cap = dynamic_field::borrow(&additional_config.id, K_NAVI_ACCOUNT_CAP);
@@ -1087,7 +1087,7 @@ module typus_dov::typus_dov_single {
         assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(collateral_index));
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         if (!dynamic_field::exists_(&additional_config.id, K_NAVI_ACCOUNT_CAP)) {
-            let navi_account_cap = navi::new_navi_account_cap(ctx);
+            let navi_account_cap = lending_core::lending::create_account(ctx);
             dynamic_field::add(&mut additional_config.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
         };
         if (balance.value() == 0) {
