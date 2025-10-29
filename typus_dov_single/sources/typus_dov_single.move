@@ -16,6 +16,8 @@ module typus_dov::typus_dov_single {
     use sui::sui::SUI;
 
     use protocol::market::Market;
+    use protocol::mint;
+    use protocol::redeem;
     use protocol::reserve::MarketCoin;
     use protocol::version::Version;
     use spool::rewards_pool::RewardsPool;
@@ -680,13 +682,26 @@ module typus_dov::typus_dov_single {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
 
-        let (market_coin, mut log) = scallop::deposit_basic_lending<TOKEN>(
-            deposit_vault,
-            version,
-            market,
-            clock,
-            ctx,
-        );
+        let (market_coin, mut log) = {
+            let (balance, mut log) = vault::withdraw_for_lending<TOKEN>(deposit_vault);
+            if (balance.value() == 0) {
+                balance::destroy_zero(balance);
+                (coin::zero(ctx), vector[0, 0, 0])
+            } else {
+                let market_coin = mint::mint<TOKEN>(
+                    version,
+                    market,
+                    coin::from_balance(balance, ctx),
+                    clock,
+                    ctx,
+                );
+                log.push_back(market_coin.value());
+                (
+                    market_coin,
+                    log,
+                )
+            }
+        };
         dynamic_field::add(&mut additional_config.id, K_SCALLOP_MARKET_COIN, market_coin);
         vector::push_back(&mut log, portfolio_vault.info.round);
 
@@ -714,18 +729,26 @@ module typus_dov::typus_dov_single {
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
         let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
         if (dynamic_field::exists_(&additional_config.id, K_SCALLOP_MARKET_COIN)) {
-            let market_coin = dynamic_field::remove(&mut additional_config.id, K_SCALLOP_MARKET_COIN);
-            let mut log = scallop::withdraw_basic_lending_v2<TOKEN>(
-                &mut registry.fee_pool,
-                deposit_vault,
-                incentive,
-                version,
-                market,
-                market_coin,
-                additional_lending_flag != 1,
-                clock,
-                ctx,
-            );
+            let market_coin = dynamic_field::remove<vector<u8>, Coin<MarketCoin<TOKEN>>>(&mut additional_config.id, K_SCALLOP_MARKET_COIN);
+            let mut log = {
+                let market_coin_amount = coin::value(&market_coin);
+                if (market_coin_amount == 0) {
+                    coin::destroy_zero(market_coin);
+                    vector[0, 0, 0, 0, 0, 0, 0, 0]
+                } else {
+                    let balance = coin::into_balance(
+                        redeem::redeem(
+                            version,
+                            market,
+                            market_coin,
+                            clock,
+                            ctx,
+                        )
+                    );
+
+                    vault::deposit_from_lending<TOKEN, TOKEN>(&mut registry.fee_pool, deposit_vault, incentive, balance, balance::zero<TOKEN>(), additional_lending_flag != 1)
+                }
+            };
             vector::push_back(&mut log, portfolio_vault.info.round);
             return log
         };
