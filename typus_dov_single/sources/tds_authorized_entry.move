@@ -9,8 +9,6 @@ module typus_dov::tds_authorized_entry {
 
     use protocol::market::Market;
     use protocol::version::Version;
-    use spool::rewards_pool::RewardsPool;
-    use spool::spool::Spool;
 
     use suilend::lending_market::{Self, LendingMarket};
     use suilend::suilend::MAIN_POOL;
@@ -951,38 +949,12 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// Event emitted when a Scallop spool account is created.
+    #[allow(unused_field)]
     public struct CreateScallopSpoolAccount has copy, drop {
         signer: address,
         index: u64,
         spool_id: address,
         spool_account_id: address,
-    }
-    /// [Authorized Function] Creates a Scallop spool account.
-    public(package) entry fun create_scallop_spool_account<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        spool: &mut Spool,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-        // main logic
-        let (spool_id, spool_account_id) = typus_dov_single::create_scallop_spool_account_<D_TOKEN>(
-            registry,
-            index,
-            spool,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(CreateScallopSpoolAccount {
-            signer: tx_context::sender(ctx),
-            index,
-            spool_id,
-            spool_account_id,
-        });
     }
 
     /// Event emitted when Scallop integration is enabled.
@@ -999,79 +971,19 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// Event emitted when funds are deposited to Scallop.
+    #[allow(unused_field)]
     public struct DepositScallop has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
     }
-    /// [Authorized Function] Deposits funds to Scallop.
-    public(package) entry fun deposit_scallop<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        version: &Version,
-        market: &mut Market,
-        spool: &mut Spool,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-        // main logic
-        let u64_padding = typus_dov_single::deposit_scallop_<D_TOKEN>(
-            registry,
-            index,
-            version,
-            market,
-            spool,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(DepositScallop {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
 
     /// Event emitted when funds are withdrawn from Scallop.
+    #[allow(unused_field)]
     public struct WithdrawScallop has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Withdraws funds from Scallop.
-    public(package) entry fun withdraw_scallop<D_TOKEN, B_TOKEN, R_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        version: &Version,
-        market: &mut Market,
-        spool: &mut Spool,
-        rewards_pool: &mut RewardsPool<R_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-        // main logic
-        let u64_padding = typus_dov_single::withdraw_scallop_<D_TOKEN, R_TOKEN>(
-            registry,
-            index,
-            version,
-            market,
-            spool,
-            rewards_pool,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(WithdrawScallop {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
     }
 
     /// Event emitted when fixed incentives are added.

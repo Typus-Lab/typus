@@ -637,107 +637,6 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    /// Creates a Scallop Spool account for a specific vault to interact with the Scallop protocol.
-    /// WARNING: no authority check inside.
-    public(package) fun create_scallop_spool_account_<TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        spool: &mut Spool,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): (address, address) {
-        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        let spool_account = scallop::new_spool_account<TOKEN>(
-            spool,
-            clock,
-            ctx,
-        );
-        let spool_account_id = object::id_address(&spool_account);
-        dynamic_field::add(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT, spool_account);
-
-        (object::id_address(spool), spool_account_id)
-    }
-
-    /// Deposits assets from a DOV into a Scallop Spool to earn yield.
-    /// WARNING: no authority check inside.
-    public(package) fun deposit_scallop_<TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        version: &Version,
-        market: &mut Market,
-        spool: &mut Spool,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): vector<u64> {
-        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        if (portfolio_vault.info.status == S_RECOUP) {
-            return vector[portfolio_vault.info.round]
-        };
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 1, scallop_disabled(index));
-        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        if (!dynamic_field::exists_(&additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)) {
-            let spool_account = scallop::new_spool_account<TOKEN>(
-                spool,
-                clock,
-                ctx,
-            );
-            dynamic_field::add(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT, spool_account);
-        };
-        let spool_account = dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT);
-        let mut log = scallop::deposit<TOKEN>(
-            deposit_vault,
-            version,
-            market,
-            spool,
-            spool_account,
-            clock,
-            ctx,
-        );
-        vector::push_back(&mut log, portfolio_vault.info.round);
-
-        log
-    }
-
-    /// Withdraws assets and rewards from a Scallop Spool back into the DOV.
-    /// WARNING: no authority check inside.
-    public(package) fun withdraw_scallop_<D_TOKEN, R_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        version: &Version,
-        market: &mut Market,
-        spool: &mut Spool,
-        rewards_pool: &mut RewardsPool<R_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): vector<u64> {
-        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<D_TOKEN>());
-        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 1, scallop_disabled(index));
-        utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
-        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        let spool_account = dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT);
-        let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
-        let mut log = scallop::withdraw<D_TOKEN, R_TOKEN>(
-            &mut registry.fee_pool,
-            deposit_vault,
-            incentive,
-            version,
-            market,
-            spool,
-            rewards_pool,
-            spool_account,
-            additional_lending_flag != 1,
-            clock,
-            ctx,
-        );
-        vector::push_back(&mut log, portfolio_vault.info.round);
-
-        log
-    }
-
     /// [View Function] Retrieves the amount of assets a vault has deposited in a Scallop Spool.
     public(package) fun get_scallop_deposit_amount<TOKEN>(
         registry: &Registry,
@@ -754,13 +653,13 @@ module typus_dov::typus_dov_single {
 
     /// Gets a mutable reference to a vault's Scallop Spool account.
     /// WARNING: no authority check inside.
-    public(package) fun get_mut_scallop_spool_account<TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-    ): &mut SpoolAccount<MarketCoin<TOKEN>> {
-        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)
-    }
+    // public(package) fun get_mut_scallop_spool_account<TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    // ): &mut SpoolAccount<MarketCoin<TOKEN>> {
+    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
+    //     dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)
+    // }
 
     /// Deposits assets from a DOV into Scallop's basic lending market.
     /// WARNING: no authority check inside.

@@ -1,13 +1,12 @@
 #[test_only]
 module typus_dov::test_manager_entry {
-    use sui::clock::{Self, Clock};
-    use sui::coin::Coin;
     use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared};
     use typus_dov::tds_authorized_entry;
     use typus_dov::tds_registry_authorized_entry;
     use typus_dov::test_environment;
     use pyth::price_info::PriceInfoObject;
     use spool::spool::Spool;
+    use spool::spool_account::SpoolAccount;
 
     const ADMIN: address = @0xFFFF;
 

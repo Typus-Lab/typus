@@ -1,8 +1,7 @@
 #[test_only]
 module typus_dov::test_manager_cases {
-    use sui::object;
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_from_sender};
+    use sui::test_scenario::{end, sender, next_tx, take_from_sender};
 
     use typus_dov::test_environment::{Self, USDC, current_ts_ms};
     use typus_dov::test_tds_user_entry;
@@ -13,7 +12,6 @@ module typus_dov::test_manager_cases {
     const ADMIN: address = @0xFFFF;
     const BABE1: address = @0xBABE1;
     const BABE2: address = @0xBABE2;
-    const BABE3: address = @0xBABE3;
 
     public struct WITNESS_1 has drop {}
     public struct WITNESS_2 has drop {}
@@ -356,7 +354,7 @@ module typus_dov::test_manager_cases {
 
         // withdraw all fund from premium share
         let ts_ms = activate_ts_ms + 86400_000;
-        let receipt = take_from_sender<TypusDepositReceipt>(&mut scenario);
+        let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
         test_tds_user_entry::test_public_reduce_fund_<BABE, BABE, BABE>(
             &mut scenario,
             index,
@@ -371,7 +369,7 @@ module typus_dov::test_manager_cases {
 
         // withdraw all fund from inactive share
         let ts_ms = activate_ts_ms + 86400_000;
-        let receipt = take_from_sender<TypusDepositReceipt>(&mut scenario);
+        let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
         test_tds_user_entry::test_public_reduce_fund_<BABE, BABE, BABE>(
             &mut scenario,
             index,
