@@ -9,11 +9,6 @@ subdir = "target_chains/sui/contracts"
 rev = "sui-contract-mainnet"
 override = true
 
-[dependencies.spool]
-git = "https://github.com/Typus-Lab/spool-contract-interface.git"
-subdir = "spool"
-rev = "main"
-
 [dependencies.ScallopProtocol]
 git = "https://github.com/Typus-Lab/sui-lending-protocol.git"
 subdir = "contracts/protocol"
@@ -38,6 +33,9 @@ rev = "main"
 git = "https://github.com/Typus-Lab/navi-protocol-interface.git"
 subdir = "oracle"
 rev = "main"
+
+[dependencies.spool]
+local = "../dependency/scallop/spool"
 
 [addresses]
 typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"

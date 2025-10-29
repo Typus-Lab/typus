@@ -308,7 +308,7 @@ module typus_dov::test_environment {
         next_tx(scenario, ADMIN);
         let storage_owner_cap = take_from_sender<lending_core::storage::OwnerCap>(scenario);
         let mut storage = take_shared<lending_core::storage::Storage>(scenario);
-        let sui_coin_metadata = take_immutable<0x2::coin::CoinMetadata<BABE>>(scenario);
+        let sui_coin_metadata = take_immutable<sui::coin::CoinMetadata<BABE>>(scenario);
         let storage_admin_cap = take_from_sender<lending_core::storage::StorageAdminCap>(scenario);
         let max_capacity = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // u256 max
         lending_core::storage::init_reserve<BABE>(
