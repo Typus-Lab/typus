@@ -105,5 +105,29 @@ module spool::admin {
     }
 
     // decompiled from Move bytecode v6
+    #[test_only]
+    public fun test_init(ctx: &mut sui::tx_context::TxContext) {
+        init(ctx);
+    }
+
+    #[test_only]
+    public fun test_create_spool<TOKEN>(
+        admin_cap: &AdminCap,
+        distributed_point_per_period: u64,
+        point_distribution_time: u64,
+        max_distributed_point: u64,
+        max_stakes: u64,
+        clock: &sui::clock::Clock,
+        ctx: &mut sui::tx_context::TxContext
+    ) {
+        create_spool<TOKEN>(admin_cap,
+            distributed_point_per_period,
+            point_distribution_time,
+            max_distributed_point,
+            max_stakes,
+            clock,
+            ctx
+        );
+    }
 }
 
