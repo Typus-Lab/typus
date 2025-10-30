@@ -25,8 +25,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut deposit_vault = typus_framework::vault::new_deposit_vault<sui::sui::SUI, sui::sui::SUI>(0, 0, b"test".to_string(), scenario.ctx());
@@ -54,8 +55,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -93,8 +95,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -131,8 +134,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -169,8 +173,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -207,8 +212,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -245,8 +251,9 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         let mut spool = spool::spool::test_new<sui::sui::SUI>(scenario.ctx());
-        let mut account = new_spool_account<sui::sui::SUI>(&mut spool, &clock, scenario.ctx());
+        let mut account = spool::spool_account::test_new(&spool, scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut rewards_pool = spool::rewards_pool::test_new(&spool, scenario.ctx());
@@ -283,6 +290,7 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut deposit_vault = typus_framework::vault::new_deposit_vault<sui::sui::SUI, sui::sui::SUI>(0, 0, b"test".to_string(), scenario.ctx());
@@ -307,6 +315,7 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut deposit_vault = typus_framework::vault::new_deposit_vault<sui::sui::SUI, sui::sui::SUI>(0, 0, b"test".to_string(), scenario.ctx());
@@ -337,6 +346,7 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut deposit_vault = typus_framework::vault::new_deposit_vault<sui::sui::SUI, sui::sui::SUI>(0, 0, b"test".to_string(), scenario.ctx());
@@ -367,6 +377,7 @@ extend module typus_framework::scallop {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
         protocol::app::init_t(scenario.ctx());
+        scenario.next_tx(@0xABCD);
         let version = protocol::version::create_for_testing(scenario.ctx());
         let mut market = scenario.take_shared<protocol::market::Market>();
         let mut deposit_vault = typus_framework::vault::new_deposit_vault<sui::sui::SUI, sui::sui::SUI>(0, 0, b"test".to_string(), scenario.ctx());

@@ -74,6 +74,19 @@ module spool::spool_account {
         sui::balance::split<T0>(&mut arg0.stakes, arg1)
     }
 
+    #[test_only]
+    public fun test_new<T0>(arg0: &spool::spool::Spool, arg1: &mut sui::tx_context::TxContext) : SpoolAccount<T0> {
+        SpoolAccount<T0>{
+            id           : sui::object::new(arg1),
+            spool_id     : sui::object::id<spool::spool::Spool>(arg0),
+            stake_type   : std::type_name::get<T0>(),
+            stakes       : sui::balance::zero<T0>(),
+            points       : 0,
+            total_points : 0,
+            index        : spool::spool::index(arg0),
+        }
+    }
+
     // decompiled from Move bytecode v6
 }
 
