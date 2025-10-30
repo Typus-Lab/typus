@@ -115,6 +115,41 @@ module spool::spool {
         arg0.max_stakes = arg4;
     }
 
+    #[test_only]
+    public fun test_new<T0>(ctx: &mut sui::tx_context::TxContext) : Spool {
+        Spool{
+            id                           : sui::object::new(ctx),
+            stake_type                   : std::type_name::get<T0>(),
+            distributed_point_per_period : 0,
+            point_distribution_time      : 0,
+            distributed_point            : 0,
+            max_distributed_point        : 0,
+            max_stakes                   : 0,
+            index                        : 1000000000,
+            stakes                       : 0,
+            last_update                  : 0,
+            created_at                   : 0,
+        }
+    }
+
+    #[test_only]
+    public fun test_drop(spool: Spool) {
+        let Spool{
+            id,
+            stake_type: _,
+            distributed_point_per_period: _,
+            point_distribution_time: _,
+            distributed_point: _,
+            max_distributed_point: _,
+            max_stakes: _,
+            index: _,
+            stakes: _,
+            last_update: _,
+            created_at: _,
+        } = spool;
+        id.delete();
+    }
+
     // decompiled from Move bytecode v6
 }
 

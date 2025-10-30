@@ -116,18 +116,6 @@ module typus_framework::scallop {
         _ctx: &mut TxContext,
     ): (Coin<MarketCoin<TOKEN>>, vector<u64>) { abort 0 }
     #[deprecated]
-    public fun withdraw_basic_lending_v2<TOKEN>(
-        _fee_pool: &mut BalancePool,
-        _deposit_vault: &mut DepositVault,
-        _incentive: &mut Balance<TOKEN>,
-        _version: &Version,
-        _market: &mut Market,
-        _market_coin: Coin<MarketCoin<TOKEN>>,
-        _distribute: bool,
-        _clock: &Clock,
-        _ctx: &mut TxContext,
-    ): vector<u64> { abort 0 }
-    #[deprecated]
     public fun withdraw_basic_lending<TOKEN>(
         _fee_pool: &mut BalancePool,
         _deposit_vault: &mut DepositVault,
@@ -146,6 +134,18 @@ module typus_framework::scallop {
         _version: &Version,
         _market: &mut Market,
         _market_coin: Coin<MarketCoin<TOKEN>>,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ): vector<u64> { abort 0 }
+    #[deprecated]
+    public fun withdraw_basic_lending_v2<TOKEN>(
+        _fee_pool: &mut BalancePool,
+        _deposit_vault: &mut DepositVault,
+        _incentive: &mut Balance<TOKEN>,
+        _version: &Version,
+        _market: &mut Market,
+        _market_coin: Coin<MarketCoin<TOKEN>>,
+        _distribute: bool,
         _clock: &Clock,
         _ctx: &mut TxContext,
     ): vector<u64> { abort 0 }

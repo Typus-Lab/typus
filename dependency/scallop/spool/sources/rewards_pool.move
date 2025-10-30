@@ -122,6 +122,32 @@ module spool::rewards_pool {
         };
     }
 
+    #[test_only]
+    public fun test_new<T0>(arg0: &spool::spool::Spool, arg3: &mut sui::tx_context::TxContext) : RewardsPool<T0> {
+        RewardsPool<T0>{
+            id                        : sui::object::new(arg3),
+            spool_id                  : sui::object::id<spool::spool::Spool>(arg0),
+            exchange_rate_numerator   : 0,
+            exchange_rate_denominator : 0,
+            rewards                   : sui::balance::zero<T0>(),
+            claimed_rewards           : 0,
+        }
+    }
+
+    #[test_only]
+    public fun test_drop<T0>(rewards_pool: RewardsPool<T0>) {
+        let RewardsPool{
+            id,
+            spool_id: _,
+            exchange_rate_numerator: _,
+            exchange_rate_denominator: _,
+            rewards,
+            claimed_rewards: _,
+        } = rewards_pool;
+        id.delete();
+        rewards.destroy_for_testing();
+    }
+
     // decompiled from Move bytecode v6
 }
 
