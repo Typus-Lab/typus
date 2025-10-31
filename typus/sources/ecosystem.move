@@ -16,7 +16,7 @@ module typus::ecosystem {
     // ======== Constants ========
 
     /// The current version of the ecosystem.
-    const CVersion: u64 = 6;
+    const CVersion: u64 = 7;
 
     // ======== Error Code ========
 
@@ -221,7 +221,7 @@ module typus::ecosystem {
         balance: Balance<TOKEN>,
     ) {
         let mut i = 0;
-        while (i < vector::length(&version.fee_pool.fee_infos)) {
+        while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = &mut version.fee_pool.fee_infos[i];
             if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 fee_info.value = fee_info.value + balance::value(&balance);
@@ -233,8 +233,7 @@ module typus::ecosystem {
             };
             i = i + 1;
         };
-        vector::push_back(
-            &mut version.fee_pool.fee_infos,
+        version.fee_pool.fee_infos.push_back(
             FeeInfo {
                 token: type_name::with_defining_ids<TOKEN>(),
                 value: balance::value(&balance),

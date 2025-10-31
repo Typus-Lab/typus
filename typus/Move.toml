@@ -1,7 +1,8 @@
 [package]
 name = "typus"
-published-at = "0x1d04ee2d2db5b33b24b72863d3031d345daf56a52ce056eeb3cb3206d2a717b4"
-edition = "2024.beta"
+version = "1.7.0"
+published-at = "0x916eaa4468870fac366464ca82dfc8e841a9c7f6df7e2922aae35240da71a733"
+edition = "2024"
 
 [dependencies.typus_nft]
 local = "../typus_nft"

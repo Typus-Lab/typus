@@ -172,6 +172,21 @@ module typus::tails_staking {
         }
     }
 
+    // entry fun remove_ids(
+    //     version: &Version,
+    //     tails_staking_registry: &mut TailsStakingRegistry,
+    //     mut count: u64,
+    //     ctx: &TxContext,
+    // ) {
+    //     version.verify(ctx);
+
+    //     let tails_ids: &mut vector<address> = &mut tails_staking_registry.tails_metadata[KTailsIds];
+    //     while (count > 0) {
+    //         tails_ids.pop_back();
+    //         count = count - 1;
+    //     }
+    // }
+
     /// Uploads a vector of placeholder levels for Tails NFTs.
     /// This is an authorized function used for initialization.
     entry fun upload_levels(
@@ -189,6 +204,21 @@ module typus::tails_staking {
             count = count - 1;
         }
     }
+
+    // entry fun remove_levels(
+    //     version: &Version,
+    //     tails_staking_registry: &mut TailsStakingRegistry,
+    //     mut count: u64,
+    //     ctx: &TxContext,
+    // ) {
+    //     version.verify(ctx);
+
+    //     let tails_levels: &mut vector<u64> = &mut tails_staking_registry.tails_metadata[KTailsLevels];
+    //     while (count > 0) {
+    //         tails_levels.pop_back();
+    //         count = count - 1;
+    //     }
+    // }
 
     /// Uploads IPFS URLs for a specific level of Tails NFTs.
     /// This is an authorized function.
@@ -746,7 +776,7 @@ module typus::tails_staking {
         user::remove_tails_exp_amount_(
             version,
             typus_user_registry,
-            tx_context::sender(ctx),
+            user,
             amount,
         );
         let tails_address = object::id_address(tails);

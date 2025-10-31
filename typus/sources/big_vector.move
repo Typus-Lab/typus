@@ -93,7 +93,7 @@ module typus::big_vector {
 
     /// Returns the number of elements in the slice.
     public fun get_slice_length<Element>(slice: &Slice<Element>): u64 {
-        vector::length(&slice.vector)
+        slice.vector.length()
     }
 
     /// Pushes a new element to the end of the BigVector.

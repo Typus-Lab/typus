@@ -157,7 +157,7 @@ module typus::leaderboard {
         };
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> =
             dynamic_field::borrow_mut(&mut registry.active_leaderboard_registry, key);
-        let leaderboard: Leaderboard = linked_object_table::remove(leaderboards, id);
+        let leaderboard: Leaderboard = leaderboards.remove(id);
         emit(DeactivateLeaderboardEvent {
             key,
             id: object::id_address(&leaderboard),
@@ -166,8 +166,7 @@ module typus::leaderboard {
         });
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> =
             dynamic_field::borrow_mut(&mut registry.inactive_leaderboard_registry, key);
-        linked_object_table::push_back(
-            leaderboards,
+        leaderboards.push_back(
             object::id_address(&leaderboard),
             leaderboard,
         );
