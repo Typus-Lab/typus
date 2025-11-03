@@ -419,6 +419,9 @@ module typus_dov::test_manager_cases {
         );
 
         let index = 0;
+        test_manager_entry::test_fixed_incentivise_<SUI, SUI, SUI>(&mut scenario, index, 10000_0000_00000, 1000_0000_00000);
+        test_manager_entry::test_withdraw_fixed_incentive_<SUI>(&mut scenario, index, option::some(1000_000_00000));
+        test_manager_entry::test_withdraw_fixed_incentive_<SUI>(&mut scenario, index, option::none());
 
         test_manager_entry::test_update_config_(
             &mut scenario,
@@ -485,6 +488,118 @@ module typus_dov::test_manager_cases {
             0_1000_00000,// initial_price: u64,
             0_0500_00000,// final_price: u64,
         );
+
+        test_manager_entry::test_create_navi_account_cap_(&mut scenario, index);
+
+        end(scenario);
+    }
+
+    #[test]
+    public(package) fun test_borrow_navi_operation() {
+        let mut scenario = test_environment::begin_test();
+        test_manager_entry::test_incentivise_<BABE>(&mut scenario, 10000_0000_00000);
+        let sui_oracle_id = test_environment::new_oracle<BABE>(&mut scenario);
+        // prepare env
+        test_environment::prepare_navi_lending_env(&mut scenario);
+
+        // create daily call
+        test_manager_entry::test_new_portfolio_vault_<BABE, BABE>(
+            &mut scenario,
+            0, // option type
+            0, // period
+            9, 9, 9, // d b o decimal
+            current_ts_ms() / 86400_000 * 86400_000, // activation ts ms
+            current_ts_ms() / 86400_000 * 86400_000 + 86400_000, // expiration ts ms
+            sui_oracle_id, 100000_0000_0000, // oracle id, price
+            1_0000_00000, 1_0000_00000, // deposit, bid lot size
+            100_0000_00000, 100_0000_00000, // min deposit, bid size
+            10000, 10000, // max deposit, bid entry
+            0, 1000, // deposit, bid fee bp
+            10, 1000, // deposit, bid incentive bp
+            0, 300_000, // auction delay, duration ts ms
+            86400_000,// recoup_delay_ts_ms
+            1000000_0000_00000, 100, 1, // capacity, leverage, risk_level
+            true, vector[10100], vector[1], vector[false], // has_next, strike_bp, weight, is_buyer
+            0_0100_00000, // strike_increment
+            1, 0_0200_00000, 0_0100_00000, // decay_speed, upper bound price, lower bound price
+            vector[ADMIN], // whitelist
+            current_ts_ms()
+        );
+
+        // create navi borrow using vault
+        test_manager_entry::test_new_portfolio_vault_<BABE, BABE>(
+            &mut scenario,
+            0, // option type
+            4, // period 10-min vault
+            9, 9, 9, // d b o decimal
+            current_ts_ms() / 86400_000 * 86400_000, // activation ts ms
+            current_ts_ms() / 86400_000 * 86400_000 + 600_000, // expiration ts ms
+            sui_oracle_id, 100000_0000_0000, // oracle id, price
+            1_0000_00000, 1_0000_00000, // deposit, bid lot size
+            100_0000_00000, 100_0000_00000, // min deposit, bid size
+            10000, 10000, // max deposit, bid entry
+            0, 1000, // deposit, bid fee bp
+            10, 1000, // deposit, bid incentive bp
+            0, 60_000, // auction delay, duration ts ms
+            600_000,// recoup_delay_ts_ms
+            1000000_0000_00000, 100, 1, // capacity, leverage, risk_level
+            true, vector[10100], vector[1], vector[false], // has_next, strike_bp, weight, is_buyer
+            0_0100_00000, // strike_increment
+            1, 0_0200_00000, 0_0100_00000, // decay_speed, upper bound price, lower bound price
+            vector[ADMIN], // whitelist
+            current_ts_ms()
+        );
+
+        let mut activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
+
+        let (index_0, index_1) = (0, 1);
+        test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index_0, 4);
+        test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index_1, 4);
+
+        // deposit index 0
+        let ts_ms = activate_ts_ms;
+        let deposit_amount = 1000_0000_00000;
+        let receipt = test_tds_user_entry::test_public_raise_fund_<BABE, BABE>(&mut scenario, index_0, vector[], deposit_amount, false, false, ts_ms);
+        transfer::public_transfer(receipt, sender(&scenario));
+
+        // deposit index 1
+        let ts_ms = activate_ts_ms;
+        let deposit_amount = 10000_0000_00000;
+        let receipt = test_tds_user_entry::test_public_raise_fund_<BABE, BABE>(&mut scenario, index_1, vector[], deposit_amount, false, false, ts_ms);
+        transfer::public_transfer(receipt, sender(&scenario));
+
+        // activate 0 & 1
+        let ts_ms = activate_ts_ms;
+        let oracle_price = 100000_0000_0000;
+        test_manager_entry::test_activate_<BABE, BABE, BABE>(
+            &mut scenario,
+            index_0,
+            sui_oracle_id,
+            sui_oracle_id,
+            oracle_price,
+            oracle_price,
+            ts_ms,
+        );
+        test_manager_entry::test_activate_<BABE, BABE, BABE>(
+            &mut scenario,
+            index_1,
+            sui_oracle_id,
+            sui_oracle_id,
+            oracle_price,
+            oracle_price,
+            ts_ms,
+        );
+
+        let asset_id = 0;
+        test_manager_entry::test_deposit_navi_<BABE, BABE>(&mut scenario, index_1, asset_id, ts_ms);
+        test_manager_entry::test_deposit_collateral_navi_<BABE>(&mut scenario, index_1, asset_id, 100_0000_00000, ts_ms);
+        test_manager_entry::test_withdraw_collateral_navi_<BABE>(&mut scenario, index_1, asset_id, option::some(10_0000_00000), ts_ms);
+
+        test_manager_entry::test_oracle_price_update_single_price_(&mut scenario, asset_id, ts_ms);
+        // test_manager_entry::test_borrow_navi_<BABE>(&mut scenario, index_1, index_0, asset_id, 1_0000_00000, ts_ms);
+        // let (hot_potato_balance, _log) = test_manager_entry::test_pre_repay_navi_interest_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
+        // test_manager_entry::test_post_repay_navi_interest_<BABE>(&mut scenario, index_1, asset_id, hot_potato_balance, ts_ms);
+        // test_manager_entry::test_unsubscribe_navi_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
 
         end(scenario);
     }

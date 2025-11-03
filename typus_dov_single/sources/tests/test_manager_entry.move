@@ -1,12 +1,12 @@
 #[test_only]
 module typus_dov::test_manager_entry {
+    use sui::balance::Balance;
     use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared};
     use typus_dov::tds_authorized_entry;
     use typus_dov::tds_registry_authorized_entry;
     use typus_dov::test_environment;
     use pyth::price_info::PriceInfoObject;
-    use spool::spool::Spool;
-    use spool::spool_account::SpoolAccount;
+    use typus::witness_lock::HotPotato;
 
     const ADMIN: address = @0xFFFF;
 
@@ -567,6 +567,30 @@ module typus_dov::test_manager_entry {
         next_tx(scenario, ADMIN);
     }
 
+    public(package) fun test_fixed_incentivise_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        amount: u64,
+        amount_per_round: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let incentive_coin = test_environment::mint_test_coin<I_TOKEN>(scenario, amount);
+        tds_authorized_entry::fixed_incentivise<D_TOKEN, B_TOKEN, I_TOKEN>(&mut registry, index, incentive_coin, amount_per_round, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_withdraw_fixed_incentive_<TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        amount: Option<u64>,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::withdraw_fixed_incentive<TOKEN>(&mut registry, index, amount, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
     public(package) fun test_incentivise_<TOKEN>(
         scenario: &mut Scenario,
         amount: u64,
@@ -652,6 +676,16 @@ module typus_dov::test_manager_entry {
     ) {
         let mut registry = test_environment::dov_registry(scenario);
         tds_authorized_entry::remove_portfolio_vault_authorized_user(&mut registry, index, users, ctx(scenario));
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_create_navi_account_cap_(
+        scenario: &mut Scenario,
+        index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        tds_authorized_entry::create_navi_account_cap(&mut registry, index, ctx(scenario));
         return_shared(registry);
         next_tx(scenario, ADMIN);
     }
@@ -769,6 +803,374 @@ module typus_dov::test_manager_entry {
             &clock,
             ctx(scenario)
         );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_oracle_price_update_single_price_(
+        scenario: &mut Scenario,
+        asset_id: u8,
+        ts_ms: u64,
+    ) {
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        oracle::oracle_pro::update_single_price(
+            &clock,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+        );
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_borrow_navi_<TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        deposit_dov_index: u64,
+        asset_id: u8,
+        amount: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::borrow_navi<TOKEN>(
+            &mut registry,
+            index,
+            deposit_dov_index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            amount,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_unsubscribe_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        deposit_dov_index: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+
+        tds_authorized_entry::unsubscribe_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+            &mut registry,
+            index,
+            deposit_dov_index,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_repay_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        deposit_dov_index: u64,
+        asset_id: u8,
+        amount: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<D_TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        let coin = test_environment::mint_test_coin<D_TOKEN>(scenario, amount);
+        tds_authorized_entry::repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+            &mut registry,
+            index,
+            deposit_dov_index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            coin,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_repay_navi_interest_<TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        deposit_dov_index: u64,
+        asset_id: u8,
+        warmup_amount: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::repay_navi_interest<TOKEN, I_TOKEN>(
+            &mut registry,
+            index,
+            deposit_dov_index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            warmup_amount,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_deposit_collateral_navi_<TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        asset_id: u8,
+        amount: u64,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        let coin = test_environment::mint_test_coin<TOKEN>(scenario, amount);
+
+        tds_authorized_entry::deposit_collateral_navi<TOKEN>(
+            &mut registry,
+            index,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            coin,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_withdraw_collateral_navi_<TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        asset_id: u8,
+        amount: Option<u64>,
+        ts_ms: u64,
+    ) {
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::withdraw_collateral_navi<TOKEN>(
+            &mut registry,
+            index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            amount,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(registry);
+        return_shared(oracle_config);
+        return_shared(price_oracle);
+        return_shared(supra_oracle_holder);
+        return_shared(pyth_price_info);
+        return_shared(storage);
+        return_shared(pool);
+        return_shared(incentive_v2);
+        return_shared(incentive_v3);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
+    public(package) fun test_pre_repay_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        deposit_dov_index: u64,
+    ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+        let mut registry = test_environment::dov_registry(scenario);
+
+        let (hot_potato_balance, log) = tds_authorized_entry::pre_repay_navi_interest<D_TOKEN, B_TOKEN, I_TOKEN>(
+            &ecosystem_version,
+            &mut registry,
+            index,
+            deposit_dov_index,
+            ctx(scenario)
+        );
+        return_shared(ecosystem_version);
+        return_shared(registry);
+        next_tx(scenario, ADMIN);
+        (hot_potato_balance, log)
+    }
+
+    public(package) fun test_post_repay_navi_interest_<TOKEN>(
+        scenario: &mut Scenario,
+        index: u64,
+        asset_id: u8,
+        hot_potato_balance: HotPotato<Balance<TOKEN>>,
+        ts_ms: u64,
+    ) {
+        let ecosystem_version = test_environment::ecosystem_version(scenario);
+        let mut registry = test_environment::dov_registry(scenario);
+        let mut oracle_config = take_shared<oracle::config::OracleConfig>(scenario);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let supra_oracle_holder = take_shared<SupraOracle::SupraSValueFeed::OracleHolder>(scenario);
+        let pyth_price_info = take_shared<PriceInfoObject>(scenario);
+        let feed_address = oracle::config::get_vec_feeds(&oracle_config)[asset_id as u64];
+        let mut storage = take_shared<lending_core::storage::Storage>(scenario);
+        let mut pool = take_shared<lending_core::pool::Pool<TOKEN>>(scenario);
+        let mut incentive_v2 = take_shared<lending_core::incentive_v2::Incentive>(scenario);
+        let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
+        let mut clock = test_environment::new_clock(scenario);
+        test_environment::update_clock(&mut clock, ts_ms);
+
+        tds_authorized_entry::post_repay_navi_interest_<TOKEN>(
+            &ecosystem_version,
+            &mut registry,
+            index,
+            &mut oracle_config,
+            &mut price_oracle,
+            &supra_oracle_holder,
+            &pyth_price_info,
+            feed_address,
+            &mut storage,
+            &mut pool,
+            asset_id,
+            &mut incentive_v2,
+            &mut incentive_v3,
+            hot_potato_balance,
+            &clock,
+            ctx(scenario)
+        );
+        return_shared(ecosystem_version);
         return_shared(registry);
         return_shared(oracle_config);
         return_shared(price_oracle);
