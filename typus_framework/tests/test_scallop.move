@@ -1,5 +1,4 @@
 #[test_only]
-#[allow(deprecated_usage)]
 extend module typus_framework::scallop {
     use sui::balance;
     use sui::clock;
@@ -7,7 +6,8 @@ extend module typus_framework::scallop {
     use sui::test_scenario;
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_new_spool_account_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -20,7 +20,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_deposit_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -50,7 +51,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -90,7 +92,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_xxx_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -129,7 +132,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_xyy_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -168,7 +172,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_xyx_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -207,7 +212,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_xyz_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -246,7 +252,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_additional_lending_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -285,7 +292,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_deposit_basic_lending_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -310,7 +318,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_basic_lending_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -341,7 +350,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_basic_lending_xy_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -372,7 +382,8 @@ extend module typus_framework::scallop {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_basic_lending_v2_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());

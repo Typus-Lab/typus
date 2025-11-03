@@ -1,5 +1,4 @@
 #[test_only]
-#[allow(deprecated_usage)]
 extend module typus_framework::suilend {
     use sui::balance;
     use sui::clock;
@@ -46,7 +45,8 @@ extend module typus_framework::suilend {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_new_suilend_obligation_owner_cap_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let (mut lending_market, obligation_owner_cap) = init_suilend_tests(&mut scenario);
@@ -58,7 +58,8 @@ extend module typus_framework::suilend {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_deposit_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -80,7 +81,8 @@ extend module typus_framework::suilend {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -110,7 +112,8 @@ extend module typus_framework::suilend {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_withdraw_without_reward_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
@@ -139,7 +142,8 @@ extend module typus_framework::suilend {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0, location = Self)]
+    #[allow(deprecated_usage)]
     fun test_reward_without_reward_abort() {
         let mut scenario = test_scenario::begin(@0xABCD);
         let clock = clock::create_for_testing(scenario.ctx());
