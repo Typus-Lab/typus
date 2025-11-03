@@ -280,7 +280,7 @@ module typus_dov::test_environment {
 
     public(package) fun prepare_navi_lending_env(scenario: &mut Scenario) {
         // oracle
-        navi_oracle::test_init(ctx(scenario));
+        navi_oracle::init_for_testing(ctx(scenario));
         next_tx(scenario, ADMIN);
         let oracle_admin_cap = take_from_sender<oracle::oracle::OracleAdminCap>(scenario);
         oracle_manage::create_config(&oracle_admin_cap, ctx(scenario));
@@ -311,13 +311,13 @@ module typus_dov::test_environment {
         next_tx(scenario, ADMIN);
 
         // lending_core
-        lending_core::pool::test_init(ctx(scenario));
+        lending_core::pool::init_for_testing(ctx(scenario));
         next_tx(scenario, ADMIN);
         let pool_admin_cap = take_from_sender<lending_core::pool::PoolAdminCap>(scenario);
-        lending_core::pool::test_create_pool<BABE>(&pool_admin_cap, 9, ctx(scenario));
+        lending_core::pool::create_pool_for_testing<BABE>(&pool_admin_cap, 9, ctx(scenario));
         next_tx(scenario, ADMIN);
 
-        lending_core::storage::test_init(ctx(scenario));
+        lending_core::storage::init_for_testing(ctx(scenario));
         next_tx(scenario, ADMIN);
         let storage_owner_cap = take_from_sender<lending_core::storage::OwnerCap>(scenario);
         let mut storage = take_shared<lending_core::storage::Storage>(scenario);
@@ -355,8 +355,8 @@ module typus_dov::test_environment {
         next_tx(scenario, ADMIN);
 
         let incentive_v2_owner_cap = take_from_sender<lending_core::incentive_v2::OwnerCap>(scenario);
-        lending_core::incentive_v2::test_create_incentive(&incentive_v2_owner_cap, ctx(scenario));
-        lending_core::incentive_v3::test_create_incentive(ctx(scenario));
+        lending_core::incentive_v2::create_incentive(&incentive_v2_owner_cap, ctx(scenario));
+        lending_core::incentive_v3::init_for_testing(ctx(scenario));
         next_tx(scenario, ADMIN);
         let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
         lending_core::manage::create_incentive_v3_pool<BABE>(&incentive_v2_owner_cap, &mut incentive_v3, &storage, 0, ctx(scenario));

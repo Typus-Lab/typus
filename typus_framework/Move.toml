@@ -25,12 +25,12 @@ subdir = "contracts/suilend"
 rev = "no-tests"
 
 [dependencies.lending_core]
-git = "https://github.com/Typus-Lab/navi-protocol-interface.git"
+git = "https://github.com/Typus-Lab/navi-smart-contracts.git"
 subdir = "lending_core"
 rev = "main"
 
 [dependencies.oracle]
-git = "https://github.com/Typus-Lab/navi-protocol-interface.git"
+git = "https://github.com/Typus-Lab/navi-smart-contracts.git"
 subdir = "oracle"
 rev = "main"
 
