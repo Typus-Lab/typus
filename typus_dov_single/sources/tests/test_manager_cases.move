@@ -177,6 +177,7 @@ module typus_dov::test_manager_cases {
 
         let ts_ms = activate_ts_ms + 86400_000;
         test_manager_entry::test_reward_navi_<BABE, BABE, SUI>(&mut scenario, index, ts_ms);
+        test_environment::navi_update_token_price(&mut scenario, 0, oracle_price as u256, ts_ms);
         test_manager_entry::test_withdraw_navi_<BABE, BABE>(&mut scenario, index, 0, ts_ms);
 
         let ts_ms = activate_ts_ms + 86400_000;
@@ -555,7 +556,8 @@ module typus_dov::test_manager_cases {
         let (index_0, index_1) = (0, 1);
         test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index_0, 4);
         test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index_1, 4);
-
+        test_manager_entry::test_fixed_incentivise_<BABE, BABE, BABE>(&mut scenario, index_0, 1_0000_00000, 0);
+        test_manager_entry::test_fixed_incentivise_<BABE, BABE, BABE>(&mut scenario, index_1, 1_0000_00000, 0);
         // deposit index 0
         let ts_ms = activate_ts_ms;
         let deposit_amount = 1000_0000_00000;
@@ -596,10 +598,10 @@ module typus_dov::test_manager_cases {
         test_manager_entry::test_withdraw_collateral_navi_<BABE>(&mut scenario, index_1, asset_id, option::some(10_0000_00000), ts_ms);
 
         test_manager_entry::test_oracle_price_update_single_price_(&mut scenario, asset_id, ts_ms);
-        // test_manager_entry::test_borrow_navi_<BABE>(&mut scenario, index_1, index_0, asset_id, 1_0000_00000, ts_ms);
+        test_manager_entry::test_borrow_navi_<BABE>(&mut scenario, index_1, index_0, asset_id, 1_0000_00000, ts_ms);
         // let (hot_potato_balance, _log) = test_manager_entry::test_pre_repay_navi_interest_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
-        // test_manager_entry::test_post_repay_navi_interest_<BABE>(&mut scenario, index_1, asset_id, hot_potato_balance, ts_ms);
-        // test_manager_entry::test_unsubscribe_navi_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
+        // test_manager_entry::test_post_repay_navi_interest_<BABE>(&mut scenario, index_1, asset_id, hot_potato_balance, ts_ms); // need to build typus_momentum env first
+        test_manager_entry::test_unsubscribe_navi_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
 
         end(scenario);
     }

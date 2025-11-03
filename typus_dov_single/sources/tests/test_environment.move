@@ -163,6 +163,31 @@ module typus_dov::test_environment {
 
     public(package) fun current_ts_ms(): u64 { return CURRENT_TS_MS }
 
+    public(package) fun navi_update_token_price(
+        scenario: &mut Scenario,
+        asset_id: u8,
+        new_token_price: u256,
+        ts_ms: u64,
+    ) {
+        let mut clock = new_clock(scenario);
+        update_clock(&mut clock, ts_ms);
+        let mut price_oracle = take_shared<oracle::oracle::PriceOracle>(scenario);
+        let oracle_feeder_cap = take_from_sender<oracle::oracle::OracleFeederCap>(scenario);
+
+        navi_oracle::update_token_price(
+            &oracle_feeder_cap,
+            &clock,
+            &mut price_oracle,
+            asset_id,
+            new_token_price,
+        );
+
+        return_to_sender(scenario, oracle_feeder_cap);
+        return_shared(price_oracle);
+        clock.destroy_for_testing();
+        next_tx(scenario, ADMIN);
+    }
+
     public(package) fun begin_test(): Scenario {
         let (mut scenario, _clock_ts_ms) = prepare_pyth();
         new_dov_registry(&mut scenario);
@@ -325,8 +350,8 @@ module typus_dov::test_environment {
         let storage_admin_cap = take_from_sender<lending_core::storage::StorageAdminCap>(scenario);
         let oracle_id = 0; // 4
         let is_isolated = true; // 5
-        let max_capacity = 55000000000000000000000000000000000000000000; // idx 6
-        let max_borrow_capacity = 800000000000000000000000000; // 7
+        let max_capacity = 20000000000000000000000000000000000000000000; // idx 6
+        let max_borrow_capacity = 900000000000000000000000000; // 7
         let (
             base_rate,
             optimal_utilization,
@@ -334,14 +359,14 @@ module typus_dov::test_environment {
             jump_rate_multiplier,
             reserve_factor,
         ) = (
-            30000000000000000000000000,
-            750000000000000000000000000,
-            90000000000000000000000000,
+            0,
+            550000000000000000000000000,
+            116360000000000000000000000,
             3000000000000000000000000000,
             200000000000000000000000000
         );
-        let ltv = 1000; // 13
-        let treasury_factor = 550000000000000000000000000; // 14
+        let ltv = 550000000000000000000000000; // 13
+        let treasury_factor = 100000000000000000000000000; // 14
         let (bonus, ratio, threshold) = (100000000000000000000000000, 350000000000000000000000000, 800000000000000000000000000); // 15~17
         lending_core::storage::init_reserve<BABE>(
             &storage_admin_cap, &pool_admin_cap, &clock, &mut storage, oracle_id,

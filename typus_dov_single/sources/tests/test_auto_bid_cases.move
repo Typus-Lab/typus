@@ -132,6 +132,8 @@ module typus_dov::test_auto_bid_cases {
 
         let ts_ms = activate_ts_ms + 86400_000;
         test_manager_entry::test_reward_navi_<BABE, BABE, SUI>(&mut scenario, index, ts_ms);
+        // test_manager_entry::test_oracle_price_update_single_price_(&mut scenario, 0, ts_ms);
+        test_environment::navi_update_token_price(&mut scenario, 0, oracle_price as u256, ts_ms);
         test_manager_entry::test_withdraw_navi_<BABE, BABE>(&mut scenario, index, 0, ts_ms);
 
         let ts_ms = activate_ts_ms + 86400_000;
