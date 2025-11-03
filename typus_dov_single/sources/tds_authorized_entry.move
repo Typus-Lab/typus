@@ -1208,30 +1208,30 @@ module typus_dov::tds_authorized_entry {
         obligation_owner_cap_id: address,
     }
     /// [Authorized Function] Creates a Suilend obligation owner cap.
-    public(package) entry fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+    // public(package) entry fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
 
-        // main logic
-        let (lending_market_id, obligation_owner_cap_id) = typus_dov_single::create_suilend_obligation_owner_cap_(
-            registry,
-            index,
-            suilend_lending_market,
-            ctx,
-        );
+    //     // main logic
+    //     let (lending_market_id, obligation_owner_cap_id) = typus_dov_single::create_suilend_obligation_owner_cap_(
+    //         registry,
+    //         index,
+    //         suilend_lending_market,
+    //         ctx,
+    //     );
 
-        // emit event
-        emit(CreateSuilendObligationOwnerCap {
-            signer: tx_context::sender(ctx),
-            index,
-            lending_market_id,
-            obligation_owner_cap_id,
-        });
-    }
+    //     // emit event
+    //     emit(CreateSuilendObligationOwnerCap {
+    //         signer: tx_context::sender(ctx),
+    //         index,
+    //         lending_market_id,
+    //         obligation_owner_cap_id,
+    //     });
+    // }
 
     /// Event emitted when funds are deposited to Suilend.
     public struct DepositSuilend has copy, drop {
@@ -1240,43 +1240,43 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Deposits funds to Suilend.
-    public(package) entry fun deposit_suilend<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-        reserve_array_index: u64,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+    // public(package) entry fun deposit_suilend<D_TOKEN, B_TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
+    //     reserve_array_index: u64,
+    //     clock: &Clock,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
 
-        // main logic
-        let u64_padding = typus_dov_single::deposit_suilend_<D_TOKEN>(
-            registry,
-            index,
-            suilend_lending_market,
-            reserve_array_index,
-            clock,
-            ctx,
-        );
+    //     // main logic
+    //     let u64_padding = typus_dov_single::deposit_suilend_<D_TOKEN>(
+    //         registry,
+    //         index,
+    //         suilend_lending_market,
+    //         reserve_array_index,
+    //         clock,
+    //         ctx,
+    //     );
 
-        // emit event
-        emit(DepositSuilend {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
+    //     // emit event
+    //     emit(DepositSuilend {
+    //         signer: tx_context::sender(ctx),
+    //         index,
+    //         u64_padding,
+    //     });
+    // }
 
     /// [Authorized Function] Refreshes the reserve price in Suilend.
-    public(package) entry fun refresh_suilend_reserve_price(
-        lending_market: &mut LendingMarket<MAIN_POOL>,
-        reserve_array_index: u64,
-        clock: &Clock,
-        price_info: &pyth::price_info::PriceInfoObject,
-    ) {
-        lending_market::refresh_reserve_price(lending_market, reserve_array_index, clock, price_info);
-    }
+    // public(package) entry fun refresh_suilend_reserve_price(
+    //     lending_market: &mut LendingMarket<MAIN_POOL>,
+    //     reserve_array_index: u64,
+    //     clock: &Clock,
+    //     price_info: &pyth::price_info::PriceInfoObject,
+    // ) {
+    //     lending_market::refresh_reserve_price(lending_market, reserve_array_index, clock, price_info);
+    // }
 
     /// Event emitted when funds are withdrawn from Suilend.
     public struct WithdrawSuilend has copy, drop {
@@ -1285,35 +1285,35 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Withdraws funds from Suilend.
-    public(package) entry fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-        reserve_array_index: u64,
-        reward_index: Option<u64>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+    // public(package) entry fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
+    //     reserve_array_index: u64,
+    //     reward_index: Option<u64>,
+    //     clock: &Clock,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
 
-        // main logic
-        let u64_padding = typus_dov_single::withdraw_suilend_<D_TOKEN, R_TOKEN>(
-            registry,
-            index,
-            suilend_lending_market,
-            reserve_array_index,
-            reward_index,
-            clock,
-            ctx,
-        );
+    //     // main logic
+    //     let u64_padding = typus_dov_single::withdraw_suilend_<D_TOKEN, R_TOKEN>(
+    //         registry,
+    //         index,
+    //         suilend_lending_market,
+    //         reserve_array_index,
+    //         reward_index,
+    //         clock,
+    //         ctx,
+    //     );
 
-        // emit event
-        emit(WithdrawSuilend {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
+    //     // emit event
+    //     emit(WithdrawSuilend {
+    //         signer: tx_context::sender(ctx),
+    //         index,
+    //         u64_padding,
+    //     });
+    // }
 
     /// Event emitted when rewards are claimed from Suilend.
     public struct RewardSuilend has copy, drop {
@@ -1322,35 +1322,35 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Claims rewards from Suilend.
-    public(package) entry fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-        reserve_array_index: u64,
-        reward_index: u64,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+    // public(package) entry fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
+    //     reserve_array_index: u64,
+    //     reward_index: u64,
+    //     clock: &Clock,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
 
-        // main logic
-        let u64_padding = typus_dov_single::reward_suilend_<R_TOKEN>(
-            registry,
-            index,
-            suilend_lending_market,
-            reserve_array_index,
-            reward_index,
-            clock,
-            ctx,
-        );
+    //     // main logic
+    //     let u64_padding = typus_dov_single::reward_suilend_<R_TOKEN>(
+    //         registry,
+    //         index,
+    //         suilend_lending_market,
+    //         reserve_array_index,
+    //         reward_index,
+    //         clock,
+    //         ctx,
+    //     );
 
-        // emit event
-        emit(RewardSuilend {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
+    //     // emit event
+    //     emit(RewardSuilend {
+    //         signer: tx_context::sender(ctx),
+    //         index,
+    //         u64_padding,
+    //     });
+    // }
 
     /// Event emitted when a Navi account cap is created.
     public struct CreateNaviAccountCap has copy, drop {
