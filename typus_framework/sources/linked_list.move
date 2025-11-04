@@ -1,26 +1,26 @@
-#[deprecated, allow(unused_type_parameter)]
+#[deprecated, allow(unused_type_parameter, unused_variable)]
 module typus_framework::linked_list {
     #[deprecated]
     public struct LinkedList<K: copy + drop + store, phantom V: store> has drop, store {
-        _id: ID,
-        _first: Option<K>,
-        _last: Option<K>,
-        _length: u64,
+        id: ID,
+        first: Option<K>,
+        last: Option<K>,
+        length: u64,
     }
     #[deprecated]
     public struct Node<K: copy + drop + store, V: store> has copy, drop, store {
-        _value: V,
-        _prev: Option<K>,
-        _next: Option<K>,
-        _exists: bool,
+        value: V,
+        prev: Option<K>,
+        next: Option<K>,
+        exists: bool,
     }
     #[deprecated]
     public fun new<K: copy + drop + store, V: store>(_id: ID): LinkedList<K, V> { abort 0 }
     #[deprecated]
     public fun new_node<K: copy + drop + store, V: store>(
-        _value: V,
-        _prev: Option<K>,
-        _next: Option<K>,
+        value: V,
+        prev: Option<K>,
+        next: Option<K>,
     ): Node<K, V> { abort 0 }
     #[deprecated]
     public fun node_exists<K: copy + drop + store, V: store>(_node: &Node<K, V>): bool { abort 0 }
