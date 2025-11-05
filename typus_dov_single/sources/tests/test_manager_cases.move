@@ -1,7 +1,7 @@
 #[test_only]
 module typus_dov::test_manager_cases {
     use sui::sui::SUI;
-    use sui::test_scenario::{end, sender, next_tx, take_from_sender};
+    use sui::test_scenario::{end, sender, next_tx, take_from_sender, return_to_sender};
 
     use typus_dov::test_environment::{Self, USDC, current_ts_ms};
     use typus_dov::test_tds_user_entry;
@@ -575,15 +575,6 @@ module typus_dov::test_manager_cases {
         let oracle_price = 100000_0000_0000;
         test_manager_entry::test_activate_<BABE, BABE, BABE>(
             &mut scenario,
-            index_0,
-            sui_oracle_id,
-            sui_oracle_id,
-            oracle_price,
-            oracle_price,
-            ts_ms,
-        );
-        test_manager_entry::test_activate_<BABE, BABE, BABE>(
-            &mut scenario,
             index_1,
             sui_oracle_id,
             sui_oracle_id,
@@ -601,6 +592,72 @@ module typus_dov::test_manager_cases {
         test_manager_entry::test_borrow_navi_<BABE>(&mut scenario, index_1, index_0, asset_id, 1_0000_00000, ts_ms);
         // let (hot_potato_balance, _log) = test_manager_entry::test_pre_repay_navi_interest_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
         // test_manager_entry::test_post_repay_navi_interest_<BABE>(&mut scenario, index_1, asset_id, hot_potato_balance, ts_ms); // need to build typus_momentum env first
+
+        test_manager_entry::test_activate_<BABE, BABE, BABE>(
+            &mut scenario,
+            index_0,
+            sui_oracle_id,
+            sui_oracle_id,
+            oracle_price,
+            oracle_price,
+            ts_ms,
+        );
+        test_manager_entry::test_deposit_navi_<BABE, BABE>(&mut scenario, index_0, asset_id, ts_ms);
+        test_manager_entry::test_new_auction_<BABE, BABE>(&mut scenario, index_0);
+        let premium = 2_0000_00000; // 100 * 0.0167 => rebate ~ 0.164
+        let bid_ts_ms = activate_ts_ms + 100_000;
+        let (bid_receipt, rebate_coin) = test_tds_user_entry::test_public_bid_<BABE, BABE>(
+            &mut scenario,
+            index_0,
+            premium,
+            100_0000_00000,
+            bid_ts_ms,
+        );
+        transfer::public_transfer(bid_receipt, sender(&scenario));
+        transfer::public_transfer(rebate_coin, sender(&scenario));
+        next_tx(&mut scenario, ADMIN);
+
+        let ts_ms = activate_ts_ms + 300_000;
+        test_manager_entry::test_delivery_<BABE, BABE, BABE>(&mut scenario, index_0, ts_ms);
+
+        // test_manager_entry::test_repay_navi_interest_<BABE, BABE>(&mut scenario, index_1, index_0, asset_id, 10000, ts_ms);
+
+        // unsubscribe
+        let receipt_1 = take_from_sender<TypusDepositReceipt>(&scenario);
+        let receipt_0 = take_from_sender<TypusDepositReceipt>(&scenario);
+        return_to_sender(&scenario, receipt_1);
+        test_tds_user_entry::test_public_reduce_fund_<BABE, BABE, BABE>(
+            &mut scenario,
+            index_0,
+            vector[receipt_0],
+            0,
+            1_0000_00000, // unsubscribe all from active
+            false,
+            false,
+            false,
+            ts_ms,
+        );
+
+        let ts_ms = activate_ts_ms + 86400_000;
+        test_environment::navi_update_token_price(&mut scenario, asset_id, oracle_price as u256, ts_ms);
+        test_manager_entry::test_withdraw_navi_<BABE, BABE>(&mut scenario, index_0, 0, ts_ms);
+
+        let ts_ms = activate_ts_ms + 86400_000;
+        test_manager_entry::test_recoup_<BABE, BABE>(&mut scenario, index_0, ts_ms);
+
+        // settle
+        let ts_ms = activate_ts_ms + 86400_000;
+        let oracle_price = 100000_0000_0000;
+        test_manager_entry::test_settle_<BABE, BABE>(
+            &mut scenario,
+            index_0,
+            sui_oracle_id,
+            sui_oracle_id,
+            oracle_price,
+            oracle_price,
+            ts_ms,
+        );
+
         test_manager_entry::test_unsubscribe_navi_<BABE, BABE, BABE>(&mut scenario, index_1, index_0);
 
         end(scenario);

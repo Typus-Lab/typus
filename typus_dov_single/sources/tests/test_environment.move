@@ -502,7 +502,6 @@ module typus_dov::babe2 {
 #[test_only]
 module typus_dov::scallop_tests {
     use sui::test_scenario::{Self, Scenario, next_tx, next_epoch, sender, ctx, take_shared, take_from_sender};
-    use sui::math;
     use sui::clock::Clock;
     use protocol::market::Market;
     use protocol::app::{Self, AdminCap};
