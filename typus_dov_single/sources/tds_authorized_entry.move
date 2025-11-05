@@ -1611,114 +1611,11 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
-    /// Event emitted when a loan from Navi is repaid.
-    public struct RepayNavi has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Repays a loan to Navi.
-    public entry fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        deposit_index: u64,
-        oracle_config: &mut OracleConfig,
-        price_oracle: &mut PriceOracle,
-        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        pyth_price_info: &pyth::price_info::PriceInfoObject,
-        feed_address: address,
-        storage: &mut lending_core::storage::Storage,
-        pool: &mut lending_core::pool::Pool<D_TOKEN>,
-        asset: u8,
-        incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        coin: Coin<D_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check_without_token(registry, index, ctx);
-
-        // main logic
-        let u64_padding = typus_dov_single::repay_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
-            registry,
-            index,
-            deposit_index,
-            oracle_config,
-            price_oracle,
-            supra_oracle_holder,
-            pyth_price_info,
-            feed_address,
-            storage,
-            pool,
-            asset,
-            incentive_v2,
-            incentive_v3,
-            coin.into_balance(),
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(RepayNavi {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
-
     /// Event emitted when the interest on a Navi loan is repaid.
     public struct RepayNaviInterest has copy, drop {
         signer: address,
         index: u64,
         u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Repays the interest on a loan to Navi.
-    entry fun repay_navi_interest<TOKEN, I_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        deposit_index: u64,
-        oracle_config: &mut OracleConfig,
-        price_oracle: &mut PriceOracle,
-        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        pyth_price_info: &pyth::price_info::PriceInfoObject,
-        feed_address: address,
-        storage: &mut lending_core::storage::Storage,
-        pool: &mut lending_core::pool::Pool<TOKEN>,
-        asset: u8,
-        incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        warmup_amount: u64,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check_without_token(registry, index, ctx);
-
-        // main logic
-        let u64_padding = typus_dov_single::repay_navi_interest_<TOKEN, I_TOKEN>(
-            registry,
-            index,
-            deposit_index,
-            oracle_config,
-            price_oracle,
-            supra_oracle_holder,
-            pyth_price_info,
-            feed_address,
-            storage,
-            pool,
-            asset,
-            incentive_v2,
-            incentive_v3,
-            warmup_amount,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(RepayNaviInterest {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
     }
 
     /// Event emitted when collateral is deposited to Navi.
@@ -1906,5 +1803,33 @@ module typus_dov::tds_authorized_entry {
             index,
             u64_padding,
         });
+    }
+
+    #[allow(unused_field)]
+    public struct RepayNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(dead_code, unused_variable, unused_type_parameter)]
+    public entry fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        coin: Coin<D_TOKEN>,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        abort 0
     }
 }

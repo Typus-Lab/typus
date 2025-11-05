@@ -20,13 +20,13 @@ module typus_dov::typus_dov_single {
     use protocol::redeem;
     use protocol::reserve::MarketCoin;
     use protocol::version::Version;
-    use spool::rewards_pool::RewardsPool;
+    // use spool::rewards_pool::RewardsPool;
     use spool::spool_account;
-    use spool::spool_account::SpoolAccount;
-    use spool::spool::Spool;
+    // use spool::spool_account::SpoolAccount;
+    // use spool::spool::Spool;
 
-    use suilend::lending_market::LendingMarket;
-    use suilend::suilend::MAIN_POOL;
+    // use suilend::lending_market::LendingMarket;
+    // use suilend::suilend::MAIN_POOL;
 
     use oracle::config::OracleConfig;
     use oracle::oracle::PriceOracle;
@@ -37,9 +37,9 @@ module typus_dov::typus_dov_single {
     use typus_framework::big_vector;
     use typus_framework::dutch::{Self, Auction};
     use typus_framework::i64::{Self, I64};
-    use typus_framework::scallop;
-    use typus_framework::suilend;
-    use typus_framework::navi;
+    // use typus_framework::scallop;
+    // use typus_framework::suilend;
+    // use typus_framework::navi;
     use typus_framework::utils;
     use typus_framework::vault::{Self, DepositVault, BidVault, RefundVault, TypusBidReceipt};
     use typus_oracle::oracle::{Self, Oracle};
@@ -1356,9 +1356,11 @@ module typus_dov::typus_dov_single {
             incentive_v3,
             navi_account_cap,
         );
+        std::debug::print(&log);
         utils::transfer_balance(balance, ctx.sender(), ctx);
         utils::transfer_balance(b_balance, ctx.sender(), ctx);
         utils::transfer_balance(i_balance, ctx.sender(), ctx);
+        std::debug::print(&receipt);
         receipt.destroy_none();
         vector::push_back(&mut log, portfolio_vault.info.round);
 
