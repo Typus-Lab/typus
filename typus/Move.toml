@@ -2,7 +2,7 @@
 name = "typus"
 version = "1.7.0"
 published-at = "0x916eaa4468870fac366464ca82dfc8e841a9c7f6df7e2922aae35240da71a733"
-edition = "2024"
+edition = "2024.alpha"
 
 [dependencies.typus_nft]
 local = "../typus_nft"
