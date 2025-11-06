@@ -4,11 +4,6 @@ extend module typus::user {
     use sui::test_scenario;
     use typus::ecosystem;
 
-    #[test_only]
-    public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
-
     #[test]
     fun test_user() {
         let mut scenario = test_scenario::begin(@0xABCD);

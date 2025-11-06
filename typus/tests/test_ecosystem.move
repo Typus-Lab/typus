@@ -3,11 +3,6 @@ extend module typus::ecosystem {
 
     use sui::test_scenario;
 
-    #[test_only]
-    public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
-
     #[test, expected_failure(abort_code = EInvalidVersion)]
     fun test_version_check_invalid_version_error() {
         let mut scenario = test_scenario::begin(@0xABCD);

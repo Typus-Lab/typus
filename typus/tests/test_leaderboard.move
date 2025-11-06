@@ -4,11 +4,6 @@ extend module typus::leaderboard {
     use typus::ecosystem;
     use sui::clock;
 
-    #[test_only]
-    public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
-
     #[test]
     fun test_leaderboard() {
         let mut scenario = test_scenario::begin(@0xABCD);

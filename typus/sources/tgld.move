@@ -115,4 +115,9 @@ module typus::tgld {
         });
         token::burn(&mut registry.treasury_cap, tgld);
     }
+
+    #[test_only]
+    public fun test_init(ctx: &mut TxContext) {
+        init(TGLD {}, ctx);
+    }
 }
