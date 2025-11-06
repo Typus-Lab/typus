@@ -1040,7 +1040,7 @@ module typus_perp::test_lp_pool {
         next_tx(scenario, ADMIN);
         let storage_owner_cap = take_from_sender<lending_core::storage::OwnerCap>(scenario);
         let mut storage = take_shared<lending_core::storage::Storage>(scenario);
-        let sui_coin_metadata = take_immutable<sui::coin::CoinMetadata<BABE>>(scenario);
+        let sui_coin_metadata = take_immutable<0x2::coin::CoinMetadata<BABE>>(scenario);
         let storage_admin_cap = take_from_sender<lending_core::storage::StorageAdminCap>(scenario);
         let max_capacity = 115792089237316195423570985008687907853269984665640564039457584007913129639935; // u256 max
         lending_core::storage::init_reserve<BABE>(
@@ -1053,8 +1053,8 @@ module typus_perp::test_lp_pool {
         next_tx(scenario, ADMIN);
 
         let incentive_v2_owner_cap = take_from_sender<lending_core::incentive_v2::OwnerCap>(scenario);
-        lending_core::incentive_v2::test_create_incentive(&incentive_v2_owner_cap, ctx(scenario));
-        lending_core::incentive_v3::test_create_incentive(ctx(scenario));
+        lending_core::incentive_v2::create_incentive(&incentive_v2_owner_cap, ctx(scenario));
+        lending_core::incentive_v3::init_for_testing(ctx(scenario));
         next_tx(scenario, ADMIN);
         let mut incentive_v3 = take_shared<lending_core::incentive_v3::Incentive>(scenario);
         lending_core::manage::create_incentive_v3_pool<BABE>(&incentive_v2_owner_cap, &mut incentive_v3, &storage, 0, ctx(scenario));

@@ -54,6 +54,7 @@ module typus_perp::test_trading {
     const MAINTENANCE_MARGIN_RATE_BP: u64 = 150; // 1.5%
     const OPTION_MAINTENANCE_MARGIN_RATE_BP: u64 = 20; // 0.2%
     const OPTION_TRADING_FEE_CONFIG: vector<u64> = vector[0_0002_000, 0_0004_000, 0_5000_000];
+    const TRADING_FEE_FORMULA_VERSION: u64 = 0;
 
     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
     const FUNDING_INTERVAL_TS_MS: u64 = 3_600_000;
@@ -422,6 +423,7 @@ module typus_perp::test_trading {
             MAINTENANCE_MARGIN_RATE_BP,
             OPTION_MAINTENANCE_MARGIN_RATE_BP,
             OPTION_TRADING_FEE_CONFIG,
+            TRADING_FEE_FORMULA_VERSION,
             &clock,
             ctx(scenario)
         );
@@ -470,6 +472,7 @@ module typus_perp::test_trading {
             option::some(MAINTENANCE_MARGIN_RATE_BP),
             option::some(OPTION_MAINTENANCE_MARGIN_RATE_BP),
             option::some(OPTION_TRADING_FEE_CONFIG),
+            option::some(TRADING_FEE_FORMULA_VERSION),
             ctx(scenario)
         );
         return_shared(registry);
@@ -1949,6 +1952,21 @@ module typus_perp::test_trading {
             option::none(),
             CURRENT_TS_MS
         ); // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 0;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<SUI, SUI>(
+            &mut scenario,
+            sui_oracle_id,
+            sui_oracle_id,
+            trigger_price,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
+        );
         test_create_trading_order_v2_<BABE, SUI>(
             &mut scenario,
             reduce_only,
@@ -1964,6 +1982,22 @@ module typus_perp::test_trading {
             option::none(),
             CURRENT_TS_MS
         ); // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 0;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<BABE, SUI>(
+            &mut scenario,
+            babe_oracle_id,
+            sui_oracle_id,
+            trigger_price,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
+        );
+
         next_tx(&mut scenario, USER_2);
         let (reduce_only, is_long, is_stop_order) = (false, false, false);
         test_create_trading_order_v2_<BABE, SUI>(
@@ -1980,7 +2014,24 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::none(),
             CURRENT_TS_MS
-        ); // filled immediately
+        );
+        // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 1;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<BABE, SUI>(
+            &mut scenario,
+            babe_oracle_id,
+            sui_oracle_id,
+            trigger_price,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
+        );
+
         next_tx(&mut scenario, USER_2);
         let (reduce_only, is_long, is_stop_order) = (true, true, false);
         test_create_trading_order_v2_<BABE, SUI>(
@@ -1997,7 +2048,7 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::some(2),
             CURRENT_TS_MS
-        ); // filled immediately
+        );
 
         {
             let version = version(&scenario);
@@ -2214,7 +2265,23 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::none(),
             CURRENT_TS_MS
-        ); // filled immediately
+        );
+        // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 0;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<SUI, SUI>(
+            &mut scenario,
+            sui_oracle_id,
+            sui_oracle_id,
+            trigger_price,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
+        );
 
         // linked order
         next_tx(&mut scenario, USER_1);
@@ -2338,6 +2405,23 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::none(),
             CURRENT_TS_MS
+        );
+
+        // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 0;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<BABE, SUI>(
+            &mut scenario,
+            babe_oracle_id,
+            sui_oracle_id,
+            SUI_PRICE,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
         );
 
         let liquidated_position_id = 1;
@@ -2493,7 +2577,23 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::none(),
             CURRENT_TS_MS
-        ); // filled immediately
+        );
+        // filled immediately
+        next_tx(&mut scenario, ADMIN);
+        let order_type_tag = 0;
+        let ts_ms = CURRENT_TS_MS;
+        let max_operation_count = 10;
+        test_match_trading_order_v2_<SUI, SUI>(
+            &mut scenario,
+            sui_oracle_id,
+            sui_oracle_id,
+            trigger_price,
+            trigger_price,
+            order_type_tag,
+            trigger_price,
+            max_operation_count,
+            ts_ms
+        );
         next_tx(&mut scenario, ADMIN);
 
         // get_user_positions
@@ -2851,6 +2951,124 @@ module typus_perp::test_trading {
             current_trading_price,
             ts_ms
         );
+        end(scenario);
+    }
+
+    #[test]
+    public(package) fun test_calculate_trading_fee_rate_mbp() {
+        let mut scenario = begin_test();
+
+        let formula_version = 1;
+        let (user_long_position_size, user_short_position_size, size_decimal) = (100_0000_00000, 800_0000_00000, 9);
+        let tvl_usd = 1_000_000_000000000; // 10 million USD
+        let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = (249_5000_0000, 8);
+        let (order_side, order_size) = (false, 500_0000_00000);
+        let trading_fee_config = vector[0_000_6000, 0_003_0000, 0_330_0000, 3, 1];
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == 7296, 0);
+
+
+        let (order_side, order_size) = (true, 500_0000_00000);
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == trading_fee_config[0], 0);
+
+
+        let (order_side, order_size) = (true, 1400_0000_00000);
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == trading_fee_config[0], 0);
+
+
+        let (order_side, order_size) = (false, 1400_0000_00000);
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == trading_fee_config[1], 0);
+
+
+        let (order_side, order_size) = (true, 2800_0000_00000);
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == trading_fee_config[1], 0);
+
+
+        let (order_side, order_size) = (true, 1);
+        let trading_fee_rate_mbp = trading::calculate_trading_fee_rate_mbp(
+            formula_version,
+            // infos
+            user_long_position_size,
+            user_short_position_size,
+            tvl_usd,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            order_side,
+            order_size,
+            trading_fee_config,
+        );
+        assert!(trading_fee_rate_mbp == trading_fee_config[0], 0);
         end(scenario);
     }
 }

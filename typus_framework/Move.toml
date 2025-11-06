@@ -6,7 +6,7 @@ edition = "2024.alpha"
 [dependencies.Pyth]
 git = "https://github.com/Typus-Lab/pyth-crosschain.git"
 subdir = "target_chains/sui/contracts"
-rev = "main"
+rev = "sui-contract-mainnet"
 override = true
 
 [dependencies.ScallopProtocol]

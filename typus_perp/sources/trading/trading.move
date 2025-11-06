@@ -42,6 +42,8 @@ module typus_perp::trading {
     const I_BASE_TRADING_FEE_MBP: u64 = 0;
     const I_MAX_TRADING_FEE_MBP: u64 = 1;
     const I_ALLOCATED_LP_EXPOSURE_MBP: u64 = 2;
+    const I_CURVATURE: u64 = 3;
+    const I_SCALE: u64 = 4;
 
     // Index to MarketConfig.u64_padding
     const I_MAX_BUY_OPEN_INTEREST: u64 = 0;
@@ -51,6 +53,7 @@ module typus_perp::trading {
     const I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP: u64 = 4;
     const I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP: u64 = 5;
     const I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP: u64 = 6;
+    const I_TRADING_FEE_FORMULA_VERSION: u64 = 7;
 
     // ======== Dynamic Field Key ========
     const K_LIMIT_BUY_ORDERS: vector<u8> = b"limit_buy_orders";
@@ -281,6 +284,7 @@ module typus_perp::trading {
         maintenance_margin_rate_bp: u64,
         option_maintenance_margin_rate_bp: u64,
         option_trading_fee_config: vector<u64>,
+        trading_fee_formula_version: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -337,6 +341,7 @@ module typus_perp::trading {
                 option_trading_fee_config[0],
                 option_trading_fee_config[1],
                 option_trading_fee_config[2],
+                trading_fee_formula_version
             ],
         };
         let mut symbol_market = SymbolMarket {
@@ -425,6 +430,7 @@ module typus_perp::trading {
         mut maintenance_margin_rate_bp: Option<u64>, // market_config.u64_padding[2]
         mut option_collateral_maintenance_margin_rate_bp: Option<u64>, // market_config.u64_padding[3]
         mut option_collateral_trading_fee_config: Option<vector<u64>>, // market_config.u64_padding[4 ~ 6]
+        mut trading_fee_formula_version: Option<u64>,
         ctx: &TxContext,
     ) {
         // safety check
@@ -490,6 +496,9 @@ module typus_perp::trading {
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP, trading_fee_config[I_BASE_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP, trading_fee_config[I_MAX_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP, trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP]);
+        };
+        if (option::is_some(&trading_fee_formula_version)) {
+            math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION, option::extract(&mut trading_fee_formula_version));
         };
         emit(UpdateMarketConfigEvent {
             index: market_index,
@@ -879,6 +888,7 @@ module typus_perp::trading {
         );
 
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -1358,6 +1368,7 @@ module typus_perp::trading {
 
         // 3. check if collateral reaches maintenance margin after releasing collateral (check liquidation)
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -1492,6 +1503,7 @@ module typus_perp::trading {
         );
 
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -1597,6 +1609,7 @@ module typus_perp::trading {
         );
 
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -1765,6 +1778,7 @@ module typus_perp::trading {
         //                                 / 10000 as u64);
 
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -1992,6 +2006,7 @@ module typus_perp::trading {
             order_size.extract()
         };
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -3099,6 +3114,7 @@ module typus_perp::trading {
                 result.push_back(bcs::to_bytes(&liquidation_info));
             } else {
                 let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+                    math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
                     // infos
                     symbol_market.market_info.user_long_position_size,
                     symbol_market.market_info.user_short_position_size,
@@ -3227,6 +3243,7 @@ module typus_perp::trading {
         );
         let is_option_position = mut_position.is_option_collateral_position();
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -3919,6 +3936,7 @@ module typus_perp::trading {
             if (position_size > order_size) { order_size } else { position_size }
         } else { order_size };
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -5018,6 +5036,7 @@ module typus_perp::trading {
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -5068,6 +5087,7 @@ module typus_perp::trading {
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
         let is_option_position = mut_position.is_option_collateral_position();
         let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
             // infos
             symbol_market.market_info.user_long_position_size,
             symbol_market.market_info.user_short_position_size,
@@ -5158,6 +5178,7 @@ module typus_perp::trading {
     }
 
     public(package) fun calculate_trading_fee_rate_mbp(
+        formula_version: u64,
         // infos
         user_long_position_size: u64,
         user_short_position_size: u64,
@@ -5185,32 +5206,71 @@ module typus_perp::trading {
             (lp_original_side, lp_original_size + order_size)
         };
         // TODO: add fee rate into event
-        if (lp_new_size <= lp_original_size) {
-            trading_fee_config[I_BASE_TRADING_FEE_MBP]
-        } else {
-            let base_fee_mbp = trading_fee_config[I_BASE_TRADING_FEE_MBP];
-            let max_fee_mbp = trading_fee_config[I_MAX_TRADING_FEE_MBP];
-            let allocated_exposure_mbp = trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP];
+        if (formula_version == 0) {
+            if (lp_new_size <= lp_original_size) {
+                trading_fee_config[I_BASE_TRADING_FEE_MBP]
+            } else {
+                let base_fee_mbp = trading_fee_config[I_BASE_TRADING_FEE_MBP];
+                let max_fee_mbp = trading_fee_config[I_MAX_TRADING_FEE_MBP];
+                let allocated_exposure_mbp = trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP];
 
-            let exposure_change = lp_new_size - lp_original_size;
-            let exposure_change_usd = amount_to_usd(
-                exposure_change,
-                size_decimal,
-                trading_pair_oracle_price,
-                trading_pair_oracle_price_decimal
-            );
-            let allocated_exposure = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / 10000000 as u64);
-            if (allocated_exposure > 0) {
-                let exposure_change_rate_mbp = ((exposure_change_usd as u128)
-                                                    * 10000000
-                                                        / (allocated_exposure as u128) as u64);
-                let fee_mbp = max_fee_mbp.min(
+                let exposure_change = lp_new_size - lp_original_size;
+                let exposure_change_usd = amount_to_usd(
+                    exposure_change,
+                    size_decimal,
+                    trading_pair_oracle_price,
+                    trading_pair_oracle_price_decimal
+                );
+                let allocated_exposure = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / 10000000 as u64);
+                if (allocated_exposure > 0) {
+                    let exposure_change_rate_mbp = ((exposure_change_usd as u128)
+                                                        * 10000000
+                                                            / (allocated_exposure as u128) as u64);
+                    let fee_mbp = max_fee_mbp.min(
+                        base_fee_mbp
+                            + (((max_fee_mbp - base_fee_mbp) as u128) * (exposure_change_rate_mbp as u128) / 10000000 as u64)
+                    );
+                    fee_mbp
+                } else {
                     base_fee_mbp
-                        + (((max_fee_mbp - base_fee_mbp) as u128) * (exposure_change_rate_mbp as u128) / 10000000 as u64)
+                }
+            }
+        } else {
+            if (lp_new_size <= lp_original_size) {
+                trading_fee_config[I_BASE_TRADING_FEE_MBP]
+            } else {
+                let base_fee_mbp = trading_fee_config[I_BASE_TRADING_FEE_MBP];
+                let max_fee_mbp = trading_fee_config[I_MAX_TRADING_FEE_MBP];
+                let allocated_exposure_mbp = trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP];
+                let curvature = trading_fee_config[I_CURVATURE];
+                let scale = trading_fee_config[I_SCALE];
+
+                let allocated_exposure_usd = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / 10000000 as u64);
+                let exposure_change = lp_new_size - lp_original_size;
+                let exposure_change_usd = amount_to_usd(
+                    exposure_change,
+                    size_decimal,
+                    trading_pair_oracle_price,
+                    trading_pair_oracle_price_decimal
+                );
+                let mut exposure_change_rate_mbp = if (allocated_exposure_usd > 0) {
+                    (10000000 * (exposure_change_usd as u128) / (allocated_exposure_usd as u128) as u64)
+                } else {
+                    0
+                };
+                exposure_change_rate_mbp = (exposure_change_rate_mbp / scale).min(10000000);
+                // exposure_change_rate_mbp is always <= 10000000, so the pow computing will not overflow
+                let mut pow_result = exposure_change_rate_mbp;
+                let mut i = 1;
+                while (i < curvature) {
+                    pow_result = ((pow_result as u128) * (exposure_change_rate_mbp as u128) / 10000000 as u64);
+                    i = i + 1;
+                };
+                let fee_mbp = max_fee_mbp.min(
+                        base_fee_mbp
+                            + (((max_fee_mbp - base_fee_mbp) as u128) * (pow_result as u128) / 10000000 as u64)
                 );
                 fee_mbp
-            } else {
-                base_fee_mbp
             }
         }
     }
