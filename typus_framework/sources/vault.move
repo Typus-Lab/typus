@@ -2705,13 +2705,13 @@ module typus_framework::vault {
         balance: &mut Balance<TOKEN>,
     ): (u64, u64) {
         let fee_amount = ((balance::value(balance) as u128) * (deposit_vault.fee_bp as u128) / (10000 as u128) as u64);
-        let mut fee_balance = balance::split(balance, fee_amount);
+        let fee_balance = balance::split(balance, fee_amount);
         let fee_share_amount = ((balance::value(&fee_balance) as u128) * (deposit_vault.fee_share_bp as u128) / (10000 as u128) as u64);
-        if (fee_share_amount > 0 && option::is_some(&deposit_vault.shared_fee_pool)) {
-            let key = *option::borrow(&deposit_vault.shared_fee_pool);
-            let fee_share_balance = balance::split(&mut fee_balance, fee_share_amount);
-            balance_pool::put_shared(fee_pool, key, fee_share_balance);
-        };
+        // if (fee_share_amount > 0 && option::is_some(&deposit_vault.shared_fee_pool)) {
+        //     let key = *option::borrow(&deposit_vault.shared_fee_pool);
+        //     let fee_share_balance = balance::split(&mut fee_balance, fee_share_amount);
+        //     balance_pool::put_shared(fee_pool, key, fee_share_balance);
+        // };
         balance_pool::put(fee_pool, fee_balance);
 
         (

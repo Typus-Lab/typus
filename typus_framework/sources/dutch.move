@@ -13,6 +13,43 @@ module typus_framework::dutch {
     use typus_framework::utils;
     use typus_framework::vault::{Self, RefundVault};
 
+    #[test_only]
+    use sui::test_scenario;
+
+    // ======== Errors ========
+
+    #[error]
+    const EInvalidTimePeriod: vector<u8> = b"invalid_time_period";
+    #[error]
+    const EInvalidSize: vector<u8> = b"invalid_size";
+    #[error]
+    const EInvalidDecaySpeed: vector<u8> = b"invalid_decay_speed";
+    #[error]
+    const EInvalidAuctionPrice: vector<u8> = b"invalid_auction_price";
+    #[error]
+    const EInvalidToken: vector<u8> = b"invalid_token";
+    #[error]
+    const EMaxSizeReached: vector<u8> = b"max_size_reached";
+    #[error]
+    const EZeroSize: vector<u8> = b"zero_size";
+    #[error]
+    const EBidNotExists: vector<u8> = b"bid_not_exists";
+    #[error]
+    const EAuctionNotYetStarted: vector<u8> = b"auction_not_yet_started";
+    #[error]
+    const EAuctionAlreadyStarted: vector<u8> = b"auction_already_started";
+    #[error]
+    const EAuctionNotYetEnded: vector<u8> = b"auction_not_yet_ended";
+    #[error]
+    const EAuctionClosed: vector<u8> = b"auction_closed";
+    #[error]
+    const EInvalidBidValue: vector<u8> = b"invalid_bid_value";
+    #[error]
+    const ERemoveBidDisabled: vector<u8> = b"remove_bid_disabled";
+    #[error]
+    const EDeprecated: vector<u8> = b"deprecated";
+
+
     // ======== Dynamic Field Key ========
 
     const K_BIDDER_BALANCE: vector<u8> = b"bidder_balance";
@@ -98,10 +135,10 @@ module typus_framework::dutch {
         able_to_remove_bid: bool,
         ctx: &mut TxContext,
     ): Auction {
-        assert!(end_ts_ms >= start_ts_ms, invalid_time_period());
-        assert!(size > 0, invalid_size());
-        assert!(decay_speed > 0, invalid_decay_speed());
-        assert!(initial_price >= final_price && final_price > 0, invalid_auction_price());
+        assert!(end_ts_ms >= start_ts_ms, EInvalidTimePeriod);
+        assert!(size > 0, EInvalidSize);
+        assert!(decay_speed > 0, EInvalidDecaySpeed);
+        assert!(initial_price >= final_price && final_price > 0, EInvalidAuctionPrice);
 
         let mut id = object::new(ctx);
         dynamic_field::add(&mut id, K_BIDDER_BALANCE, balance::zero<TOKEN>());
@@ -143,17 +180,17 @@ module typus_framework::dutch {
     ): (u64, u64, u64, u64, u64, u64, address, Coin<TOKEN>) {
         // safety check
         let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms >= auction.start_ts_ms, auction_not_yet_started());
-        assert!(ts_ms <= auction.end_ts_ms, auction_closed());
-        assert!(size > 0, zero_size());
-        assert!(auction.total_bid_size + size <= auction.size, max_size_reached());
-        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
+        assert!(ts_ms >= auction.start_ts_ms, EAuctionNotYetStarted);
+        assert!(ts_ms <= auction.end_ts_ms, EAuctionClosed);
+        assert!(size > 0, EZeroSize);
+        assert!(auction.total_bid_size + size <= auction.size, EMaxSizeReached);
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), EInvalidToken);
 
         // main logic
         let refund_index = vault::register_refund<TOKEN>(refund_vault, bidder);
         let (price, size, bid_value, fee) = get_bid_info(auction, size, fee_discount, ts_ms);
         let total_bid_value = bid_value + fee;
-        assert!(total_bid_value > 0, invalid_bid_value());
+        assert!(total_bid_value > 0, EInvalidBidValue);
         let incentive_balance_value = balance::value(&incentive_balance);
         // add new bid
         let index = auction.bid_index;
@@ -216,50 +253,6 @@ module typus_framework::dutch {
         )
     }
 
-    /// Deprecated function.
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun public_new_bid<TOKEN>(
-        _bidder: address,
-        _auction: &mut Auction,
-        _size: u64,
-        _coins: vector<Coin<TOKEN>>,
-        _incentive_balance: Balance<TOKEN>,
-        _fee_discount: u64,
-        _clock: &Clock,
-        _ctx: &mut TxContext,
-    ): (u64, u64, u64, u64, u64, u64, address, Coin<TOKEN>) {
-        abort deprecated()
-    }
-
-    /// Deprecated function.
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun new_bid_v2<TOKEN>(
-        _refund_vault: &mut RefundVault,
-        _auction: &mut Auction,
-        _size: u64,
-        _coins: vector<Coin<TOKEN>>,
-        _incentive_balance: Balance<TOKEN>,
-        _fee_discount: u64,
-        _clock: &Clock,
-        _ctx: &TxContext,
-    ): (u64, u64, u64, u64, u64, u64, address) {
-        abort deprecated()
-    }
-
-    /// Deprecated function.
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun new_bid<TOKEN>(
-        _auction: &mut Auction,
-        _size: u64,
-        _coins: vector<Coin<TOKEN>>,
-        _incentive_balance: Balance<TOKEN>,
-        _fee_discount: u64,
-        _clock: &Clock,
-        _ctx: &TxContext,
-    ): (u64, u64, u64, u64, u64, u64, address) {
-        abort deprecated()
-    }
-
     /// Allows a user to remove their bid.
     /// WARNING: mut inputs without authority check inside
     #[lint_allow(self_transfer)]
@@ -270,11 +263,11 @@ module typus_framework::dutch {
         ctx: &mut TxContext,
     ): Balance<TOKEN> {
         // safety check
-        assert!(auction.able_to_remove_bid, remove_bid_disabled());
+        assert!(auction.able_to_remove_bid, ERemoveBidDisabled);
         let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms >= auction.start_ts_ms, auction_not_yet_started());
-        assert!(ts_ms <= auction.end_ts_ms, auction_closed());
-        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
+        assert!(ts_ms >= auction.start_ts_ms, EAuctionNotYetStarted);
+        assert!(ts_ms <= auction.end_ts_ms, EAuctionClosed);
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), EInvalidToken);
 
         // main logic
         let bidder = tx_context::sender(ctx);
@@ -297,7 +290,7 @@ module typus_framework::dutch {
             i = i + 1;
         };
         if (i == length) {
-            abort bid_not_exists()
+            abort EBidNotExists
         };
         let Bid {
             index: _,
@@ -309,6 +302,7 @@ module typus_framework::dutch {
             fee_discount,
             ts_ms,
         } = big_vector::remove(&mut auction.bids, i);
+        auction.total_bid_size = auction.total_bid_size - size;
         transfer::public_transfer(
             coin::from_balance<TOKEN>(
                 balance::split(
@@ -351,9 +345,9 @@ module typus_framework::dutch {
         ctx: &mut TxContext,
     ): (Balance<TOKEN>, Balance<TOKEN>, u64, u64, u64, u64, u64, u64) {
         // safety check
-        assert!(clock::timestamp_ms(clock) >= auction.start_ts_ms, auction_not_yet_started());
-        assert!(early || clock::timestamp_ms(clock) >= auction.end_ts_ms, auction_not_yet_ended());
-        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
+        assert!(clock::timestamp_ms(clock) >= auction.start_ts_ms, EAuctionNotYetStarted);
+        assert!(early || clock::timestamp_ms(clock) >= auction.end_ts_ms, EAuctionNotYetEnded);
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), EInvalidToken);
 
         // main logic
         let Auction {
@@ -437,7 +431,7 @@ module typus_framework::dutch {
                 balance::join(&mut refund_balance, balance);
             };
         };
-        if (!vector::is_empty(&refund_users) || !vector::is_empty(&refund_shares) || balance::value(&refund_balance) != 0) {
+        if (balance::value(&refund_balance) != 0) {
             vault::put_refunds<TOKEN>(
                 refund_vault,
                 refund_balance,
@@ -446,138 +440,6 @@ module typus_framework::dutch {
             );
         } else {
             balance::destroy_zero(refund_balance);
-        };
-        // extract balance
-        let mut incentive_refund: Balance<TOKEN> = dynamic_field::remove(&mut id, K_INCENTIVE_BALANCE);
-        let mut fee_balance = balance::split(&mut premium_balance, total_bidder_fee);
-        let total_bidder_bid_value = balance::value(&premium_balance);
-        balance::join(&mut fee_balance, balance::split(&mut incentive_refund, total_incentive_fee));
-        balance_pool::put(fee_pool, fee_balance);
-        balance::join(&mut premium_balance, balance::split(&mut incentive_refund, total_incentive_bid_value));
-        // destruct auction
-        object::delete(id);
-        big_vector::destroy_empty(bids);
-
-        // emit event
-        emit(Delivery {
-            signer: tx_context::sender(ctx),
-            index,
-            token: type_name::with_defining_ids<TOKEN>(),
-            price,
-            size: total_bid_size,
-            bidder_bid_value: total_bidder_bid_value,
-            bidder_fee: total_bidder_fee,
-            incentive_bid_value: total_incentive_bid_value,
-            incentive_fee: total_incentive_fee,
-        });
-
-        (
-            premium_balance,
-            incentive_refund,
-            price,
-            total_bid_size,
-            total_bidder_bid_value,
-            total_bidder_fee,
-            total_incentive_bid_value,
-            total_incentive_fee,
-        )
-    }
-
-    /// An older version of the delivery function.
-    /// WARNING: mut inputs without authority check inside
-    public fun old_delivery<TOKEN>(
-        fee_pool: &mut BalancePool,
-        refund_vault: &mut RefundVault,
-        auction: Auction,
-        early: bool,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): (Balance<TOKEN>, Balance<TOKEN>, u64, u64, u64, u64, u64, u64) {
-        // safety check
-        assert!(clock::timestamp_ms(clock) >= auction.start_ts_ms, auction_not_yet_started());
-        assert!(early || clock::timestamp_ms(clock) >= auction.end_ts_ms, auction_not_yet_ended());
-        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
-
-        // main logic
-        let Auction {
-            mut id,
-            index,
-            token: _,
-            start_ts_ms: _,
-            end_ts_ms: _,
-            size,
-            decay_speed: _,
-            initial_price: _,
-            final_price,
-            fee_bp,
-            incentive_bp,
-            token_decimal,
-            size_decimal,
-            total_bid_size,
-            able_to_remove_bid: _,
-            mut bids,
-            bid_index: _,
-        } = auction;
-        let mut total_incentive_bid_value = 0;
-        let mut total_incentive_fee = 0;
-        let mut total_bidder_fee = 0;
-        let price = if (total_bid_size < size) {
-            final_price
-        } else {
-            big_vector::borrow(&bids, big_vector::length(&bids) - 1).price
-        };
-        let mut premium_balance = dynamic_field::remove(&mut id, K_BIDDER_BALANCE);
-        while (!big_vector::is_empty(&bids)) {
-            // get market maker bid and fund
-            let Bid {
-                index: _,
-                bidder,
-                price: _,
-                size,
-                mut bidder_balance,
-                mut incentive_balance,
-                fee_discount,
-                ts_ms: _,
-            } = big_vector::pop_back(&mut bids);
-            let (mut bid_value, mut fee) = calculate_bid_value(
-                fee_bp,
-                token_decimal,
-                size_decimal,
-                price,
-                size,
-                fee_discount,
-            );
-            let mut incentive_bid_value = ((bid_value as u128)
-                                        * (incentive_bp as u128)
-                                            / (10000 as u128) as u64);
-            let mut incentive_fee = ((fee as u128)
-                                        * (incentive_bp as u128)
-                                            / (10000 as u128) as u64);
-            if (incentive_fee > incentive_balance) {
-                incentive_fee = incentive_balance;
-            };
-            total_incentive_fee = total_incentive_fee + incentive_fee;
-            incentive_balance = incentive_balance - incentive_fee;
-            fee = fee - incentive_fee;
-            if (incentive_bid_value > incentive_balance) {
-                incentive_bid_value = incentive_balance;
-            };
-            total_incentive_bid_value = total_incentive_bid_value + incentive_bid_value;
-            bid_value = bid_value - incentive_bid_value;
-            // balance
-            if (fee > bidder_balance) {
-                fee = bidder_balance;
-            };
-            total_bidder_fee = total_bidder_fee + fee;
-            bidder_balance = bidder_balance - fee;
-            if (bid_value < bidder_balance) {
-                let balance = balance::split(&mut premium_balance, bidder_balance - bid_value);
-                vault::put_refund<TOKEN>(
-                    refund_vault,
-                    balance,
-                    bidder,
-                );
-            };
         };
         // extract balance
         let mut incentive_refund: Balance<TOKEN> = dynamic_field::remove(&mut id, K_INCENTIVE_BALANCE);
@@ -634,10 +496,10 @@ module typus_framework::dutch {
     ) {
         // main logic
         let ts_ms = clock::timestamp_ms(clock);
-        assert!(ts_ms < auction.start_ts_ms, auction_already_started());
-        assert!(end_ts_ms >= start_ts_ms, invalid_time_period());
-        assert!(decay_speed > 0, invalid_decay_speed());
-        assert!(initial_price >= final_price && final_price > 0, invalid_auction_price());
+        assert!(ts_ms < auction.start_ts_ms, EAuctionAlreadyStarted);
+        assert!(end_ts_ms >= start_ts_ms, EInvalidTimePeriod);
+        assert!(decay_speed > 0, EInvalidDecaySpeed);
+        assert!(initial_price >= final_price && final_price > 0, EInvalidAuctionPrice);
         let prev_start_ts_ms = auction.start_ts_ms;
         let prev_end_ts_ms = auction.end_ts_ms;
         let prev_decay_speed = auction.decay_speed;
@@ -694,7 +556,7 @@ module typus_framework::dutch {
         ctx: &TxContext,
     ): Balance<TOKEN> {
         // safety check
-        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), invalid_token());
+        assert!(auction.token == type_name::with_defining_ids<TOKEN>(), EInvalidToken);
 
         // main logic
         let Auction {
@@ -1018,21 +880,60 @@ module typus_framework::dutch {
         token: TypeName,
     }
 
-    // ======== Errors ========
+    #[test]
+    fun test_init() {
+        let mut scenario = test_scenario::begin(@0xABCD);
+        init(DUTCH {}, scenario.ctx());
+        scenario.end();
+    }
 
-    fun invalid_time_period(): u64 { abort 0 }
-    fun invalid_size(): u64 { abort 0 }
-    fun invalid_decay_speed(): u64 { abort 0 }
-    fun invalid_auction_price(): u64 { abort 0 }
-    fun invalid_token(): u64 { abort 0 }
-    fun max_size_reached(): u64 { abort 0 }
-    fun zero_size(): u64 { abort 0 }
-    fun bid_not_exists(): u64 { abort 0 }
-    fun auction_not_yet_started(): u64 { abort 0 }
-    fun auction_already_started(): u64 { abort 0 }
-    fun auction_not_yet_ended(): u64 { abort 0 }
-    fun auction_closed(): u64 { abort 0 }
-    fun invalid_bid_value(): u64 { abort 0 }
-    fun remove_bid_disabled(): u64 { abort 0 }
-    fun deprecated(): u64 { abort 0 }
+    #[deprecated]
+    public fun public_new_bid<TOKEN>(
+        _bidder: address,
+        _auction: &mut Auction,
+        _size: u64,
+        _coins: vector<Coin<TOKEN>>,
+        _incentive_balance: Balance<TOKEN>,
+        _fee_discount: u64,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ): (u64, u64, u64, u64, u64, u64, address, Coin<TOKEN>) {
+        abort EDeprecated
+    }
+    #[deprecated]
+    public fun new_bid_v2<TOKEN>(
+        _refund_vault: &mut RefundVault,
+        _auction: &mut Auction,
+        _size: u64,
+        _coins: vector<Coin<TOKEN>>,
+        _incentive_balance: Balance<TOKEN>,
+        _fee_discount: u64,
+        _clock: &Clock,
+        _ctx: &TxContext,
+    ): (u64, u64, u64, u64, u64, u64, address) {
+        abort EDeprecated
+    }
+    #[deprecated]
+    public fun new_bid<TOKEN>(
+        _auction: &mut Auction,
+        _size: u64,
+        _coins: vector<Coin<TOKEN>>,
+        _incentive_balance: Balance<TOKEN>,
+        _fee_discount: u64,
+        _clock: &Clock,
+        _ctx: &TxContext,
+    ): (u64, u64, u64, u64, u64, u64, address) {
+        abort EDeprecated
+    }
+    #[deprecated]
+    public fun old_delivery<TOKEN>(
+        _fee_pool: &mut BalancePool,
+        _refund_vault: &mut RefundVault,
+        _auction: Auction,
+        _early: bool,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ): (Balance<TOKEN>, Balance<TOKEN>, u64, u64, u64, u64, u64, u64) {
+        abort EDeprecated
+    }
 }
