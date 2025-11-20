@@ -1,13 +1,13 @@
 [package]
 name = "typus_framework"
-published-at = "0x708bf175f5a6f365dae45ff7684eb27e0597dcd0f142ba1999587825091c134f"
+version = "1.0.0"
+published-at = "0x8b009ac14a8401a270ba4e52341f0d141acc690d0cd82fd66a0c632ad64af22c"
 edition = "2024.alpha"
 
 [dependencies.Pyth]
 git = "https://github.com/Typus-Lab/pyth-crosschain.git"
 subdir = "target_chains/sui/contracts"
 rev = "main"
-override = true
 
 [dependencies.ScallopProtocol]
 git = "https://github.com/Typus-Lab/sui-lending-protocol.git"
