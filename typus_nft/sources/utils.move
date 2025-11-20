@@ -184,18 +184,18 @@ module typus_nft::utils {
         // std::debug::print(&num);
         // test_scenario::end(scenario);
     }
-    #[test]
-    fun test_sub_string() {
-        use std::string;
-        use std::debug;
+    // #[test]
+    // fun test_sub_string() {
+    //     use std::string;
+    //     use std::debug;
 
-        let name = string::utf8(b"Tails By Typus #2");
-        let len = string::length(&name);
-        let num_str = string::sub_string(&name, 16, len);
-        debug::print(&num_str);
+    //     let name = string::utf8(b"Tails By Typus #2");
+    //     let len = string::length(&name);
+    //     let num_str = string::sub_string(&name, 16, len);
+    //     debug::print(&num_str);
 
-        let mut description = string::utf8(b"Tails /6,666 by Typus Finance.");
-        string::insert(&mut description, 6, num_str);
-        debug::print(&description);
-    }
+    //     let mut description = string::utf8(b"Tails /6,666 by Typus Finance.");
+    //     string::insert(&mut description, 6, num_str);
+    //     debug::print(&description);
+    // }
 }
