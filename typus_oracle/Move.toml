@@ -1,13 +1,13 @@
 [package]
 name = "typus_oracle"
 edition = "2024.beta"
-version = "2.0.2"
+version = "1.0.0"
 published-at = "0xe684e3780fcb82a70c19937a1ef34b03db054dc0d8dc8f6f3980c3c42ae4b61b"
 
 [dependencies.Pyth]
 git = "https://github.com/Typus-Lab/pyth-crosschain.git"
 subdir = "target_chains/sui/contracts"
-rev = "sui-contract-mainnet"
+rev = "main"
 
 [dependencies.SupraOracle]
 git = "https://github.com/Typus-Lab/dora-interface.git"
