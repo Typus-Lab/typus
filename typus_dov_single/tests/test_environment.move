@@ -120,7 +120,7 @@ module typus_dov::test_environment {
 
     public(package) fun new_strategy_pool(scenario: &mut Scenario) {
         let registry = dov_registry(scenario);
-        auto_bid::new_strategy_pool(&registry, ctx(scenario));
+        // auto_bid::new_strategy_pool(&registry, ctx(scenario));
         return_shared(registry);
         next_tx(scenario, ADMIN);
     }

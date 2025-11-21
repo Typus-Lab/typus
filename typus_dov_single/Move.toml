@@ -1,7 +1,7 @@
 [package]
 name = "typus_dov"
-version = "1.0.0"
-published-at = "0x0e8ef99e05886d03e19b8f2dce7b7c637bcf3cdc156f9a10fdd9ffd8e0c6b531"
+version = "3.0.0"
+published-at = "0xbed073f6fac85eaef22076e1dc2320ebec6a1ad4642716752d2354d24c72b2a6"
 edition = "2024.alpha"
 
 [dependencies.typus_nft]
@@ -19,3 +19,5 @@ local = "../typus_framework"
 [addresses]
 typus_dov = "0x321848bf1ae327a9e022ccb3701940191e02fa193ab160d9c0e49cd3c003de3a"
 dov_fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
+
+# sui client upgrade --upgrade-capability 0xc9a11c34734c7742a7f10c62d2d8161c0e0fccb619f46a39367b2925408b4e4f --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt

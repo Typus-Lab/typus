@@ -10,13 +10,10 @@ module typus_dov::tds_authorized_entry {
     use protocol::market::Market;
     use protocol::version::Version;
 
-    use suilend::lending_market::{Self, LendingMarket};
-    use suilend::suilend::MAIN_POOL;
-
     use oracle::config::OracleConfig;
     use oracle::oracle::PriceOracle;
 
-    use typus_dov::typus_dov_single::{Self, Registry, Config, VaultConfig};
+    use typus_dov::typus_dov_single::{Self, Registry, Config, VaultConfig, Info};
     use typus_framework::authority;
     use typus_framework::dutch;
     use typus_framework::utils;
@@ -116,7 +113,7 @@ module typus_dov::tds_authorized_entry {
         lending_protocol: u64,
     }
     /// [Authorized Function] Sets the lending protocol flag.
-    public entry fun set_lending_protocol_flag(
+    public fun set_lending_protocol_flag(
         registry: &mut Registry,
         index: u64,
         lending_protocol: u64,
@@ -335,7 +332,7 @@ module typus_dov::tds_authorized_entry {
         current: VaultConfig,
     }
     /// [Authorized Function] Updates the warmup vault configuration.
-    public(package) entry fun update_warmup_vault_config(
+    public fun update_warmup_vault_config(
         registry: &mut Registry,
         index: u64,
         strike_pct: vector<u64>,
@@ -380,7 +377,7 @@ module typus_dov::tds_authorized_entry {
         vault_config: VaultConfig,
     }
     /// [Authorized Function] Updates the strike price based on the oracle price.
-    public(package) entry fun update_strike(
+    public fun update_strike(
         registry: &mut Registry,
         index: u64,
         oracle: &Oracle,
@@ -428,7 +425,7 @@ module typus_dov::tds_authorized_entry {
         able_to_remove_bid: bool,
     }
     /// [Authorized Function] Updates the auction configuration.
-    public(package) entry fun update_auction_config(
+    public fun update_auction_config(
         registry: &mut Registry,
         index: u64,
         start_ts_ms: u64,
@@ -481,7 +478,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Activates a vault.
-    public entry fun activate<D_TOKEN, B_TOKEN, I_TOKEN>(
+    public fun activate<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         oracle: &Oracle,
@@ -520,7 +517,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Creates a new auction.
-    public entry fun new_auction<D_TOKEN, B_TOKEN>(
+    public fun new_auction<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         auction_delay_ts_ms: Option<u64>,
@@ -552,7 +549,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Delivers the results of an auction.
-    public entry fun delivery<D_TOKEN, B_TOKEN, I_TOKEN>(
+    public fun delivery<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         early: bool,
@@ -579,7 +576,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Handles an over-the-counter deal.
-    public(package) entry fun otc<D_TOKEN, B_TOKEN>(
+    public fun otc<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         coins: vector<Coin<B_TOKEN>>,
@@ -735,7 +732,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Recoups funds after an auction.
-    public entry fun recoup<D_TOKEN, B_TOKEN>(
+    public fun recoup<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         clock: &Clock,
@@ -760,7 +757,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Settles a vault.
-    public entry fun settle<D_TOKEN, B_TOKEN>(
+    public fun settle<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         oracle: &Oracle,
@@ -807,7 +804,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Skips a round.
-    public(package) entry fun skip<D_TOKEN, B_TOKEN>(
+    public fun skip<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         clock: &Clock,
@@ -837,7 +834,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Closes a vault.
-    public(package) entry fun close<D_TOKEN, B_TOKEN>(
+    public fun close<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: &TxContext,
@@ -854,7 +851,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Resumes a vault.
-    public(package) entry fun resume<D_TOKEN, B_TOKEN>(
+    public fun resume<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: &TxContext,
@@ -872,7 +869,7 @@ module typus_dov::tds_authorized_entry {
 
 
     /// [Authorized Function] Terminates a vault.
-    public(package) entry fun terminate_vault<D_TOKEN, B_TOKEN>(
+    public fun terminate_vault<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: & TxContext,
@@ -889,7 +886,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Drops a vault.
-    public(package) entry fun drop_vault<D_TOKEN, B_TOKEN>(
+    public fun drop_vault<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: & TxContext,
@@ -906,7 +903,7 @@ module typus_dov::tds_authorized_entry {
     }
 
     /// [Authorized Function] Terminates an auction.
-    public(package) entry fun terminate_auction<D_TOKEN, B_TOKEN>(
+    public fun terminate_auction<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: & TxContext,
@@ -994,7 +991,7 @@ module typus_dov::tds_authorized_entry {
         fixed_incentive_amount: u64,
     }
     /// [Authorized Function] Adds fixed incentives to a vault.
-    public(package) entry fun fixed_incentivise<D_TOKEN, B_TOKEN, I_TOKEN>(
+    public fun fixed_incentivise<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         coin: Coin<I_TOKEN>,
@@ -1022,7 +1019,7 @@ module typus_dov::tds_authorized_entry {
     }
     /// [Authorized Function] Withdraws fixed incentives from a vault.
     #[lint_allow(self_transfer)]
-    public(package) entry fun withdraw_fixed_incentive<I_TOKEN>(
+    public fun withdraw_fixed_incentive<I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         fixed_incentive_amount: Option<u64>,
@@ -1063,7 +1060,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Deposits funds to Scallop for basic lending.
-    public entry fun deposit_scallop_basic_lending<D_TOKEN, B_TOKEN>(
+    public fun deposit_scallop_basic_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         version: &Version,
@@ -1098,7 +1095,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Withdraws funds from Scallop for basic lending.
-    public entry fun withdraw_scallop_basic_lending<D_TOKEN, B_TOKEN>(
+    public fun withdraw_scallop_basic_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         version: &Version,
@@ -1133,7 +1130,7 @@ module typus_dov::tds_authorized_entry {
         index: u64,
     }
     /// [Authorized Function] Enables additional lending for a vault.
-    public(package) entry fun enable_additional_lending<D_TOKEN, B_TOKEN>(
+    public fun enable_additional_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: & TxContext,
@@ -1156,7 +1153,7 @@ module typus_dov::tds_authorized_entry {
         index: u64,
     }
     /// [Authorized Function] Disables additional lending for a vault.
-    public(package) entry fun disable_additional_lending<D_TOKEN, B_TOKEN>(
+    public fun disable_additional_lending<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         ctx: & TxContext,
@@ -1208,7 +1205,7 @@ module typus_dov::tds_authorized_entry {
         obligation_owner_cap_id: address,
     }
     /// [Authorized Function] Creates a Suilend obligation owner cap.
-    // public(package) entry fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
+    // public fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
     //     registry: &mut Registry,
     //     index: u64,
     //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
@@ -1240,7 +1237,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Deposits funds to Suilend.
-    // public(package) entry fun deposit_suilend<D_TOKEN, B_TOKEN>(
+    // public fun deposit_suilend<D_TOKEN, B_TOKEN>(
     //     registry: &mut Registry,
     //     index: u64,
     //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
@@ -1269,7 +1266,7 @@ module typus_dov::tds_authorized_entry {
     // }
 
     /// [Authorized Function] Refreshes the reserve price in Suilend.
-    // public(package) entry fun refresh_suilend_reserve_price(
+    // public fun refresh_suilend_reserve_price(
     //     lending_market: &mut LendingMarket<MAIN_POOL>,
     //     reserve_array_index: u64,
     //     clock: &Clock,
@@ -1285,7 +1282,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Withdraws funds from Suilend.
-    // public(package) entry fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
+    // public fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
     //     registry: &mut Registry,
     //     index: u64,
     //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
@@ -1322,7 +1319,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Claims rewards from Suilend.
-    // public(package) entry fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
+    // public fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
     //     registry: &mut Registry,
     //     index: u64,
     //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
@@ -1359,7 +1356,7 @@ module typus_dov::tds_authorized_entry {
         account_cap_id: address,
     }
     /// [Authorized Function] Creates a Navi account cap.
-    public(package) entry fun create_navi_account_cap(
+    public fun create_navi_account_cap(
         registry: &mut Registry,
         index: u64,
         ctx: &mut TxContext,
@@ -1385,7 +1382,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Deposits funds to Navi.
-    public entry fun deposit_navi<D_TOKEN, B_TOKEN>(
+    public fun deposit_navi<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         storage: &mut lending_core::storage::Storage,
@@ -1425,8 +1422,26 @@ module typus_dov::tds_authorized_entry {
         index: u64,
         u64_padding: vector<u64>,
     }
-    /// [Authorized Function] Withdraws funds from Navi.
-    public entry fun withdraw_navi<D_TOKEN, B_TOKEN>(
+    #[deprecated, allow(unused_type_parameter)]
+    public fun withdraw_navi<D_TOKEN, B_TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _oracle_config: &mut OracleConfig,
+        _price_oracle: &mut PriceOracle,
+        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pyth_price_info: &pyth::price_info::PriceInfoObject,
+        _feed_address: address,
+        _storage: &mut lending_core::storage::Storage,
+        _pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        _asset: u8,
+        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        _clock: &Clock,
+        _ctx: &TxContext,
+    ) {
+        abort 0
+    }
+    public fun withdraw_navi_v2<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         oracle_config: &mut OracleConfig,
@@ -1440,7 +1455,7 @@ module typus_dov::tds_authorized_entry {
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
-        ctx: &TxContext,
+        ctx: &mut TxContext,
     ) {
         safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
 
@@ -1459,6 +1474,7 @@ module typus_dov::tds_authorized_entry {
             incentive_v2,
             incentive_v3,
             clock,
+            ctx,
         );
 
         // emit event
@@ -1532,7 +1548,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Borrows funds from Navi.
-    public entry fun borrow_navi<TOKEN>(
+    public fun borrow_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
         deposit_index: u64,
@@ -1587,7 +1603,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Unsubscribes from a Navi vault.
-    public entry fun unsubscribe_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+    public fun unsubscribe_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         deposit_index: u64,
@@ -1617,6 +1633,54 @@ module typus_dov::tds_authorized_entry {
         index: u64,
         u64_padding: vector<u64>,
     }
+    /// [Authorized Function] Repays the interest on a loan to Navi.
+    public fun repay_navi_interest<TOKEN, I_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        warmup_amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check_without_token(registry, index, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::repay_navi_interest_<TOKEN, I_TOKEN>(
+            registry,
+            index,
+            deposit_index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            warmup_amount,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(RepayNaviInterest {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
 
     /// Event emitted when collateral is deposited to Navi.
     public struct DepositCollateralNavi has copy, drop {
@@ -1625,7 +1689,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Deposits collateral to Navi.
-    public entry fun deposit_collateral_navi<TOKEN>(
+    public fun deposit_collateral_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
         storage: &mut lending_core::storage::Storage,
@@ -1668,7 +1732,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Withdraws collateral from Navi.
-    public entry fun withdraw_collateral_navi<TOKEN>(
+    public fun withdraw_collateral_navi<TOKEN>(
         registry: &mut Registry,
         index: u64,
         oracle_config: &mut OracleConfig,
@@ -1812,7 +1876,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public entry fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+    public fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
         registry: &mut Registry,
         index: u64,
         deposit_index: u64,
@@ -1831,5 +1895,40 @@ module typus_dov::tds_authorized_entry {
         ctx: &mut TxContext,
     ) {
         abort 0
+    }
+
+    public struct UpdateInfoEvent has copy, drop {
+        signer: address,
+        index: u64,
+        previous: Info,
+        current: Info,
+    }
+
+    entry fun update_info(
+        registry: &mut Registry,
+        index: u64,
+        status: Option<u64>,
+        oracle_price: Option<u64>,
+        settlement_price: Option<u64>,
+        ctx: &TxContext,
+    ) {
+        safety_check_without_token(registry, index, ctx);
+
+        // main logic
+        let (previous, current) = typus_dov_single::update_info_(
+            registry,
+            index,
+            status,
+            oracle_price,
+            settlement_price,
+        );
+
+        // emit event
+        emit(UpdateInfoEvent {
+            signer: tx_context::sender(ctx),
+            index,
+            previous,
+            current,
+        });
     }
 }

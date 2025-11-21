@@ -52,7 +52,7 @@ module typus_dov::typus_dov_single {
 
     // ======== Constants ========
 
-    const C_VERSION: u64 = 28;
+    const C_VERSION: u64 = 30;
     const C_LEVERAGE_DECIMAL: u64 = 2;
     const C_SHARE_PRICE_DECIMAL: u64 = 8;
     const C_U64_MAX: u64 = 18446744073709551615;
@@ -991,6 +991,7 @@ module typus_dov::typus_dov_single {
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
+        ctx: &TxContext,
     ): vector<u64> {
         if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
             dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
@@ -2165,6 +2166,33 @@ module typus_dov::typus_dov_single {
         assert!(settlement_base == portfolio_vault.info.settlement_base, 0);
         portfolio_vault.info.settlement_quote = settlement_quote;
         portfolio_vault.info.settlement_quote_name = string::from_ascii(settlement_quote_name);
+    }
+
+    public(package) fun update_info_(
+        registry: &mut Registry,
+        index: u64,
+        status: Option<u64>,
+        oracle_price: Option<u64>,
+        settlement_price: Option<u64>,
+    ): (Info, Info) {
+        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
+
+        let previous = portfolio_vault.info;
+
+        if (option::is_some(&status)) {
+            portfolio_vault.info.status = option::destroy_some(status);
+        };
+        if (option::is_some(&oracle_price)) {
+            let price = option::destroy_some(oracle_price);
+            portfolio_vault.info.oracle_info.price = price;
+        };
+        if (option::is_some(&settlement_price)) {
+            let price = option::destroy_some(settlement_price);
+            let settlement_info: &mut SettlementInfo = option::borrow_mut(&mut portfolio_vault.info.settlement_info);
+            settlement_info.oracle_price = price;
+        };
+
+        (previous, portfolio_vault.info)
     }
 
     /// Updates the general configuration of a vault. Allows for partial updates.

@@ -787,7 +787,7 @@ module typus_dov::test_manager_entry {
         let mut clock = test_environment::new_clock(scenario);
         test_environment::update_clock(&mut clock, ts_ms);
 
-        tds_authorized_entry::withdraw_navi<D_TOKEN, B_TOKEN>(
+        tds_authorized_entry::withdraw_navi_v2<D_TOKEN, B_TOKEN>(
             &mut registry,
             index,
             &mut oracle_config,
