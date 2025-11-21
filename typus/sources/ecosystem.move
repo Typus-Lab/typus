@@ -16,7 +16,7 @@ module typus::ecosystem {
     // ======== Constants ========
 
     /// The current version of the ecosystem.
-    const CVersion: u64 = 7;
+    const CVersion: u64 = 30;
 
     // ======== Error Code ========
 

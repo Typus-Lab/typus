@@ -1,7 +1,7 @@
 [package]
 name = "typus"
-version = "1.7.0"
-published-at = "0x916eaa4468870fac366464ca82dfc8e841a9c7f6df7e2922aae35240da71a733"
+version = "3.0.0"
+published-at = "0xb0abb4ebee8e864d6e41c55c81790b9adf6af6384ff4883011001ceab6c67081"
 edition = "2024.alpha"
 
 [dependencies.typus_nft]
@@ -10,3 +10,5 @@ local = "../typus_nft"
 [addresses]
 typus = "0x4b0f4ee1a40ce37ec81c987cc4e76a665419e74b863319492fc7d26f708b835a"
 fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
+
+# sui client upgrade --upgrade-capability 0xe8a7bb2dac645a6f57ed6711dfcb4c109b5dcf24be6c5db63ab0915b3e9c036c --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt

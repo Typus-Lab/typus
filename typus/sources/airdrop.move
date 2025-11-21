@@ -11,6 +11,7 @@ module typus::airdrop {
     use sui::coin::Coin;
     use sui::dynamic_field;
     use sui::event::emit;
+    use sui::table::{Self, Table};
 
     use typus::big_vector::{Self, BigVector};
     use typus::ecosystem::Version;
@@ -22,6 +23,9 @@ module typus::airdrop {
     const EInsufficientBalance: u64 = 0;
     /// Error for invalid input parameters.
     const EInvalidInput: u64 = 1;
+
+    const TotalValue: vector<u8> = b"total_value";
+    const ClaimedTable: vector<u8> = b"claimed_table";
 
     // ======== Typus Airdrop ========
 
@@ -39,6 +43,9 @@ module typus::airdrop {
         balance: Balance<TOKEN>,
         /// A big vector containing the list of `Airdrop` structs for each user.
         airdrops: BigVector,
+        // df:
+        //  total_value: u64,
+        //  claimed_table: Table<address, u64>,
     }
 
     /// Represents a single airdrop for a user.
@@ -108,6 +115,19 @@ module typus::airdrop {
             );
         };
 
+        if (dynamic_field::exists_(& airdrop_info.id, TotalValue.to_string())) {
+            let v: &mut u64 = dynamic_field::borrow_mut(&mut airdrop_info.id, TotalValue.to_string());
+            *v = total_value;
+        } else {
+            dynamic_field::add(&mut airdrop_info.id, TotalValue.to_string(), total_value);
+        };
+
+        if (!dynamic_field::exists_(& airdrop_info.id, ClaimedTable.to_string())) {
+            let claimed_table = table::new<address, u64>(ctx);
+            dynamic_field::add(&mut airdrop_info.id, ClaimedTable.to_string(), claimed_table);
+        };
+
+        // add insufficient balance from coins to airdrop_info.balance
         let airdrop_value = airdrop_info.balance.value();
         let mut spent_value = 0;
         if (airdrop_value < total_value) {
@@ -169,10 +189,20 @@ module typus::airdrop {
         version.verify(ctx);
 
         let AirdropInfo {
-            id,
+            mut id,
             balance,
             airdrops,
         } = dynamic_field::remove(&mut typus_airdrop_registry.id, key);
+
+        if (dynamic_field::exists_(& id, TotalValue.to_string())) {
+            let _: u64 = dynamic_field::remove(&mut id, TotalValue.to_string());
+        };
+
+        if (dynamic_field::exists_(& id, ClaimedTable.to_string())) {
+            let t: Table<address, u64> = dynamic_field::remove(&mut id, ClaimedTable.to_string());
+            t.drop();
+        };
+
         object::delete(id);
         big_vector::drop<Airdrop>(airdrops);
 
@@ -233,6 +263,18 @@ module typus::airdrop {
                     log: vector[airdrop.value],
                     bcs_padding: vector[],
                 });
+
+                // update claimed_table
+                if (dynamic_field::exists_(& airdrop_info.id, ClaimedTable.to_string())) {
+                    let claimed_table: &mut Table<address, u64> = dynamic_field::borrow_mut(&mut airdrop_info.id, ClaimedTable.to_string());
+                    if (claimed_table.contains(user)) {
+                        let claimed = claimed_table.borrow_mut(user);
+                        *claimed = *claimed + airdrop.value;
+                    } else {
+                        claimed_table.add(user, airdrop.value);
+                    };
+                };
+
                 airdrop.value = 0;
                 return option::some(balance)
             };
@@ -275,6 +317,18 @@ module typus::airdrop {
                 log: vector[airdrop.value],
                 bcs_padding: vector[],
             });
+
+            // update claimed_table
+            if (dynamic_field::exists_(& airdrop_info.id, ClaimedTable.to_string())) {
+                let claimed_table: &mut Table<address, u64> = dynamic_field::borrow_mut(&mut airdrop_info.id, ClaimedTable.to_string());
+                if (claimed_table.contains(user)) {
+                    let claimed = claimed_table.borrow_mut(user);
+                    *claimed = *claimed + airdrop.value;
+                } else {
+                    claimed_table.add(user, airdrop.value);
+                };
+            };
+
             airdrop.value = 0;
             return option::some(balance)
         };
@@ -297,6 +351,12 @@ module typus::airdrop {
             abort EInvalidInput
         };
         let airdrop_info = dynamic_field::borrow<String, AirdropInfo<TOKEN>>(&typus_airdrop_registry.id, key);
+
+        let mut total_value = 0;
+        if (dynamic_field::exists_(& airdrop_info.id, TotalValue.to_string())) {
+            total_value = *dynamic_field::borrow(& airdrop_info.id, TotalValue.to_string());
+        };
+
         let length = airdrop_info.airdrops.length();
         let slice_size = (airdrop_info.airdrops.slice_size() as u64);
         let mut slice_idx = 0;
@@ -306,7 +366,16 @@ module typus::airdrop {
         while (i < length) {
             let airdrop: &Airdrop = &slice[i % slice_size];
             if (airdrop.user == user) {
-                return vector[i, airdrop.value]
+                // get claimed_table
+                let mut claimed = 0;
+                if (dynamic_field::exists_(& airdrop_info.id, ClaimedTable.to_string())) {
+                    let claimed_table: & Table<address, u64> = dynamic_field::borrow(&airdrop_info.id, ClaimedTable.to_string());
+                    if (claimed_table.contains(user)) {
+                        claimed = *claimed_table.borrow(user);
+                    };
+                };
+
+                return vector[i, airdrop.value, claimed, total_value]
             };
             // jump to next slice
             if (i + 1 < length && i + 1 == slice_idx * slice_size + slice_length) {
@@ -317,6 +386,6 @@ module typus::airdrop {
             i = i + 1;
         };
 
-        vector[0, 0]
+        vector[0, 0, 0, total_value]
     }
 }
