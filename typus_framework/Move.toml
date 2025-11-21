@@ -1,7 +1,7 @@
 [package]
 name = "typus_framework"
-version = "1.0.0"
-published-at = "0x8b009ac14a8401a270ba4e52341f0d141acc690d0cd82fd66a0c632ad64af22c"
+version = "3.0.0"
+published-at = "0x34886772abd15f2cf42f996605e2fc864c36df0de7dc1d700f628c75ed714508"
 edition = "2024.alpha"
 
 [dependencies.Pyth]
@@ -39,3 +39,6 @@ local = "../dependency/scallop/spool"
 
 [addresses]
 typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"
+
+# sui client upgrade --upgrade-capability 0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --skip-dependency-verification --serialize-unsigned-transaction > data.txt
+
