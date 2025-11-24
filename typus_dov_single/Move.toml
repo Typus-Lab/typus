@@ -1,17 +1,23 @@
 [package]
 name = "typus_dov"
-version = "3.0.0"
-published-at = "0xbed073f6fac85eaef22076e1dc2320ebec6a1ad4642716752d2354d24c72b2a6"
+version = "3.0.1"
+published-at = "0x91235d393df2d32482897c6c7fef19e81f8a2918229f16d7711a4ad18367d0cf"
 edition = "2024.alpha"
 
 [dependencies.typus_nft]
-local = "../typus_nft"
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus_nft"
+rev = "main"
 
 [dependencies.typus_oracle]
-local = "../typus_oracle"
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus_oracle"
+rev = "main"
 
 [dependencies.typus]
-local = "../typus"
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus"
+rev = "main"
 
 [dependencies.typus_framework]
 local = "../typus_framework"
