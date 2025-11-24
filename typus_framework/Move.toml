@@ -1,7 +1,7 @@
 [package]
 name = "typus_framework"
-version = "3.0.0"
-published-at = "0x34886772abd15f2cf42f996605e2fc864c36df0de7dc1d700f628c75ed714508"
+version = "3.0.1"
+published-at = "0xdc0794d74ea9fa1b0439e3ae1f72b061431830649874843e26a15d5b9862f54e"
 edition = "2024.alpha"
 
 [dependencies.Pyth]
@@ -35,7 +35,9 @@ subdir = "oracle"
 rev = "main"
 
 [dependencies.spool]
-local = "../dependency/scallop/spool"
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "dependency/scallop/spool"
+rev = "main"
 
 [addresses]
 typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"
