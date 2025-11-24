@@ -3,8 +3,10 @@ name = "typus_nft"
 published-at = "0x153ead7b2ccad1483458d41f0daffa35965d89960d1024a4883ba52fb18332b3"
 edition = "2024.alpha"
 
-[dependencies]
-Kiosk = { local = "../dependency/kiosk" }
+[dependencies.Kiosk]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "dependency/kiosk"
+rev = "main"
 
 
 [addresses]
