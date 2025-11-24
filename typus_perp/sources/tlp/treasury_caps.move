@@ -4,6 +4,8 @@ module typus_perp::treasury_caps {
     use sui::coin::TreasuryCap;
     use sui::dynamic_object_field;
 
+    use typus_perp::admin::{Self, Version};
+
     /// A shared object that stores the treasury caps for the TLP tokens.
     public struct TreasuryCaps has key, store {
         id: UID
@@ -33,6 +35,16 @@ module typus_perp::treasury_caps {
     #[test_only]
     public(package) fun remove_treasury_cap<TOKEN>(treasury_caps: &mut TreasuryCaps): TreasuryCap<TOKEN> {
         dynamic_object_field::remove<TypeName, TreasuryCap<TOKEN>>(&mut treasury_caps.id, type_name::with_defining_ids<TOKEN>())
+    }
+
+    public fun manager_store_treasury_cap<TOKEN>(
+        version: &Version,
+        treasury_caps: &mut TreasuryCaps,
+        treasury_cap: TreasuryCap<TOKEN>,
+        ctx: &TxContext,
+    ) {
+        admin::verify(version, ctx);
+        dynamic_object_field::add(&mut treasury_caps.id, type_name::with_defining_ids<TOKEN>(), treasury_cap);
     }
 
     #[test_only]
