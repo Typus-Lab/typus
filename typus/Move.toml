@@ -5,7 +5,9 @@ published-at = "0xb0abb4ebee8e864d6e41c55c81790b9adf6af6384ff4883011001ceab6c670
 edition = "2024.alpha"
 
 [dependencies.typus_nft]
-local = "../typus_nft"
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus_nft"
+rev = "main"
 
 [addresses]
 typus = "0x4b0f4ee1a40ce37ec81c987cc4e76a665419e74b863319492fc7d26f708b835a"
