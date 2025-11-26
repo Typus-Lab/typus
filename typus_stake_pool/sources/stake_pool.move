@@ -8,7 +8,6 @@ module typus_stake_pool::stake_pool {
     use sui::coin::{Self, Coin};
     use sui::dynamic_field;
     use sui::dynamic_object_field;
-    use sui::table::{Table};
     use sui::vec_map::{Self, VecMap};
     use sui::event::emit;
 
@@ -22,7 +21,6 @@ module typus_stake_pool::stake_pool {
     const C_INCENTIVE_INDEX_DECIMAL: u64 = 9;
 
     // ======== Keys ========
-    const K_LP_USER_SHARES: vector<u8> = b"lp_user_shares";
     const K_LP_USER_SHARES_V2: vector<u8> = b"lp_user_shares_v2";
     const K_STAKED_TLP: vector<u8> = b"staked_tlp";
 
@@ -81,7 +79,11 @@ module typus_stake_pool::stake_pool {
         total_share: u64, // = total staked and has not been unsubscribed
         /// Whether the pool is active.
         active: bool,
-        /// Padding for future use. [new_tlp_price (decimal 4), usd_per_exp, depositors_count]
+        /// tlp price (decimal 4)
+        new_tlp_price: u64,
+        /// number of depositor
+        depositors_count: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
@@ -89,6 +91,8 @@ module typus_stake_pool::stake_pool {
     public struct StakePoolConfig has copy, drop, store {
         /// The unlock countdown in milliseconds.
         unlock_countdown_ts_ms: u64,
+        /// for exp calculation
+        usd_per_exp: u64,
         /// Padding for future use.
         u64_padding: vector<u64>,
     }
@@ -133,7 +137,13 @@ module typus_stake_pool::stake_pool {
         deactivating_shares: vector<DeactivatingShares>,
         /// The last incentive price index.
         last_incentive_price_index: VecMap<TypeName, u64>,
-        /// Padding for future use. [snapshot_ts_ms, old_tlp_price (decimal 4), is_auto_compound(deprecated), harvested_amount]
+        /// The last snapshot ts for exp.
+        snapshot_ts_ms: u64,
+        /// old tlp price  for exp with decimal 4
+        tlp_price: u64,
+        /// accumulated harvested amount
+        harvested_amount: u64,
+        /// Padding for future use.
         u64_padding: vector<u64>,
     }
 
@@ -198,10 +208,13 @@ module typus_stake_pool::stake_pool {
                 next_user_share_id: 0,
                 total_share: 0,
                 active: true,
+                new_tlp_price: 10000,
+                depositors_count: 0,
                 u64_padding: vector::empty()
             },
             config: StakePoolConfig {
                 unlock_countdown_ts_ms,
+                usd_per_exp: 200,
                 u64_padding: vector::empty()
             },
             incentives: vector::empty(),
@@ -218,102 +231,6 @@ module typus_stake_pool::stake_pool {
         dynamic_object_field::add(&mut registry.id, registry.num_pool, stake_pool);
         registry.num_pool = registry.num_pool + 1;
     }
-
-    /// [Authorized Function] Migrates to staked TLP.
-    // entry fun migrate_to_staked_tlp<TOKEN>(
-    //     version: &Version,
-    //     registry: &mut StakePoolRegistry,
-    //     index: u64,
-    //     ctx: &TxContext
-    // ) {
-    //     // safety check
-    //     admin::verify(version, ctx);
-
-    //     let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-    //     assert!(type_name::with_defining_ids<TOKEN>() == stake_pool.pool_info.stake_token, E_TOKEN_TYPE_MISMATCHED);
-    //     let balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(&mut stake_pool.id, type_name::with_defining_ids<TOKEN>());
-    //     dynamic_field::add(&mut stake_pool.id, string::utf8(K_STAKED_TLP), balance);
-    // }
-
-    /// [Authorized Function]
-    // entry fun add_lp_user_shares_v2(
-    //     version: &Version,
-    //     registry: &mut StakePoolRegistry,
-    //     index: u64,
-    //     ctx: &mut TxContext
-    // ) {
-    //     // safety check
-    //     admin::verify(version, ctx);
-    //     let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-    //     dynamic_field::add(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2), keyed_big_vector::new<address, LpUserShare>(1000, ctx));
-    // }
-
-    /// [Authorized Function]
-    // entry fun migrate_lp_user_shares_v2(
-    //     version: &Version,
-    //     registry: &mut StakePoolRegistry,
-    //     index: u64,
-    //     user: address,
-    //     ctx: & TxContext
-    // ) {
-    //     // safety check
-    //     admin::verify(version, ctx);
-
-    //     let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-    //     let all_lp_user_shares = dynamic_field::borrow_mut<String, Table<address, vector<LpUserShare>>>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
-    //     let user_shares = all_lp_user_shares.borrow_mut(user);
-
-    //     let mut user_share = user_shares.pop_back();
-
-    //     // if more than 1
-    //     while (vector::length(user_shares) > 0) {
-
-    //         let user_share2 = user_shares.pop_back();
-
-    //         let LpUserShare {
-    //             user: _,
-    //             user_share_id: _,
-    //             stake_ts_ms: _,
-    //             total_shares,
-    //             active_shares,
-    //             deactivating_shares,
-    //             last_incentive_price_index: _,
-    //             u64_padding: _,
-    //         } = user_share2;
-
-    //         user_share.total_shares = user_share.total_shares + total_shares;
-    //         user_share.active_shares = user_share.active_shares + active_shares;
-    //         user_share.deactivating_shares.append(deactivating_shares);
-    //     };
-
-    //     if (user_shares.length() == 0) {
-    //         let shares = all_lp_user_shares.remove(user);
-    //         shares.destroy_empty();
-    //     };
-
-    //     // add to v2
-    //     let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-    //     user_shares_v2.push_back(user, user_share);
-    // }
-
-
-    /// [Authorized Function]
-    // entry fun remove_lp_user_shares_v1(
-    //     version: &Version,
-    //     registry: &mut StakePoolRegistry,
-    //     index: u64,
-    //     ctx: & TxContext
-    // ) {
-    //     // safety check
-    //     admin::verify(version, ctx);
-    //     let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-    //     let all_lp_user_shares = dynamic_field::remove<String, Table<address, vector<LpUserShare>>>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
-    //     all_lp_user_shares.destroy_empty();
-
-    //     let user_shares_v2 = dynamic_field::borrow<String, KeyedBigVector>(& stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-    //     let depositors_count = user_shares_v2.length();
-    //     stake_pool.pool_info.u64_padding.push_back(depositors_count);
-    // }
 
     public struct AutoCompoundEvent has copy, drop {
         sender: address,
@@ -787,7 +704,6 @@ module typus_stake_pool::stake_pool {
         registry: &mut StakePoolRegistry,
         index: u64,
         lp_token: Coin<LP_TOKEN>,
-        _user_share_id: Option<u64>, // deprecated
         clock: &Clock,
         ctx: &TxContext,
     ) {
@@ -807,7 +723,7 @@ module typus_stake_pool::stake_pool {
         balance::join(dynamic_field::borrow_mut(&mut stake_pool.id, string::utf8(K_STAKED_TLP)), balance);
 
         let current_ts_ms = clock::timestamp_ms(clock);
-        let new_tlp_price = stake_pool.pool_info.u64_padding[0];
+        let new_tlp_price = stake_pool.pool_info.new_tlp_price;
 
         let last_incentive_price_index = get_last_incentive_price_index(stake_pool);
 
@@ -819,7 +735,7 @@ module typus_stake_pool::stake_pool {
 
             let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
             lp_user_share.stake_ts_ms = current_ts_ms;
-            assert!(lp_user_share.u64_padding[0] == current_ts_ms, E_TIMESTAMP_MISMATCHED);
+            assert!(lp_user_share.snapshot_ts_ms == current_ts_ms, E_TIMESTAMP_MISMATCHED); // check snapshot already
             lp_user_share.total_shares = lp_user_share.total_shares + balance_value;
             lp_user_share.active_shares = lp_user_share.active_shares + balance_value;
 
@@ -842,7 +758,10 @@ module typus_stake_pool::stake_pool {
                 active_shares: balance_value,
                 deactivating_shares: vector::empty(),
                 last_incentive_price_index,
-                u64_padding: vector[current_ts_ms, new_tlp_price, 0, 0],
+                snapshot_ts_ms: current_ts_ms,
+                tlp_price: new_tlp_price,
+                harvested_amount: 0,
+                u64_padding: vector[],
             };
             stake_pool.pool_info.next_user_share_id = stake_pool.pool_info.next_user_share_id + 1;
 
@@ -859,9 +778,7 @@ module typus_stake_pool::stake_pool {
             user_shares_v2.push_back(user, lp_user_share);
         };
 
-        let depositors_count = user_shares_v2.length();
-        *vector::borrow_mut(&mut stake_pool.pool_info.u64_padding, 2) = depositors_count;
-
+        stake_pool.pool_info.depositors_count = user_shares_v2.length();
         stake_pool.pool_info.total_share = stake_pool.pool_info.total_share + balance_value;
     }
 
@@ -884,36 +801,13 @@ module typus_stake_pool::stake_pool {
         admin::verify(version, ctx);
 
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        *vector::borrow_mut(&mut stake_pool.pool_info.u64_padding, 0) = tlp_price;
-        *vector::borrow_mut(&mut stake_pool.pool_info.u64_padding, 1) = usd_per_exp;
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        *vector::borrow_mut(&mut stake_pool.pool_info.u64_padding, 2) = user_shares_v2.length();
+        stake_pool.pool_info.new_tlp_price = tlp_price;
+        stake_pool.config.usd_per_exp = usd_per_exp;
 
         emit(UpdatePoolInfoU64PaddingEvent {
             sender: tx_context::sender(ctx),
             index,
-            u64_padding: stake_pool.pool_info.u64_padding
-        })
-    }
-
-    /// [Authorized Function] Update TLP price for calculating staking exp
-    entry fun hotfix_pool_info_u64_padding(
-        version: &Version,
-        registry: &mut StakePoolRegistry,
-        index: u64,
-        u64_padding: vector<u64>,
-        ctx: &TxContext,
-    ) {
-        // safety check auth
-        admin::verify(version, ctx);
-
-        let stake_pool = get_mut_stake_pool(&mut registry.id, index);
-        stake_pool.pool_info.u64_padding = u64_padding;
-
-        emit(UpdatePoolInfoU64PaddingEvent {
-            sender: tx_context::sender(ctx),
-            index,
-            u64_padding: stake_pool.pool_info.u64_padding
+            u64_padding: vector[tlp_price, usd_per_exp]
         })
     }
 
@@ -936,7 +830,6 @@ module typus_stake_pool::stake_pool {
         typus_ecosystem_version: &TypusEcosystemVersion,
         typus_user_registry: &mut TypusUserRegistry,
         index: u64,
-        _user_share_id: u64, // deprecated
         clock: &Clock,
         ctx: &TxContext,
     ) {
@@ -946,29 +839,25 @@ module typus_stake_pool::stake_pool {
         let user = tx_context::sender(ctx);
         let stake_pool = get_mut_stake_pool(&mut registry.id, index);
 
-        let new_tlp_price = stake_pool.pool_info.u64_padding[0];
+        let new_tlp_price = stake_pool.pool_info.new_tlp_price;
 
         let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
         let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
 
-        if (lp_user_share.u64_padding.length() == 0) {
-            lp_user_share.u64_padding = vector[lp_user_share.stake_ts_ms, new_tlp_price];
-        };
-
         let shares = lp_user_share.active_shares;
-        let last_ts_ms = lp_user_share.u64_padding[0];
-        let old_tlp_price = lp_user_share.u64_padding[1];
+        let last_ts_ms = lp_user_share.snapshot_ts_ms;
+        let old_tlp_price = lp_user_share.tlp_price;
         let user_share_id = lp_user_share.user_share_id;
 
         let current_ts_ms = clock::timestamp_ms(clock);
         let minutes = (current_ts_ms - last_ts_ms) / 60_000;
 
-        let usd_per_exp = stake_pool.pool_info.u64_padding[1];
+        let usd_per_exp = stake_pool.config.usd_per_exp;
         let exp = ((shares as u256) * (old_tlp_price as u256) * (minutes as u256)
             / (multiplier(9 + 4) as u256) / ((60 * usd_per_exp) as u256) as u64);
         // snapshot_ts_ms ony update here
-        *vector::borrow_mut(&mut lp_user_share.u64_padding, 0) = current_ts_ms;
-        *vector::borrow_mut(&mut lp_user_share.u64_padding, 1) = new_tlp_price;
+        lp_user_share.snapshot_ts_ms = current_ts_ms;
+        lp_user_share.tlp_price = new_tlp_price;
 
         admin::add_tails_exp_amount(version, typus_ecosystem_version, typus_user_registry, user, exp);
         emit(SnapshotEvent {
@@ -1000,7 +889,6 @@ module typus_stake_pool::stake_pool {
         version: &Version,
         registry: &mut StakePoolRegistry,
         index: u64,
-        _user_share_id: u64, // deprecated
         mut unsubscribed_shares: Option<u64>,
         clock: &Clock,
         ctx: &TxContext,
@@ -1030,7 +918,7 @@ module typus_stake_pool::stake_pool {
         assert!(lp_user_share.active_shares >= unsubscribed_shares, E_ACTIVE_SHARES_NOT_ENOUGH);
 
         // check snapshot_ts_ms updated
-        assert!(lp_user_share.u64_padding[0] == current_ts_ms, E_TIMESTAMP_MISMATCHED);
+        assert!(lp_user_share.snapshot_ts_ms == current_ts_ms, E_TIMESTAMP_MISMATCHED); // check snapshot already
         lp_user_share.active_shares = lp_user_share.active_shares - unsubscribed_shares;
 
         let unlocked_ts_ms = current_ts_ms + stake_pool.config.unlock_countdown_ts_ms;
@@ -1071,7 +959,6 @@ module typus_stake_pool::stake_pool {
         version: &Version,
         registry: &mut StakePoolRegistry,
         index: u64,
-        _user_share_id: u64, // deprecated
         clock: &Clock,
         ctx: &mut TxContext,
     ): Coin<LP_TOKEN> {
@@ -1113,7 +1000,7 @@ module typus_stake_pool::stake_pool {
             };
         };
 
-        assert!(lp_user_share.u64_padding[0] == current_ts_ms, E_TIMESTAMP_MISMATCHED);
+        assert!(lp_user_share.snapshot_ts_ms == current_ts_ms, E_TIMESTAMP_MISMATCHED); // check snapshot already
         lp_user_share.total_shares = lp_user_share.total_shares - temp_unstaked_shares;
 
         if (
@@ -1130,6 +1017,9 @@ module typus_stake_pool::stake_pool {
                 active_shares: _,
                 deactivating_shares,
                 last_incentive_price_index: _,
+                snapshot_ts_ms: _,
+                tlp_price: _,
+                harvested_amount: _,
                 u64_padding: _,
             } = lp_user_share;
             deactivating_shares.destroy_empty();
@@ -1168,12 +1058,7 @@ module typus_stake_pool::stake_pool {
     }
 
     fun log_harvested_amount(user_share: &mut LpUserShare, incentive_value: u64) {
-        if (user_share.u64_padding.length() == 2) {
-            user_share.u64_padding.append(vector[0, incentive_value]);
-        } else if (user_share.u64_padding.length() == 4) {
-            let v = user_share.u64_padding.borrow_mut(3);
-            *v = *v + incentive_value;
-        }
+        user_share.harvested_amount = user_share.harvested_amount + incentive_value;
     }
 
     /// [User Function] Harvest the incentive from staking TLP
@@ -1181,7 +1066,6 @@ module typus_stake_pool::stake_pool {
         version: &Version,
         registry: &mut StakePoolRegistry,
         index: u64,
-        _user_share_id: u64, // deprecated
         clock: &Clock,
         ctx: &mut TxContext,
     ): Coin<I_TOKEN> {
@@ -1436,41 +1320,30 @@ module typus_stake_pool::stake_pool {
         last_incentive_price_index
     }
 
-    #[allow(dead_code, unused_variable, unused_type_parameter, unused_let_mut)]
-    public fun withdraw_incentive<I_TOKEN>(
-        version: &Version,
-        registry: &mut StakePoolRegistry,
-        index: u64,
-        mut amount: Option<u64>,
-        ctx: &mut TxContext
-    ): Coin<I_TOKEN> {
-        deprecated();
-        coin::zero<I_TOKEN>(ctx)
-    }
+    // #[test_only]
+    // public(package) fun test_init(ctx: &mut TxContext) {
+    //     init(ctx);
+    // }
 
-    fun deprecated() { abort 0 }
+    // #[test_only]
+    // public(package) fun test_get_stake_pool(registry: &StakePoolRegistry, index: u64): &StakePool {
+    //     get_stake_pool(&registry.id, index)
+    // }
 
-    #[test_only]
-    public(package) fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
-
-    #[test_only]
-    public(package) fun test_get_stake_pool(registry: &StakePoolRegistry, index: u64): &StakePool {
-        get_stake_pool(&registry.id, index)
-    }
-
-    #[test_only]
-    public(package) fun test_get_last_incentive_price_index(stake_pool: &StakePool): VecMap<TypeName, u64> {
-        get_last_incentive_price_index(stake_pool)
-    }
-
-    #[test_only]
-    public(package) fun get_user_share_id(stake_pool: &StakePool, user: address): u64 {
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let user_shares = all_lp_user_shares.borrow_by_key<address, LpUserShare>(user);
-        user_shares.user_share_id
-    }
+    // #[test_only]
+    // fun get_user_share_ids(stake_pool: &StakePool, user: address): vector<u64> {
+    //     let all_lp_user_shares
+    //         = dynamic_field::borrow<String, Table<address, vector<LpUserShare>>>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
+    //     let user_shares = table::borrow(all_lp_user_shares, user);
+    //     let mut i = 0;
+    //     let mut ids = vector::empty();
+    //     let length = user_shares.length();
+    //     while (i < length) {
+    //         ids.push_back(user_shares[i].user_share_id);
+    //         i = i + 1;
+    //     };
+    //     ids
+    // }
 
     // #[test_only]
     // public(package) fun test_get_lp_user_share_info<I_TOKEN>(
@@ -1503,22 +1376,600 @@ module typus_stake_pool::stake_pool {
     //     (user_share_id, share, stake_ts_ms, unlock_incentive_price_index, last_incentive_price_index, last_harvest_ts_ms)
     // }
 
-    #[test_only]
-    public(package) fun test_get_single_lp_user_share_info<I_TOKEN>(
-        registry: &StakePoolRegistry,
-        index: u64,
-        ctx: &TxContext
-    ): (u64, u64, u64, u64, u64) {
-        let stake_pool = get_stake_pool(&registry.id, index);
-        let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let user_shares = all_lp_user_shares.borrow_by_key<address, LpUserShare>(tx_context::sender(ctx));
-        return (
-            user_shares.user_share_id,
-            user_shares.stake_ts_ms,
-            user_shares.total_shares,
-            user_shares.active_shares,
-            *user_shares.last_incentive_price_index.get(&incentive_token_type)
-        )
-    }
+    // #[test_only]
+    // public(package) fun test_get_single_lp_user_share_info<I_TOKEN>(
+    //     registry: &StakePoolRegistry,
+    //     index: u64,
+    //     share_id: u64,
+    //     ctx: &TxContext
+    // ): (u64, u64, u64, u64, u64, u64) {
+    //     let stake_pool = get_stake_pool(&registry.id, index);
+    //     let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
+    //     let all_lp_user_shares
+    //         = dynamic_field::borrow<String, Table<address, vector<LpUserShare>>>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
+    //     let user_shares = table::borrow(all_lp_user_shares, tx_context::sender(ctx));
+    //     let mut i = 0;
+    //     let mut user_share_id = vector::empty();
+    //     let mut share = vector::empty();
+    //     let mut stake_ts_ms = vector::empty();
+    //     let mut unlock_incentive_price_index = vector::empty();
+    //     let mut last_incentive_price_index = vector::empty();
+    //     let mut last_harvest_ts_ms = vector::empty();
+    //     let length = user_shares.length();
+    //     while (i < length) {
+    //         if (user_shares[i].user_share_id == share_id) {
+    //             user_share_id.push_back(user_shares[i].user_share_id);
+    //             share.push_back(user_shares[i].share);
+    //             stake_ts_ms.push_back(user_shares[i].stake_ts_ms);
+    //             last_incentive_price_index.push_back(*user_shares[i].last_incentive_price_index.get(&incentive_token_type));
+    //             last_harvest_ts_ms.push_back(*user_shares[i].last_harvest_ts_ms.get(&incentive_token_type));
+    //             unlock_incentive_price_index.push_back(*user_shares[i].unlock_incentive_price_index.get(&incentive_token_type));
+    //         };
+    //         i = i + 1;
+    //     };
+    //     (
+    //         user_share_id.pop_back(),
+    //         share.pop_back(),
+    //         stake_ts_ms.pop_back(),
+    //         unlock_incentive_price_index.pop_back(),
+    //         last_incentive_price_index.pop_back(),
+    //         last_harvest_ts_ms.pop_back()
+    //     )
+    // }
 }
+
+
+// #[test_only]
+// module typus_stake_pool::test_stake_pool {
+//     use std::type_name;
+
+//     use sui::balance;
+//     use sui::clock::{Self, Clock};
+//     use sui::coin::{Self, Coin};
+//     use sui::sui::SUI;
+//     use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared, sender};
+
+//     use typus_perp::admin::{Self, Version};
+//     use typus_perp::stake_pool::{Self, StakePoolRegistry};
+//     use typus_perp::tlp::TLP;
+//     use typus_perp::math;
+
+//     const ADMIN: address = @0xFFFF;
+//     const USER_1: address = @0xBABE1;
+//     const USER_2: address = @0xBABE2;
+//     const UNLOCK_COUNTDOWN_TS_MS: u64 = 5 * 24 * 60 * 60 * 1000; // 5 days
+//     const PERIOD_INCENTIVE_AMOUNT: u64 = 0_0100_00000;
+//     const INCENTIVE_INTERVAL_TS_MS: u64 = 60_000;
+//     const C_INCENTIVE_INDEX_DECIMAL: u64 = 9;
+
+//     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
+
+//     fun new_registry(scenario: &mut Scenario) {
+//         stake_pool::test_init(ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun new_version(scenario: &mut Scenario) {
+//         admin::test_init(ctx(scenario));
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun new_clock(scenario: &mut Scenario): Clock {
+//         let mut clock = clock::create_for_testing(ctx(scenario));
+//         clock::set_for_testing(&mut clock, CURRENT_TS_MS);
+//         clock
+//     }
+
+//     fun registry(scenario: &Scenario): StakePoolRegistry {
+//         take_shared<StakePoolRegistry>(scenario)
+//     }
+
+//     fun version(scenario: &Scenario): Version {
+//         take_shared<Version>(scenario)
+//     }
+
+//     fun mint_test_coin<T>(scenario: &mut Scenario, amount: u64): Coin<T> {
+//         coin::mint_for_testing<T>(amount, ctx(scenario))
+//     }
+
+//     fun update_clock(clock: &mut Clock, ts_ms: u64) {
+//         clock::set_for_testing(clock, ts_ms);
+//     }
+
+//     fun test_new_stake_pool_<LP_TOKEN>(scenario: &mut Scenario) {
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         stake_pool::new_stake_pool<LP_TOKEN>(
+//             &version,
+//             &mut registry,
+//             UNLOCK_COUNTDOWN_TS_MS,
+//             ctx(scenario)
+//         );
+//         return_shared(registry);
+//         return_shared(version);
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun test_add_incentive_token_<I_TOKEN>(scenario: &mut Scenario, index: u64) {
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         let clock = new_clock(scenario);
+//         stake_pool::add_incentive_token<I_TOKEN>(
+//             &version,
+//             &mut registry,
+//             index,
+//             // incentive config
+//             PERIOD_INCENTIVE_AMOUNT,
+//             INCENTIVE_INTERVAL_TS_MS,
+//             &clock,
+//             ctx(scenario)
+//         );
+//         return_shared(registry);
+//         return_shared(version);
+//         clock::destroy_for_testing(clock);
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun test_deposit_incentive_<I_TOKEN>(scenario: &mut Scenario, index: u64, incentive_amount: u64) {
+//         let deposit_incentive = mint_test_coin<I_TOKEN>(scenario, incentive_amount);
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         stake_pool::deposit_incentive<I_TOKEN>(
+//             &version,
+//             &mut registry,
+//             index,
+//             deposit_incentive,
+//             incentive_amount,
+//             ctx(scenario)
+//         );
+//         return_shared(registry);
+//         return_shared(version);
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun test_stake_<LP_TOKEN>(
+//         scenario: &mut Scenario,
+//         index: u64,
+//         stake_amount: u64,
+//         stake_ts_ms: u64
+//     ) {
+//         let lp_token = mint_test_coin<LP_TOKEN>(scenario, stake_amount);
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         let mut clock = new_clock(scenario);
+//         update_clock(&mut clock, stake_ts_ms);
+//         stake_pool::stake<LP_TOKEN>(
+//             &version,
+//             &mut registry,
+//             index,
+//             lp_token,
+//             &clock,
+//             ctx(scenario)
+//         );
+//         return_shared(registry);
+//         return_shared(version);
+//         clock::destroy_for_testing(clock);
+//         next_tx(scenario, ADMIN);
+//     }
+
+//     fun test_unstake_<LP_TOKEN>(scenario: &mut Scenario, index: u64, mut user_share_id: Option<u64>, unstake_ts_ms: u64): u64 {
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         let mut clock = new_clock(scenario);
+//         update_clock(&mut clock, unstake_ts_ms);
+
+//         let mut balance = balance::zero<LP_TOKEN>();
+//         if (user_share_id.is_some()) {
+//             let unstake_balance = stake_pool::unstake<LP_TOKEN>(
+//                 &version,
+//                 &mut registry,
+//                 index,
+//                 user_share_id.extract(),
+//                 &clock,
+//                 ctx(scenario),
+//             );
+//             balance.join(unstake_balance);
+//         } else {
+//             let mut user_share_ids = stake_pool::get_user_share_ids(
+//                 stake_pool::test_get_stake_pool(&registry, index),
+//                 sender(scenario)
+//             );
+//             while (!user_share_ids.is_empty()) {
+//                 let unstake_balance = stake_pool::unstake<LP_TOKEN>(
+//                     &version,
+//                     &mut registry,
+//                     index,
+//                     user_share_ids.pop_back(),
+//                     &clock,
+//                     ctx(scenario),
+//                 );
+//                 balance.join(unstake_balance);
+//             };
+//         };
+
+//         let unstake_balance_value = balance.value();
+//         transfer::public_transfer(coin::from_balance(balance, ctx(scenario)), sender(scenario));
+
+//         return_shared(registry);
+//         return_shared(version);
+//         clock::destroy_for_testing(clock);
+//         next_tx(scenario, ADMIN);
+//         unstake_balance_value
+//     }
+
+//     fun test_harvest_<I_TOKEN>(scenario: &mut Scenario, index: u64, harvest_ts_ms: u64): (u64, u64) {
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         let mut clock = new_clock(scenario);
+//         update_clock(&mut clock, harvest_ts_ms);
+//         let harvest_balance = stake_pool::harvest<I_TOKEN>(&version, &mut registry, index, &clock, ctx(scenario));
+//         let harvest_balance_value = harvest_balance.value();
+//         let (user_share_id, _, _, _, last_incentive_price_index, _)
+//             = stake_pool::test_get_lp_user_share_info<I_TOKEN>(&registry, index, ctx(scenario));
+//         // get stake pool get_last_incentive_price_index
+//         let incentive_token = type_name::with_defining_ids<I_TOKEN>();
+//         let incentive_price_indices
+//             = stake_pool::get_last_incentive_price_index(stake_pool::test_get_stake_pool(&registry, index));
+//         let incentive_price_index = incentive_price_indices.get(&incentive_token);
+//         // calculate harvest_balance value
+//         let mut i = 0;
+//         let length = user_share_id.length();
+//         while (i < length) {
+//             // get user last_incentive_price_index and check the same as pool incentive_price_index
+//             assert!(last_incentive_price_index[i] == *incentive_price_index, 0);
+//             i = i + 1;
+//         };
+//         transfer::public_transfer(coin::from_balance(harvest_balance, ctx(scenario)), sender(scenario));
+//         return_shared(registry);
+//         return_shared(version);
+//         clock::destroy_for_testing(clock);
+//         next_tx(scenario, ADMIN);
+//         (harvest_balance_value, *incentive_price_index)
+//     }
+
+//     fun test_harvest_per_user_share_<I_TOKEN>(
+//         scenario: &mut Scenario,
+//         index: u64,
+//         user_share_id: u64,
+//         harvest_ts_ms: u64
+//     ): (u64, u64) {
+//         let mut registry = registry(scenario);
+//         let version = version(scenario);
+//         let mut clock = new_clock(scenario);
+//         update_clock(&mut clock, harvest_ts_ms);
+//         let harvest_balance = stake_pool::harvest_per_user_share<I_TOKEN>(
+//             &version,
+//             &mut registry,
+//             index,
+//             user_share_id,
+//             &clock,
+//             ctx(scenario),
+//         );
+//         let harvest_balance_value = harvest_balance.value();
+//         let (_user_share_id, _, _, _, last_incentive_price_index, _)
+//             = stake_pool::test_get_single_lp_user_share_info<I_TOKEN>(&registry, index, user_share_id, ctx(scenario));
+//         let incentive_token = type_name::with_defining_ids<I_TOKEN>();
+//         let incentive_price_indices
+//             = stake_pool::get_last_incentive_price_index(stake_pool::test_get_stake_pool(&registry, index));
+//         let incentive_price_index = incentive_price_indices.get(&incentive_token);
+//         assert!(last_incentive_price_index == *incentive_price_index, 0);
+//         transfer::public_transfer(coin::from_balance(harvest_balance, ctx(scenario)), sender(scenario));
+//         return_shared(registry);
+//         return_shared(version);
+//         clock::destroy_for_testing(clock);
+//         next_tx(scenario, ADMIN);
+//         (harvest_balance_value, *incentive_price_index)
+//     }
+
+//     #[test]
+//     public(package) fun test_new_stake_pool() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_add_incentive_token() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_deposit_incentive() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+
+//         let incentive_amount = 1000_0000_00000;
+//         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_stake() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+
+//         let incentive_amount = 1000_0000_00000;
+//         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+//         let stake_amount = 1_0000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount, CURRENT_TS_MS);
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_normal_harvest() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+
+//         let incentive_amount = 1000_0000_00000;
+//         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+//         next_tx(&mut scenario, USER_1);
+//         let stake_amount_1 = 1_0000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_1, CURRENT_TS_MS);
+
+//         next_tx(&mut scenario, USER_2);
+//         let stake_amount_2 = 0_0100_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_2, CURRENT_TS_MS);
+
+//         // USER_1 harvest within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_0 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_1) = test_harvest_<SUI>(&mut scenario, index, harvest_ts_ms_0);
+//         let estimated_value_1 = ((stake_amount_1 as u128)
+//                             * (incentive_price_index_1 as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 11000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_1, 0);
+
+//         // USER_2 harvest within locked-up period
+//         next_tx(&mut scenario, USER_2);
+//         let harvest_ts_ms_1 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS + 1; // which means it would be the same period as USER_1
+//         let (harvest_balance_value, incentive_price_index_2) = test_harvest_<SUI>(&mut scenario, index, harvest_ts_ms_1);
+//         let estimated_value_2 = ((stake_amount_2 as u128)
+//                             * (incentive_price_index_2 as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 11000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_2, 0);
+
+//         assert!(incentive_price_index_1 == incentive_price_index_2, 0);
+
+//         // USER_1 harvest within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_2 = CURRENT_TS_MS + 5 * INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_3) = test_harvest_<SUI>(&mut scenario, index, harvest_ts_ms_2);
+//         let estimated_value_3 = ((stake_amount_1 as u128)
+//                             * ((incentive_price_index_3 - incentive_price_index_1) as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 11000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_3, 0);
+
+//         // USER_1 harvest accross expiration
+//         next_tx(&mut scenario, USER_1);
+//         let expiration_ts_ms = CURRENT_TS_MS + locked_up_period_ts_ms_1;
+//         let harvest_ts_ms_3 = expiration_ts_ms + 5 * INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_4) = test_harvest_<SUI>(&mut scenario, index, harvest_ts_ms_3);
+//         let new_multiplier = ((harvest_ts_ms_3 - expiration_ts_ms) * 0
+//                                 + (expiration_ts_ms - harvest_ts_ms_2) * 1000)
+//                                     / (harvest_ts_ms_3 - harvest_ts_ms_2);
+//         let estimated_value_4 = ((stake_amount_1 as u128)
+//                             * ((incentive_price_index_4 - incentive_price_index_3) as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * (10000 + new_multiplier as u128)
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_4, 0);
+
+//         // USER_1 harvest after expiration
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_4 = harvest_ts_ms_3 + 3 * INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_5) = test_harvest_<SUI>(&mut scenario, index, harvest_ts_ms_4);
+//         let estimated_value_5 = ((stake_amount_1 as u128)
+//                             * ((incentive_price_index_5 - incentive_price_index_4) as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)as u64);
+//         assert!(harvest_balance_value == estimated_value_5, 0);
+
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_harvest_per_user_share() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+
+//         let incentive_amount = 1000_0000_00000;
+//         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+//         next_tx(&mut scenario, USER_1);
+//         let stake_amount_1 = 1_0000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_1, CURRENT_TS_MS);
+
+//         next_tx(&mut scenario, USER_1);
+//         let stake_amount_2 = 0_0100_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_2, CURRENT_TS_MS);
+
+//         next_tx(&mut scenario, USER_2);
+//         let stake_amount_3 = 0_2000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_3, CURRENT_TS_MS);
+
+//         // USER_1 harvest user_share_id 0 within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_0 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_1)
+//             = test_harvest_per_user_share_<SUI>(&mut scenario, index, 0, harvest_ts_ms_0);
+//         let estimated_value_1 = ((stake_amount_1 as u128)
+//                             * (incentive_price_index_1 as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 11000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_1, 0);
+
+//         // USER_1 harvest user_share_id 1 within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_1 = CURRENT_TS_MS + 5 * INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_2)
+//             = test_harvest_per_user_share_<SUI>(&mut scenario, index, 1, harvest_ts_ms_1);
+//         let estimated_value_2 = ((stake_amount_2 as u128)
+//                             * (incentive_price_index_2 as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 15000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_2, 0);
+
+//         end(scenario);
+//     }
+
+//     #[test]
+//     public(package) fun test_harvest_for_zero_balance() {
+//         let mut scenario = begin(ADMIN);
+//         new_registry(&mut scenario);
+//         new_version(&mut scenario);
+//         test_new_stake_pool_<TLP>(&mut scenario);
+
+//         let index = 0;
+//         test_add_incentive_token_<SUI>(&mut scenario, index);
+
+//         let incentive_amount = 1000_0000_00000;
+//         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+//         next_tx(&mut scenario, USER_1);
+//         let stake_amount_1 = 1_0000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_1, CURRENT_TS_MS);
+
+//         next_tx(&mut scenario, USER_1);
+//         let stake_amount_2 = 0_0100_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_2, CURRENT_TS_MS);
+
+//         next_tx(&mut scenario, USER_2);
+//         let stake_amount_3 = 0_2000_00000;
+//         test_stake_<TLP>(&mut scenario, index, stake_amount_3, CURRENT_TS_MS);
+
+//         // USER_1 harvest user_share_id 0 within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_0 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS;
+//         let (harvest_balance_value, incentive_price_index_1)
+//             = test_harvest_per_user_share_<SUI>(&mut scenario, index, 0, harvest_ts_ms_0);
+//         let estimated_value_1 = ((stake_amount_1 as u128)
+//                             * (incentive_price_index_1 as u128)
+//                                 / (math::multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128)
+//                                     * 11000
+//                                         / 10000 as u64);
+//         assert!(harvest_balance_value == estimated_value_1, 0);
+
+//         // USER_1 harvest user_share_id 0 within locked-up period
+//         next_tx(&mut scenario, USER_1);
+//         let harvest_ts_ms_1 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS + 1;
+//         let (harvest_balance_value, incentive_price_index_2)
+//             = test_harvest_per_user_share_<SUI>(&mut scenario, index, 0, harvest_ts_ms_1);
+//         assert!(harvest_balance_value == 0, 0);
+//         assert!(incentive_price_index_2 == incentive_price_index_1, 0);
+
+//         end(scenario);
+//     }
+
+    // #[test]
+    // #[expected_failure(abort_code = stake_pool::E_USER_SHARE_NOT_YET_EXPIRED)]
+    // public(package) fun test_early_unstake_failed() {
+    //     let mut scenario = begin(ADMIN);
+    //     new_registry(&mut scenario);
+    //     new_version(&mut scenario);
+    //     test_new_stake_pool_<TLP>(&mut scenario);
+
+    //     let index = 0;
+    //     test_add_incentive_token_<SUI>(&mut scenario, index);
+
+    //     let incentive_amount = 1000_0000_00000;
+    //     test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+    //     next_tx(&mut scenario, USER_1);
+    //     let stake_amount_1 = 1_0000_00000;
+    //     test_stake_<TLP>(&mut scenario, index, stake_amount_1, CURRENT_TS_MS);
+
+    //     next_tx(&mut scenario, USER_1);
+    //     let unstake_ts_ms = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS;
+    //     let _ = test_unstake_<TLP>(&mut scenario, index, option::none(), unstake_ts_ms); // unstake all
+
+    //     end(scenario);
+    // }
+
+    // #[test]
+    // public(package) fun test_unstake_multiple_times() {
+    //     let mut scenario = begin(ADMIN);
+    //     new_registry(&mut scenario);
+    //     new_version(&mut scenario);
+    //     test_new_stake_pool_<TLP>(&mut scenario);
+
+    //     let index = 0;
+    //     test_add_incentive_token_<SUI>(&mut scenario, index);
+
+    //     let incentive_amount = 1000_0000_00000;
+    //     test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
+
+    //     next_tx(&mut scenario, USER_1);
+    //     let stake_amount_1 = 1_0000_00000;
+    //     test_stake_<TLP>(&mut scenario, index, stake_amount_1, CURRENT_TS_MS);
+
+    //     next_tx(&mut scenario, USER_2);
+    //     let stake_amount_2 = 0_0100_00000;
+    //     test_stake_<TLP>(&mut scenario, index, stake_amount_2, CURRENT_TS_MS);
+
+    //     next_tx(&mut scenario, USER_2);
+    //     let stake_amount_3 = 0_3000_00000;
+    //     test_stake_<TLP>(&mut scenario, index, stake_amount_3, CURRENT_TS_MS + 1);
+
+    //     next_tx(&mut scenario, USER_1);
+    //     let stake_amount_4 = 1_0000_00000;
+    //     test_stake_<TLP>(
+    //         &mut scenario,
+    //         index,
+    //         stake_amount_4,
+    //         CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS
+    //     ); // stake at first incentive period
+
+    //     // unstake user_share_id = 1 (share = 0_0100_00000)
+    //     next_tx(&mut scenario, USER_2);
+    //     let unstake_ts_ms_0 = CURRENT_TS_MS + locked_up_period_ts_ms_1;
+    //     let unstake_user_2
+    //         = test_unstake_<TLP>(&mut scenario, index, option::some(1), unstake_ts_ms_0);
+    //     assert!(unstake_user_2 == stake_amount_2, 1);
+
+    //     // unstake USER_1 all shares
+    //     next_tx(&mut scenario, USER_1);
+    //     let unstake_ts_ms_1 = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS + locked_up_period_ts_ms_3;
+    //     let unstake_user_1 = test_unstake_<TLP>(&mut scenario, index, option::none(), unstake_ts_ms_1);
+    //     assert!(unstake_user_1 == stake_amount_1 + stake_amount_4, 1);
+
+    //     end(scenario);
+    // }
+// }

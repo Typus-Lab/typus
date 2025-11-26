@@ -19,19 +19,6 @@ module typus_stake_pool::admin {
     // ======== Constants ========
     const CVersion: u64 = 2;
 
-    // ======== Manager Cap ========
-
-    // public struct ManagerCap has store { }
-
-    // public(package) fun issue_manager_cap(
-    //     version: &Version,
-    //     ctx: &TxContext,
-    // ): ManagerCap {
-    //     verify(version, ctx);
-
-    //     ManagerCap { }
-    // }
-
     // ======== Version ========
 
     /// A shared object that holds the version of the contract, the fee pools, and the authority list.
@@ -81,10 +68,10 @@ module typus_stake_pool::admin {
         });
     }
 
-    #[test_only]
-    public(package) fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
+    // #[test_only]
+    // public(package) fun test_init(ctx: &mut TxContext) {
+    //     init(ctx);
+    // }
 
     // ======== Authority ========
 
@@ -128,7 +115,6 @@ module typus_stake_pool::admin {
 
     // ======== Tails Exp & Leaderboard ========
     use typus::ecosystem::{Self, Version as TypusEcosystemVersion};
-    use typus::leaderboard::{Self, TypusLeaderboardRegistry};
     use typus::user::{Self, TypusUserRegistry};
 
     /// [Authorized Function] Installs the ecosystem manager cap.
@@ -159,28 +145,6 @@ module typus_stake_pool::admin {
             amount
         );
     }
-
-    /// Adds a score to the experience leaderboard.
-    // public(package) fun add_exp_leaderboard(
-    //     version: &Version,
-    //     typus_ecosystem_version: &TypusEcosystemVersion,
-    //     typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-    //     user: address,
-    //     score: u64,
-    //     clock: &sui::clock::Clock,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     leaderboard::score(
-    //         dynamic_field::borrow(&version.id, std::string::utf8(b"ecosystem_manager_cap")),
-    //         typus_ecosystem_version,
-    //         typus_leaderboard_registry,
-    //         std::ascii::string(b"exp_leaderboard"),
-    //         user,
-    //         score,
-    //         clock,
-    //         ctx,
-    //     );
-    // }
 
     // ======== Fee Pool ========
 
