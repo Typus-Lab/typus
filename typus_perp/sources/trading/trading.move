@@ -18,6 +18,7 @@ module typus_perp::trading {
     use typus_perp::lp_pool::{Self, Registry as PoolRegistry, LiquidityPool, RemoveLiquidityTokenProcess};
     use typus_perp::math::{Self, amount_to_usd, usd_to_amount};
     use typus_perp::position::{Self, TradingOrder, Position};
+    use typus_perp::profit_vault::ProfitVault;
     use typus_perp::symbol;
     use typus_perp::user_account::{Self, UserAccount, UserAccountCap};
 
@@ -54,6 +55,9 @@ module typus_perp::trading {
     const I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP: u64 = 5;
     const I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP: u64 = 6;
     const I_TRADING_FEE_FORMULA_VERSION: u64 = 7;
+    const I_PROFIT_VAULT_FLAG: u64 = 8; // 1 = put realized profit into profit vault, 0 = return profit directly to user
+    const I_OPTION_COLLATERAL_CURVATURE: u64 = 9;
+    const I_OPTION_COLLATERAL_SCALE: u64 = 10;
 
     // ======== Dynamic Field Key ========
     const K_LIMIT_BUY_ORDERS: vector<u8> = b"limit_buy_orders";
@@ -285,6 +289,7 @@ module typus_perp::trading {
         option_maintenance_margin_rate_bp: u64,
         option_trading_fee_config: vector<u64>,
         trading_fee_formula_version: u64,
+        profit_vault_flag: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -296,7 +301,13 @@ module typus_perp::trading {
         assert!(!vector::contains(&market.symbols, &base_token), error::trading_symbol_existed());
 
         assert!(
-            trading_fee_config[I_MAX_TRADING_FEE_MBP] >= trading_fee_config[I_BASE_TRADING_FEE_MBP],
+            trading_fee_config[I_MAX_TRADING_FEE_MBP] >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
+            && trading_fee_config.length() == 5,
+            error::invalid_trading_fee_config()
+        );
+        assert!(
+            option_trading_fee_config[I_MAX_TRADING_FEE_MBP] >= option_trading_fee_config[I_BASE_TRADING_FEE_MBP]
+            && option_trading_fee_config.length() == 5,
             error::invalid_trading_fee_config()
         );
 
@@ -341,7 +352,10 @@ module typus_perp::trading {
                 option_trading_fee_config[0],
                 option_trading_fee_config[1],
                 option_trading_fee_config[2],
-                trading_fee_formula_version
+                trading_fee_formula_version,
+                profit_vault_flag,
+                option_trading_fee_config[3],
+                option_trading_fee_config[4]
             ],
         };
         let mut symbol_market = SymbolMarket {
@@ -429,8 +443,9 @@ module typus_perp::trading {
         mut max_sell_open_interest: Option<u64>, // market_config.u64_padding[1]
         mut maintenance_margin_rate_bp: Option<u64>, // market_config.u64_padding[2]
         mut option_collateral_maintenance_margin_rate_bp: Option<u64>, // market_config.u64_padding[3]
-        mut option_collateral_trading_fee_config: Option<vector<u64>>, // market_config.u64_padding[4 ~ 6]
-        mut trading_fee_formula_version: Option<u64>,
+        mut option_collateral_trading_fee_config: Option<vector<u64>>, // market_config.u64_padding[4 ~ 6, 9, 10]
+        mut trading_fee_formula_version: Option<u64>, // market_config.u64_padding[7]
+        mut profit_vault_flag: Option<u64>, // market_config.u64_padding[8]
         ctx: &TxContext,
     ) {
         // safety check
@@ -461,7 +476,8 @@ module typus_perp::trading {
             symbol_market.market_config.trading_fee_config = option::extract(&mut trading_fee_config);
             assert!(
                 symbol_market.market_config.trading_fee_config[I_MAX_TRADING_FEE_MBP]
-                    >= symbol_market.market_config.trading_fee_config[I_BASE_TRADING_FEE_MBP],
+                    >= symbol_market.market_config.trading_fee_config[I_BASE_TRADING_FEE_MBP]
+                        && symbol_market.market_config.trading_fee_config.length() == 5,
                 error::invalid_trading_fee_config()
             );
         };
@@ -490,15 +506,21 @@ module typus_perp::trading {
             let trading_fee_config = option::extract(&mut option_collateral_trading_fee_config);
             assert!(
                 trading_fee_config[I_MAX_TRADING_FEE_MBP]
-                    >= trading_fee_config[I_BASE_TRADING_FEE_MBP],
+                    >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
+                        && trading_fee_config.length() == 5,
                 error::invalid_trading_fee_config()
             );
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP, trading_fee_config[I_BASE_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP, trading_fee_config[I_MAX_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP, trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP]);
+            math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_CURVATURE, trading_fee_config[I_CURVATURE]);
+            math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_SCALE, trading_fee_config[I_SCALE]);
         };
         if (option::is_some(&trading_fee_formula_version)) {
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION, option::extract(&mut trading_fee_formula_version));
+        };
+        if (option::is_some(&profit_vault_flag)) {
+            math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_PROFIT_VAULT_FLAG, option::extract(&mut profit_vault_flag));
         };
         emit(UpdateMarketConfigEvent {
             index: market_index,
@@ -1789,11 +1811,7 @@ module typus_perp::trading {
             // condition & config
             is_long,
             size,
-            vector[
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP),
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP),
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP),
-            ],
+            get_trading_fee_config(&symbol_market.market_config, true),
         );
         let trading_fee = ((notional_size_in_c_token as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
         assert!(
@@ -2017,11 +2035,7 @@ module typus_perp::trading {
             // condition & config
             !mut_position.get_position_side(),
             size,
-            vector[
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP),
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP),
-                math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP),
-            ],
+            get_trading_fee_config(&symbol_market.market_config, true)
         );
         let (has_profit, pnl_usd, _) = mut_position.calculate_unrealized_pnl(
             trading_pair_oracle_price,
@@ -2146,6 +2160,7 @@ module typus_perp::trading {
         version: &mut Version,
         registry: &mut MarketRegistry,
         pool_registry: &mut PoolRegistry,
+        profit_vault: &mut ProfitVault,
         typus_oracle_c_token: &Oracle,
         typus_oracle_trading_symbol: &Oracle,
         clock: &Clock,
@@ -2258,6 +2273,7 @@ module typus_perp::trading {
                     market_index,
                     symbol_market,
                     liquidity_pool,
+                    profit_vault,
                     order,
                     market.protocol_fee_share_bp,
                     collateral_oracle_price,
@@ -2464,6 +2480,7 @@ module typus_perp::trading {
         version: &mut Version,
         registry: &mut MarketRegistry,
         pool_registry: &mut PoolRegistry,
+        profit_vault: &mut ProfitVault,
         typus_oracle_c_token: &Oracle,
         typus_oracle_trading_symbol: &Oracle,
         clock: &Clock,
@@ -2555,6 +2572,7 @@ module typus_perp::trading {
             market_index,
             symbol_market,
             liquidity_pool,
+            profit_vault,
             order,
             market.protocol_fee_share_bp,
             collateral_oracle_price,
@@ -3050,6 +3068,8 @@ module typus_perp::trading {
                 math::get_u64_vector_value(&market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP),
                 math::get_u64_vector_value(&market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP),
                 math::get_u64_vector_value(&market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP),
+                math::get_u64_vector_value(&market_config.u64_padding, I_OPTION_COLLATERAL_CURVATURE),
+                math::get_u64_vector_value(&market_config.u64_padding, I_OPTION_COLLATERAL_SCALE),
             ]
         } else {
             market_config.trading_fee_config
@@ -3802,6 +3822,26 @@ module typus_perp::trading {
         user_account.add_delegate_user(user);
     }
 
+    /// [User Function] Remove a delegate user to a user account.
+    /// Safe with `check_owner`
+    entry fun remove_delegate_user(
+        version: &Version,
+        registry: &mut MarketRegistry,
+        market_index: u64,
+        user: address,
+        ctx: &TxContext,
+    ) {
+        // safety check
+        admin::version_check(version);
+
+        let market_id = registry.get_mut_market_id(market_index);
+        let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
+        // check only owner can deposit
+        user_account.check_owner(ctx); // abort inside
+
+        user_account.remove_delegate_user(user);
+    }
+
     /// [User Function] Removes a user account.
     /// Safe with `UserAccountCap`
     entry fun remove_user_account(
@@ -3902,6 +3942,7 @@ module typus_perp::trading {
         market_index: u64,
         symbol_market: &mut SymbolMarket,
         liquidity_pool: &mut LiquidityPool,
+        profit_vault: &mut ProfitVault,
         order: TradingOrder,
         protocol_fee_share_bp: u64,
         collateral_oracle_price: u64,
@@ -3998,6 +4039,15 @@ module typus_perp::trading {
             collateral_oracle_price,
             collateral_oracle_price_decimal,
         );
+
+        if (
+            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_PROFIT_VAULT_FLAG) == 1
+            && !profit_vault.is_whitelist(position.get_position_user())
+        ) {
+            let realized_profit_value = realized_profit.value();
+            let profit = realized_profit.split(realized_profit_value);
+            profit_vault.put_user_profit(position.get_position_user(), profit, clock);
+        };
 
         // put referral rebate
         // let fee_balance_value = fee_balance.value();
@@ -5098,15 +5148,7 @@ module typus_perp::trading {
             // condition & config
             !mut_position.get_position_side(),
             mut_position.get_position_size(),
-            if (is_option_position) {
-                vector[
-                    math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP),
-                    math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP),
-                    math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP),
-                ]
-            } else {
-                symbol_market.market_config.trading_fee_config
-            },
+            get_trading_fee_config(&symbol_market.market_config, is_option_position),
         );
 
         if (is_option_position) {

@@ -431,8 +431,6 @@ module typus_perp::lp_pool {
         assert!(!vector::contains(&liquidity_pool.liquidity_tokens, &token_type), error::liquidity_token_existed());
         vector::push_back(&mut liquidity_pool.liquidity_tokens, token_type);
 
-        assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-
         assert!(basic_mint_fee_bp <= 30, error::invalid_config_range());
         assert!(additional_mint_fee_bp <= 30, error::invalid_config_range());
         assert!(basic_burn_fee_bp <= 30, error::invalid_config_range());
@@ -561,24 +559,31 @@ module typus_perp::lp_pool {
             token_pool.config.spot_config.max_capacity = *option::borrow(&max_capacity);
         };
         if (option::is_some(&basic_mint_fee_bp)) {
+            assert!(*option::borrow(&basic_mint_fee_bp) <= 30, error::invalid_config_range());
             token_pool.config.spot_config.basic_mint_fee_bp = *option::borrow(&basic_mint_fee_bp);
         };
         if (option::is_some(&additional_mint_fee_bp)) {
+            assert!(*option::borrow(&additional_mint_fee_bp) <= 30, error::invalid_config_range());
             token_pool.config.spot_config.additional_mint_fee_bp = *option::borrow(&additional_mint_fee_bp);
         };
         if (option::is_some(&basic_burn_fee_bp)) {
+            assert!(*option::borrow(&basic_burn_fee_bp) <= 30, error::invalid_config_range());
             token_pool.config.spot_config.basic_burn_fee_bp = *option::borrow(&basic_burn_fee_bp);
         };
         if (option::is_some(&additional_burn_fee_bp)) {
+            assert!(*option::borrow(&additional_burn_fee_bp) <= 30, error::invalid_config_range());
             token_pool.config.spot_config.additional_burn_fee_bp = *option::borrow(&additional_burn_fee_bp);
         };
         if (option::is_some(&swap_fee_bp)) {
+            assert!(*option::borrow(&swap_fee_bp) <= 30, error::invalid_config_range());
             token_pool.config.spot_config.swap_fee_bp = *option::borrow(&swap_fee_bp);
         };
         if (option::is_some(&swap_fee_protocol_share_bp)) {
+            assert!(*option::borrow(&swap_fee_protocol_share_bp) <= 10000, error::invalid_config_range());
             token_pool.config.spot_config.swap_fee_protocol_share_bp = *option::borrow(&swap_fee_protocol_share_bp);
         };
         if (option::is_some(&lending_protocol_share_bp)) {
+            assert!(*option::borrow(&lending_protocol_share_bp) <= 10000, error::invalid_config_range());
             token_pool.config.spot_config.lending_protocol_share_bp = *option::borrow(&lending_protocol_share_bp);
         };
 
@@ -767,11 +772,20 @@ module typus_perp::lp_pool {
             token_pool.config.margin_config.utilization_threshold_bp_1 = *option::borrow(&utilization_threshold_bp_1);
         };
         if (option::is_some(&borrow_interval_ts_ms)) {
+            assert!(*option::borrow(&borrow_interval_ts_ms) > 0, error::invalid_config_range());
             token_pool.config.margin_config.borrow_interval_ts_ms = *option::borrow(&borrow_interval_ts_ms);
         };
         if (option::is_some(&max_order_reserve_ratio_bp)) {
+            assert!(*option::borrow(&max_order_reserve_ratio_bp) > 0, error::invalid_config_range());
             token_pool.config.margin_config.max_order_reserve_ratio_bp = *option::borrow(&max_order_reserve_ratio_bp);
         };
+
+        assert!(
+            token_pool.config.margin_config.utilization_threshold_bp_0 > 0
+                && token_pool.config.margin_config.utilization_threshold_bp_0 < token_pool.config.margin_config.utilization_threshold_bp_1
+                    && token_pool.config.margin_config.utilization_threshold_bp_1 < 10000,
+            error::invalid_config_range()
+        );
 
         emit(UpdateMarginConfigEvent {
             sender: tx_context::sender(ctx),
@@ -2328,6 +2342,25 @@ module typus_perp::lp_pool {
 
     }
 
+    /// Only for current contract sunset purpose. Will be removed in new contract
+    /// [Authorized Function] Manager remove all liquidity of a token.
+    public fun manager_remove_all_liquidity<TOKEN>(
+        version: &Version,
+        registry: &mut Registry,
+        index: u64,
+        ctx: &TxContext
+    ): Balance<TOKEN> {
+        // safety check
+        admin::verify(version, ctx);
+        let liquidity_pool = get_mut_liquidity_pool(registry, index);
+        let balance = dynamic_field::remove<TypeName, Balance<TOKEN>>(
+            &mut liquidity_pool.id,
+            type_name::with_defining_ids<TOKEN>()
+        );
+
+        balance
+    }
+
     public struct UpdateLiquidityValueEvent has copy, drop {
         sender: address,
         index: u64,
@@ -2354,6 +2387,11 @@ module typus_perp::lp_pool {
         assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
         let liquidity_token = type_name::with_defining_ids<TOKEN>();
+        {
+            // check collateral token active
+            let token_pool = get_token_pool(liquidity_pool, &liquidity_token);
+            assert!(token_pool.state.is_active, error::token_pool_inactive());
+        };
 
         let mut log = update_tvl(
             version,
@@ -2479,6 +2517,7 @@ module typus_perp::lp_pool {
         if (add_reserve) {
             token_pool.state.reserved_amount = token_pool.state.reserved_amount + d_reserve;
         } else {
+            assert!(token_pool.state.reserved_amount >= d_reserve, error::reserve_bookkeeping_error());
             token_pool.state.reserved_amount = token_pool.state.reserved_amount - d_reserve;
         };
     }

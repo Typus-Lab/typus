@@ -2,13 +2,14 @@
 module typus_perp::test_trading {
     use std::type_name;
     use sui::clock::{Self, Clock};
-    use sui::coin::{Self, Coin};
+    use sui::coin::{Self, Coin, TreasuryCap};
     use sui::sui::SUI;
     use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_from_address};
     use sui::transfer_policy;
 
     use typus_perp::admin::{Self, Version};
-    use typus_perp::tlp::{Self, TLP, LpRegistry as TlpRegistry};
+    use typus_perp::profit_vault::{Self, ProfitVault};
+    use typus_perp::tlp::{Self, TLP};
     use typus_perp::trading::{Self, MarketRegistry};
     use typus_perp::lp_pool::{Self, Registry as LpPoolRegistry};
     use typus_perp::treasury_caps::{Self, TreasuryCaps};
@@ -45,7 +46,7 @@ module typus_perp::test_trading {
     const OPTION_COLLATERAL_MAX_LEVERAGE_MBP: u64 = 100000000000;
     const MIN_SIZE: u64 = 1_0000_00000;
     const LOT_SIZE: u64 = 1_0000_00000;
-    const TRADING_FEE_CONFIG: vector<u64> = vector[0_0010_000, 0_0020_000, 0_2000_000];
+    const TRADING_FEE_CONFIG: vector<u64> = vector[0_0010_000, 0_0020_000, 0_2000_000, 2, 1];
     const BASIC_FUNDING_RATE: u64 = 0_0001_00000;
 
     const EXP_MULTIPLIER: u64 = 200;
@@ -53,8 +54,11 @@ module typus_perp::test_trading {
     const MAX_SELL_OPEN_INTEREST: u64 = 1_000_000_000000000;
     const MAINTENANCE_MARGIN_RATE_BP: u64 = 150; // 1.5%
     const OPTION_MAINTENANCE_MARGIN_RATE_BP: u64 = 20; // 0.2%
-    const OPTION_TRADING_FEE_CONFIG: vector<u64> = vector[0_0002_000, 0_0004_000, 0_5000_000];
+    const OPTION_TRADING_FEE_CONFIG: vector<u64> = vector[0_0002_000, 0_0004_000, 0_5000_000, 1, 1];
     const TRADING_FEE_FORMULA_VERSION: u64 = 0;
+    const PROFIT_VAULT_FLAG: u64 = 0;
+
+    const UNLOCK_COUNTDOWN_TS_MS: u64 = 3_600_000;
 
     const CURRENT_TS_MS: u64 = 1_715_212_800_000;
     const FUNDING_INTERVAL_TS_MS: u64 = 3_600_000;
@@ -85,17 +89,24 @@ module typus_perp::test_trading {
         clock
     }
 
-    fun new_tlp_registry(scenario: &mut Scenario) {
+    fun new_tlp(scenario: &mut Scenario) {
         tlp::test_init(ctx(scenario));
         next_tx(scenario, ADMIN);
 
+        let treasury_cap = take_from_sender<TreasuryCap<TLP>>(scenario);
         let version = version(scenario);
-        let mut tlp_registry = tlp_registry(scenario);
         let mut treasury_caps = treasury_caps(scenario);
-        tlp::transfer_treasury_cap(&version, &mut tlp_registry, &mut treasury_caps, ctx(scenario));
+        treasury_caps::manager_store_treasury_cap(&version, &mut treasury_caps, treasury_cap, ctx(scenario));
         return_shared(version);
-        return_shared(tlp_registry);
         return_shared(treasury_caps);
+        next_tx(scenario, ADMIN);
+    }
+
+    fun new_profit_vault(scenario: &mut Scenario) {
+        let version = version(scenario);
+        profit_vault::create_profit_vault(&version, UNLOCK_COUNTDOWN_TS_MS, ctx(scenario));
+        profit_vault::create_lock_vault(&version, ctx(scenario));
+        return_shared(version);
         next_tx(scenario, ADMIN);
     }
 
@@ -350,8 +361,8 @@ module typus_perp::test_trading {
         take_shared<TreasuryCaps>(scenario)
     }
 
-    fun tlp_registry(scenario: &Scenario): TlpRegistry {
-        take_shared<TlpRegistry>(scenario)
+    fun profit_vault(scenario: &Scenario): ProfitVault {
+        take_shared<ProfitVault>(scenario)
     }
 
     fun tails_staking_registry(scenario: &Scenario): TailsStakingRegistry {
@@ -424,6 +435,7 @@ module typus_perp::test_trading {
             OPTION_MAINTENANCE_MARGIN_RATE_BP,
             OPTION_TRADING_FEE_CONFIG,
             TRADING_FEE_FORMULA_VERSION,
+            PROFIT_VAULT_FLAG,
             &clock,
             ctx(scenario)
         );
@@ -463,7 +475,7 @@ module typus_perp::test_trading {
             option::some(OPTION_COLLATERAL_MAX_LEVERAGE_MBP + 1),
             option::some(MIN_SIZE + 1_0000_00000),
             option::some(LOT_SIZE / 10),
-            option::some(vector[0_0008_000, 0_0020_000, 0_2000_000]),
+            option::some(vector[0_0008_000, 0_0020_000, 0_2000_000, 2, 1]),
             option::some(BASIC_FUNDING_RATE),
             option::some(FUNDING_INTERVAL_TS_MS),
             option::some(EXP_MULTIPLIER),
@@ -473,6 +485,7 @@ module typus_perp::test_trading {
             option::some(OPTION_MAINTENANCE_MARGIN_RATE_BP),
             option::some(OPTION_TRADING_FEE_CONFIG),
             option::some(TRADING_FEE_FORMULA_VERSION),
+            option::some(PROFIT_VAULT_FLAG),
             ctx(scenario)
         );
         return_shared(registry);
@@ -832,6 +845,7 @@ module typus_perp::test_trading {
         let mut leaderboard_registry = leaderboard_registry(scenario);
         let tails_staking_registry = tails_staking_registry(scenario);
         let competition_config = competition_config(scenario);
+        let mut profit_vault = profit_vault(scenario);
 
         if (c_oracle_id == trading_oracle_id) {
             let typus_oracle_c_token = oracle(scenario, c_oracle_id);
@@ -839,6 +853,7 @@ module typus_perp::test_trading {
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
+                &mut profit_vault,
                 &typus_oracle_c_token,
                 &typus_oracle_c_token,
                 &clock,
@@ -861,6 +876,7 @@ module typus_perp::test_trading {
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
+                &mut profit_vault,
                 &typus_oracle_c_token,
                 &typus_oracle_trading_symbol,
                 &clock,
@@ -880,6 +896,7 @@ module typus_perp::test_trading {
         };
         return_shared(registry);
         return_shared(pool_registry);
+        return_shared(profit_vault);
         return_shared(version);
         return_shared(ecosystem_version);
         clock::destroy_for_testing(clock);
@@ -911,6 +928,7 @@ module typus_perp::test_trading {
         let mut leaderboard_registry = leaderboard_registry(scenario);
         let tails_staking_registry = tails_staking_registry(scenario);
         let competition_config = competition_config(scenario);
+        let mut profit_vault = profit_vault(scenario);
 
         if (c_oracle_id == trading_oracle_id) {
             let mut typus_oracle_c_token = oracle(scenario, c_oracle_id);
@@ -919,6 +937,7 @@ module typus_perp::test_trading {
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
+                &mut profit_vault,
                 &typus_oracle_c_token,
                 &typus_oracle_c_token,
                 &clock,
@@ -944,6 +963,7 @@ module typus_perp::test_trading {
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
+                &mut profit_vault,
                 &typus_oracle_c_token,
                 &typus_oracle_trading_symbol,
                 &clock,
@@ -965,6 +985,7 @@ module typus_perp::test_trading {
 
         return_shared(registry);
         return_shared(pool_registry);
+        return_shared(profit_vault);
         return_shared(version);
         return_shared(ecosystem_version);
         clock::destroy_for_testing(clock);
@@ -1638,7 +1659,8 @@ module typus_perp::test_trading {
         new_competition_config(&mut scenario);
         init_oracle(&mut scenario);
         new_treasury_caps(&mut scenario);
-        new_tlp_registry(&mut scenario);
+        new_tlp(&mut scenario);
+        new_profit_vault(&mut scenario);
         new_nft_pool(&mut scenario);
         new_tails_staking_registry(&mut scenario);
         install_ecosystem_manager_cap_entry(&mut scenario);

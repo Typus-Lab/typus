@@ -56,10 +56,11 @@ module typus_perp::treasury_caps {
 
 #[test_only]
 module typus_perp::test_treasury_caps {
-    use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared};
+    use sui::coin::TreasuryCap;
+    use sui::test_scenario::{Scenario, begin, end, ctx, next_tx, take_shared, return_shared, take_from_sender};
     use typus_perp::admin::{Self, Version};
     use typus_perp::treasury_caps::{Self, TreasuryCaps};
-    use typus_perp::tlp::{Self, TLP, LpRegistry as TlpRegistry};
+    use typus_perp::tlp::{Self, TLP};
     const ADMIN: address = @0xFFFF;
 
     fun new_version(scenario: &mut Scenario) {
@@ -72,16 +73,15 @@ module typus_perp::test_treasury_caps {
         next_tx(scenario, ADMIN);
     }
 
-    fun new_tlp_registry(scenario: &mut Scenario) {
+    fun new_tlp(scenario: &mut Scenario) {
         tlp::test_init(ctx(scenario));
         next_tx(scenario, ADMIN);
 
+        let treasury_cap = take_from_sender<TreasuryCap<TLP>>(scenario);
         let version = version(scenario);
-        let mut tlp_registry = tlp_registry(scenario);
         let mut treasury_caps = treasury_caps(scenario);
-        tlp::transfer_treasury_cap(&version, &mut tlp_registry, &mut treasury_caps, ctx(scenario));
+        treasury_caps::manager_store_treasury_cap(&version, &mut treasury_caps, treasury_cap, ctx(scenario));
         return_shared(version);
-        return_shared(tlp_registry);
         return_shared(treasury_caps);
         next_tx(scenario, ADMIN);
     }
@@ -91,16 +91,12 @@ module typus_perp::test_treasury_caps {
         tlp::test_init(ctx(&mut scenario));
         new_version(&mut scenario);
         new_treasury_caps(&mut scenario);
-        new_tlp_registry(&mut scenario);
+        new_tlp(&mut scenario);
         scenario
     }
 
     fun version(scenario: &Scenario): Version {
         take_shared<Version>(scenario)
-    }
-
-    fun tlp_registry(scenario: &Scenario): TlpRegistry {
-        take_shared<TlpRegistry>(scenario)
     }
 
     fun treasury_caps(scenario: &Scenario): TreasuryCaps {

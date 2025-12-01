@@ -124,6 +124,18 @@ module typus_perp::user_account {
         }
     }
 
+    /// Remove a delegate user from a user account.
+    /// WARNING: no authority check inside
+    public(package) fun remove_delegate_user(
+        user_account: &mut UserAccount,
+        user: address,
+    ) {
+        if (user_account.delegate_user.contains(&user)) {
+            let (_exists, idx) = user_account.delegate_user.index_of(&user);
+            user_account.delegate_user.remove(idx);
+        }
+    }
+
     /// Deposits collateral into a user account.
     /// WARNING: no authority check inside
     public(package) fun deposit<C_TOKEN>(

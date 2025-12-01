@@ -3,7 +3,7 @@
 module typus_perp::test_lp_pool {
     use std::type_name;
     use sui::clock::{Self, Clock};
-    use sui::coin::{Self, Coin};
+    use sui::coin::{Self, Coin, TreasuryCap};
     use sui::math as sui_math;
     use sui::sui::SUI;
     use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
@@ -15,7 +15,7 @@ module typus_perp::test_lp_pool {
     use typus_perp::lp_pool::{Self, Registry, ManagerDepositReceiptV2};
     use typus_perp::math;
     use typus_perp::scallop_tests;
-    use typus_perp::tlp::{Self, TLP, LpRegistry as TlpRegistry};
+    use typus_perp::tlp::{Self, TLP};
     use typus_perp::trading::USD;
     use typus_perp::treasury_caps::{Self, TreasuryCaps};
 
@@ -74,16 +74,15 @@ module typus_perp::test_lp_pool {
         next_tx(scenario, ADMIN);
     }
 
-    fun new_tlp_registry(scenario: &mut Scenario) {
+    fun new_tlp(scenario: &mut Scenario) {
         tlp::test_init(ctx(scenario));
         next_tx(scenario, ADMIN);
 
+        let treasury_cap = take_from_sender<TreasuryCap<TLP>>(scenario);
         let version = version(scenario);
-        let mut tlp_registry = tlp_registry(scenario);
         let mut treasury_caps = treasury_caps(scenario);
-        tlp::transfer_treasury_cap(&version, &mut tlp_registry, &mut treasury_caps, ctx(scenario));
+        treasury_caps::manager_store_treasury_cap(&version, &mut treasury_caps, treasury_cap, ctx(scenario));
         return_shared(version);
-        return_shared(tlp_registry);
         return_shared(treasury_caps);
         next_tx(scenario, ADMIN);
     }
@@ -150,10 +149,6 @@ module typus_perp::test_lp_pool {
 
     fun treasury_caps(scenario: &Scenario): TreasuryCaps {
         take_shared<TreasuryCaps>(scenario)
-    }
-
-    fun tlp_registry(scenario: &Scenario): TlpRegistry {
-        take_shared<TlpRegistry>(scenario)
     }
 
     fun oracle(scenario: &Scenario, id: ID): Oracle {
@@ -940,7 +935,7 @@ module typus_perp::test_lp_pool {
         new_version(&mut scenario);
         init_oracle(&mut scenario);
         new_treasury_caps(&mut scenario);
-        new_tlp_registry(&mut scenario);
+        new_tlp(&mut scenario);
         test_new_liquidity_pool_<TLP>(&mut scenario);
         scenario
     }
@@ -1273,7 +1268,7 @@ module typus_perp::test_lp_pool {
         let basic_borrow_rate_1 = option::some(1000);
         let basic_borrow_rate_2 = option::some(1000);
         let utilization_threshold_bp_0 = option::some(1000);
-        let utilization_threshold_bp_1 = option::some(1000);
+        let utilization_threshold_bp_1 = option::some(2000);
 
         {
             let mut registry = registry(&scenario);
@@ -1752,4 +1747,38 @@ module typus_perp::scallop_tests {
     public fun interest_model_scale<T>(params: &InterestModelParams<T>): u64 { params.scale }
     public fun min_borrow_amount<T>(params: &InterestModelParams<T>): u64 { params.min_borrow_amount }
     public fun borrow_weight<T>(params: &InterestModelParams<T>): u64 { params.borrow_weight }
+}
+
+/// The `tlp` module defines the TLP token and its associated functions.
+#[test_only]
+module typus_perp::tlp {
+    use sui::coin_registry;
+
+    /// The TLP token.
+    public struct TLP has drop {}
+
+    /// The number of decimals for the TLP token.
+    const Decimals: u8 = 9;
+
+    /// Initializes the TLP token.
+    fun init(witness: TLP, ctx: &mut TxContext) {
+        let (builder, treasury_cap) = coin_registry::new_currency_with_otw(
+            witness,
+            Decimals,
+            std::string::utf8(b"TLP"),
+            std::string::utf8(b"Typus Perp LP Token Main Pool"),
+            std::string::utf8(b"Typus Perp LP Token for Main Pool"),
+            std::string::utf8(b"https://raw.githubusercontent.com/Typus-Lab/typus-asset/main/assets/TLP.svg"),
+            ctx
+        );
+        let metadata_cap = builder.finalize(ctx);
+
+        transfer::public_transfer(metadata_cap, tx_context::sender(ctx));
+        transfer::public_transfer(treasury_cap, tx_context::sender(ctx));
+    }
+
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(TLP {}, ctx);
+    }
 }

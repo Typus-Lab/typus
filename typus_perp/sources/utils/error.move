@@ -45,6 +45,8 @@ module typus_perp::error {
     const EInvalidConfigRange: u64 = 19;
     /// The pool index is mismatched.
     const EPoolIndexMismatched: u64 = 20;
+    /// The bookkeeping in reserved_amount is wrong. e.g. negative number.
+    const EReserveBookkeepingError: u64 = 21;
     /// The rebalance process field is mismatched.
     const ERebalanceProcessFieldMismatched: u64 = 101;
     /// The rebalance cost threshold has been exceeded.
@@ -182,6 +184,11 @@ module typus_perp::error {
     /// The boost bp array length is invalid.
     const EInvalidBoostBpArrayLength: u64 = 0;
 
+    // ======== Errors from profit_vault ========
+    const EInvalidIdx: u64 = 0;
+    const EWhitelistAlreadyExisted: u64 = 1;
+    const EWhitelistNotExisted: u64 = 2;
+
 
     // ======== Functions ========
     public(package) fun pool_inactive(): u64 { abort EPoolInactive }
@@ -205,6 +212,7 @@ module typus_perp::error {
     public(package) fun liquidity_token_existed(): u64 { abort ELiquidityTokenExisted }
     public(package) fun invalid_config_range(): u64 { abort EInvalidConfigRange }
     public(package) fun pool_index_mismatched(): u64 { abort EPoolIndexMismatched }
+    public(package) fun reserve_bookkeeping_error(): u64 { abort EReserveBookkeepingError }
 
     public(package) fun rebalance_process_field_mismatched(): u64 { abort ERebalanceProcessFieldMismatched }
     public(package) fun exceed_rebalance_cost_threshold(): u64 { abort EExceedRebalanceCostThreshold }
@@ -276,6 +284,11 @@ module typus_perp::error {
 
 
     public(package) fun invalid_boost_bp_array_length(): u64 { abort EInvalidBoostBpArrayLength }
+
+    public(package) fun invalid_idx(): u64 { abort EInvalidIdx }
+    public(package) fun whitelist_already_existed(): u64 { abort EWhitelistAlreadyExisted }
+    public(package) fun whitelist_not_existed(): u64 { abort EWhitelistNotExisted }
+
 }
 
 #[test_only]

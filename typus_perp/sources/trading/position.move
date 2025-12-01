@@ -1451,7 +1451,7 @@ module typus_perp::position {
         let deposit_token = dynamic_field::remove<String, TypeName>(&mut id, string::utf8(K_DEPOSIT_TOKEN));
         let portfolio_index = dynamic_field::remove<String, u64>(&mut id, string::utf8(K_PORTFOLIO_INDEX));
 
-        let (mut fee_in_d_token, trading_fee_usd) = calculate_trading_fee(
+        let (fee_in_d_token, trading_fee_usd) = calculate_trading_fee(
             size,
             size_decimal,
             collateral_oracle_price,
@@ -1462,8 +1462,8 @@ module typus_perp::position {
             collateral_token_decimal,
         );
 
-        let rebate = ((fee_in_d_token as u128) * (referral_fee_rebate_bp as u128) / 10000 as u64);
-        fee_in_d_token = fee_in_d_token - rebate;
+        // let rebate = ((fee_in_d_token as u128) * (referral_fee_rebate_bp as u128) / 10000 as u64);
+        // fee_in_d_token = fee_in_d_token - rebate;
 
         let (mut bid_receipts, collateral_amount) = if (!reduce_only) {
             let receipts = dynamic_field::remove<String, vector<TypusBidReceipt>>(&mut id, string::utf8(K_COLLATERAL));
@@ -1534,7 +1534,7 @@ module typus_perp::position {
             position.reserve_amount = reserve_amount;
             position.collateral_amount = new_collateral_amount;
             position.unrealized_trading_fee = position.unrealized_trading_fee + fee_in_d_token;
-            position.unrealized_rebate = position.unrealized_rebate + rebate;
+            // position.unrealized_rebate = position.unrealized_rebate + rebate;
             (position, is_realized, is_profit, realized_usd, filled_size)
         } else {
             let reserve_usd
@@ -1575,7 +1575,7 @@ module typus_perp::position {
                 unrealized_funding_fee: 0,
                 unrealized_trading_fee: fee_in_d_token,
                 unrealized_borrow_fee: 0,
-                unrealized_rebate: rebate,
+                unrealized_rebate: 0, // rebate,
                 option_collateral_info: option::some(OptionCollateralInfo {
                     index: portfolio_index,
                     bid_token: type_name::with_defining_ids<B_TOKEN>(),

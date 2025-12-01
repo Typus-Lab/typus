@@ -248,12 +248,12 @@ module typus_perp::admin {
                         ),
                         @typus_perp_fee_address,
                     );
+                    emit(SendFeeEvent {
+                        token: type_name::with_defining_ids<TOKEN>(),
+                        amount: fee_info.value,
+                    });
+                    fee_info.value = 0;
                 };
-                emit(SendFeeEvent {
-                    token: type_name::with_defining_ids<TOKEN>(),
-                    amount: fee_info.value,
-                });
-                fee_info.value = 0;
                 return
             };
             i = i + 1;
