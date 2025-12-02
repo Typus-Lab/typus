@@ -52,8 +52,8 @@ module typus_perp::test_lp_pool {
 
     // margin config
     const BASIC_BORROW_RATE_0: u64 = 100;
-    const BASIC_BORROW_RATE_1: u64 = 100;
-    const BASIC_BORROW_RATE_2: u64 = 200;
+    const BASIC_BORROW_RATE_1: u64 = 200;
+    const BASIC_BORROW_RATE_2: u64 = 300;
     const UTILITY_THRESHOLD_BP_0: u64 = 3000;
     const UTILITY_THRESHOLD_BP_1: u64 = 6000;
     const FUNDING_INTERVAL_TS_MS: u64 = 10000;
@@ -1265,8 +1265,8 @@ module typus_perp::test_lp_pool {
         test_add_liquidity_token_<SUI>(&mut scenario, oracle_id, index);
 
         let basic_borrow_rate_0 = option::some(1000);
-        let basic_borrow_rate_1 = option::some(1000);
-        let basic_borrow_rate_2 = option::some(1000);
+        let basic_borrow_rate_1 = option::some(2000);
+        let basic_borrow_rate_2 = option::some(3000);
         let utilization_threshold_bp_0 = option::some(1000);
         let utilization_threshold_bp_1 = option::some(2000);
 

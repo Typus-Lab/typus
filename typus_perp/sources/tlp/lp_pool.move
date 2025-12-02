@@ -36,6 +36,23 @@ module typus_perp::lp_pool {
     const C_BORROW_RATE_DECIMAL: u64 = 9;
     // const C_BUCKET_HARDCODE_LOCK_TIME: u64 = 4838400000;
 
+    const C_MIN_TARGET_WEIGHT_BP: u64 = 0;
+    const C_MAX_TARGET_WEIGHT_BP: u64 = 10000;
+    const C_MIN_MIN_DEPOSIT: u64 = 0;
+    const C_MIN_MAX_CAPACITY: u64 = 0;
+    const C_MAX_BASIC_MINT_FEE_BP: u64 = 30;
+    const C_MAX_ADDITIONAL_MINT_FEE_BP: u64 = 30;
+    const C_MAX_BASIC_BURN_FEE_BP: u64 = 30;
+    const C_MAX_ADDITIONAL_BURN_FEE_BP: u64 = 30;
+    const C_MAX_SWAP_FEE_BP: u64 = 30;
+    const C_MIN_BASIC_BORROW_RATE: u64 = 0;
+    const C_MIN_UTILIZATION_THRESHOLD_BP: u64 = 0;
+    const C_MAX_UTILIZATION_THRESHOLD_BP: u64 = 10000;
+    const C_MAX_SWAP_FEE_PROTOCOL_SHARE_BP: u64 = 10000;
+    const C_MAX_LENDING_PROTOCOL_SHARE_BP: u64 = 10000;
+    const C_MIN_BORROW_INTERVAL_TS_MS: u64 = 0;
+    const C_MIN_MAX_ORDER_RESERVE_RATIO_BP: u64 = 0;
+
     // ======== Structs ========
     /// A registry for all liquidity pools.
     public struct Registry has key {
@@ -431,21 +448,33 @@ module typus_perp::lp_pool {
         assert!(!vector::contains(&liquidity_pool.liquidity_tokens, &token_type), error::liquidity_token_existed());
         vector::push_back(&mut liquidity_pool.liquidity_tokens, token_type);
 
-        assert!(basic_mint_fee_bp <= 30, error::invalid_config_range());
-        assert!(additional_mint_fee_bp <= 30, error::invalid_config_range());
-        assert!(basic_burn_fee_bp <= 30, error::invalid_config_range());
-        assert!(additional_burn_fee_bp <= 30, error::invalid_config_range());
-        assert!(swap_fee_bp <= 30, error::invalid_config_range());
-        assert!(swap_fee_protocol_share_bp <= 10000, error::invalid_config_range());
-        assert!(lending_protocol_share_bp <= 3000, error::invalid_config_range());
         assert!(
-            utilization_threshold_bp_0 > 0
-                && utilization_threshold_bp_0 < utilization_threshold_bp_1
-                    && utilization_threshold_bp_1 < 10000,
+            target_weight_bp > C_MIN_TARGET_WEIGHT_BP && target_weight_bp <= C_MAX_TARGET_WEIGHT_BP,
             error::invalid_config_range()
         );
-        assert!(borrow_interval_ts_ms > 0, error::invalid_config_range());
-        assert!(max_order_reserve_ratio_bp > 0, error::invalid_config_range());
+        assert!(min_deposit > C_MIN_MIN_DEPOSIT, error::invalid_config_range());
+        assert!(max_capacity > C_MIN_MAX_CAPACITY, error::invalid_config_range());
+        assert!(basic_mint_fee_bp <= C_MAX_BASIC_MINT_FEE_BP, error::invalid_config_range());
+        assert!(additional_mint_fee_bp <= C_MAX_ADDITIONAL_MINT_FEE_BP, error::invalid_config_range());
+        assert!(basic_burn_fee_bp <= C_MAX_BASIC_BURN_FEE_BP, error::invalid_config_range());
+        assert!(additional_burn_fee_bp <= C_MAX_ADDITIONAL_BURN_FEE_BP, error::invalid_config_range());
+        assert!(swap_fee_bp <= C_MAX_SWAP_FEE_BP, error::invalid_config_range());
+        assert!(swap_fee_protocol_share_bp <= C_MAX_SWAP_FEE_PROTOCOL_SHARE_BP, error::invalid_config_range());
+        assert!(lending_protocol_share_bp <= C_MAX_LENDING_PROTOCOL_SHARE_BP, error::invalid_config_range());
+        assert!(
+            basic_borrow_rate_0 > C_MIN_BASIC_BORROW_RATE
+                && basic_borrow_rate_0 < basic_borrow_rate_1
+                    && basic_borrow_rate_1 < basic_borrow_rate_2,
+            error::invalid_config_range()
+        );
+        assert!(
+            utilization_threshold_bp_0 > C_MIN_UTILIZATION_THRESHOLD_BP
+                && utilization_threshold_bp_0 < utilization_threshold_bp_1
+                    && utilization_threshold_bp_1 < C_MAX_UTILIZATION_THRESHOLD_BP,
+            error::invalid_config_range()
+        );
+        assert!(borrow_interval_ts_ms > C_MIN_BORROW_INTERVAL_TS_MS, error::invalid_config_range());
+        assert!(max_order_reserve_ratio_bp > C_MIN_MAX_ORDER_RESERVE_RATIO_BP, error::invalid_config_range());
 
         let spot_config = SpotConfig {
             min_deposit,
@@ -550,40 +579,47 @@ module typus_perp::lp_pool {
         let previous_spot_config = token_pool.config.spot_config;
 
         if (option::is_some(&target_weight_bp)) {
+            assert!(
+                *option::borrow(&target_weight_bp) > C_MIN_TARGET_WEIGHT_BP
+                    &&*option::borrow(&target_weight_bp) <= C_MAX_TARGET_WEIGHT_BP,
+                error::invalid_config_range()
+            );
             token_pool.config.spot_config.target_weight_bp = *option::borrow(&target_weight_bp);
         };
         if (option::is_some(&min_deposit)) {
+            assert!(*option::borrow(&min_deposit) > C_MIN_MIN_DEPOSIT, error::invalid_config_range());
             token_pool.config.spot_config.min_deposit = *option::borrow(&min_deposit);
         };
         if (option::is_some(&max_capacity)) {
+            assert!(*option::borrow(&max_capacity) > C_MIN_MAX_CAPACITY, error::invalid_config_range());
             token_pool.config.spot_config.max_capacity = *option::borrow(&max_capacity);
         };
         if (option::is_some(&basic_mint_fee_bp)) {
-            assert!(*option::borrow(&basic_mint_fee_bp) <= 30, error::invalid_config_range());
+            assert!(*option::borrow(&basic_mint_fee_bp) <= C_MAX_BASIC_MINT_FEE_BP, error::invalid_config_range());
             token_pool.config.spot_config.basic_mint_fee_bp = *option::borrow(&basic_mint_fee_bp);
         };
         if (option::is_some(&additional_mint_fee_bp)) {
-            assert!(*option::borrow(&additional_mint_fee_bp) <= 30, error::invalid_config_range());
+            assert!(*option::borrow(&additional_mint_fee_bp) <= C_MAX_ADDITIONAL_MINT_FEE_BP, error::invalid_config_range());
             token_pool.config.spot_config.additional_mint_fee_bp = *option::borrow(&additional_mint_fee_bp);
         };
         if (option::is_some(&basic_burn_fee_bp)) {
-            assert!(*option::borrow(&basic_burn_fee_bp) <= 30, error::invalid_config_range());
+            assert!(*option::borrow(&basic_burn_fee_bp) <= C_MAX_BASIC_BURN_FEE_BP, error::invalid_config_range());
             token_pool.config.spot_config.basic_burn_fee_bp = *option::borrow(&basic_burn_fee_bp);
         };
         if (option::is_some(&additional_burn_fee_bp)) {
-            assert!(*option::borrow(&additional_burn_fee_bp) <= 30, error::invalid_config_range());
+            assert!(*option::borrow(&additional_burn_fee_bp) <= C_MAX_ADDITIONAL_BURN_FEE_BP, error::invalid_config_range());
             token_pool.config.spot_config.additional_burn_fee_bp = *option::borrow(&additional_burn_fee_bp);
         };
         if (option::is_some(&swap_fee_bp)) {
-            assert!(*option::borrow(&swap_fee_bp) <= 30, error::invalid_config_range());
+            assert!(*option::borrow(&swap_fee_bp) <= C_MAX_SWAP_FEE_BP, error::invalid_config_range());
             token_pool.config.spot_config.swap_fee_bp = *option::borrow(&swap_fee_bp);
         };
         if (option::is_some(&swap_fee_protocol_share_bp)) {
-            assert!(*option::borrow(&swap_fee_protocol_share_bp) <= 10000, error::invalid_config_range());
+            assert!(*option::borrow(&swap_fee_protocol_share_bp) <= C_MAX_SWAP_FEE_PROTOCOL_SHARE_BP, error::invalid_config_range());
             token_pool.config.spot_config.swap_fee_protocol_share_bp = *option::borrow(&swap_fee_protocol_share_bp);
         };
         if (option::is_some(&lending_protocol_share_bp)) {
-            assert!(*option::borrow(&lending_protocol_share_bp) <= 10000, error::invalid_config_range());
+            assert!(*option::borrow(&lending_protocol_share_bp) <= C_MAX_LENDING_PROTOCOL_SHARE_BP, error::invalid_config_range());
             token_pool.config.spot_config.lending_protocol_share_bp = *option::borrow(&lending_protocol_share_bp);
         };
 
@@ -772,18 +808,23 @@ module typus_perp::lp_pool {
             token_pool.config.margin_config.utilization_threshold_bp_1 = *option::borrow(&utilization_threshold_bp_1);
         };
         if (option::is_some(&borrow_interval_ts_ms)) {
-            assert!(*option::borrow(&borrow_interval_ts_ms) > 0, error::invalid_config_range());
+            assert!(*option::borrow(&borrow_interval_ts_ms) > C_MIN_BORROW_INTERVAL_TS_MS, error::invalid_config_range());
             token_pool.config.margin_config.borrow_interval_ts_ms = *option::borrow(&borrow_interval_ts_ms);
         };
         if (option::is_some(&max_order_reserve_ratio_bp)) {
-            assert!(*option::borrow(&max_order_reserve_ratio_bp) > 0, error::invalid_config_range());
+            assert!(*option::borrow(&max_order_reserve_ratio_bp) > C_MIN_MAX_ORDER_RESERVE_RATIO_BP, error::invalid_config_range());
             token_pool.config.margin_config.max_order_reserve_ratio_bp = *option::borrow(&max_order_reserve_ratio_bp);
         };
-
         assert!(
-            token_pool.config.margin_config.utilization_threshold_bp_0 > 0
+            token_pool.config.margin_config.basic_borrow_rate_0 > C_MIN_BASIC_BORROW_RATE
+                && token_pool.config.margin_config.basic_borrow_rate_0 < token_pool.config.margin_config.basic_borrow_rate_1
+                    && token_pool.config.margin_config.basic_borrow_rate_1 < token_pool.config.margin_config.basic_borrow_rate_2,
+            error::invalid_config_range()
+        );
+        assert!(
+            token_pool.config.margin_config.utilization_threshold_bp_0 > C_MIN_UTILIZATION_THRESHOLD_BP
                 && token_pool.config.margin_config.utilization_threshold_bp_0 < token_pool.config.margin_config.utilization_threshold_bp_1
-                    && token_pool.config.margin_config.utilization_threshold_bp_1 < 10000,
+                    && token_pool.config.margin_config.utilization_threshold_bp_1 < C_MAX_UTILIZATION_THRESHOLD_BP,
             error::invalid_config_range()
         );
 

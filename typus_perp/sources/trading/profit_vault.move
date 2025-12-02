@@ -27,7 +27,6 @@ module typus_perp::profit_vault {
         token: TypeName,
         amount: u64,
         create_ts_ms: u64,
-        unlock_ts_ms: u64
     }
 
     public struct LockedUserProfit has copy, drop, store {
@@ -210,7 +209,7 @@ module typus_perp::profit_vault {
                 &mut lock_vault.id, token_type
             ).split(locked_balance_value);
 
-            if (dynamic_field::exists_(&lock_vault.id, token_type)) {
+            if (dynamic_field::exists_(&profit_vault.id, token_type)) {
                 dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut profit_vault.id, token_type).join(locked_balance);
             } else {
                 dynamic_field::add(&mut profit_vault.id, token_type, locked_balance);
@@ -241,7 +240,6 @@ module typus_perp::profit_vault {
             token: token_type,
             amount: balance.value(),
             create_ts_ms: clock.timestamp_ms(),
-            unlock_ts_ms: clock.timestamp_ms() + profit_vault.unlock_countdown_ts_ms
         };
         if (profit_vault.user_profits.contains(user)) {
             let profits = profit_vault.user_profits.borrow_mut(user);
@@ -275,7 +273,9 @@ module typus_perp::profit_vault {
             let mut profits = profit_vault.user_profits.remove(user);
             while (profits.length() > 0) {
                 let user_profit = profits.pop_back();
-                if (user_profit.token == token_type && current_ts_ms >= user_profit.unlock_ts_ms) {
+                if (user_profit.token == token_type
+                    && current_ts_ms >= user_profit.create_ts_ms + profit_vault.unlock_countdown_ts_ms
+                ) {
                     total_withdrawable = total_withdrawable + user_profit.amount;
                 } else {
                     remaining_shares.push_back(user_profit);
