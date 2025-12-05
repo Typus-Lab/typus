@@ -2,16 +2,6 @@ module typus_dov::tds_view_function {
     use std::bcs;
     use std::type_name;
 
-    use sui::clock::Clock;
-
-    use spool::user;
-    use spool::spool::Spool;
-    use spool::spool_account;
-    use spool::rewards_pool::RewardsPool;
-    use protocol::redeem;
-    use protocol::market::Market;
-    use protocol::version::Version;
-
     use typus_dov::typus_dov_single::{Self, Registry};
     use typus_framework::big_vector;
     use typus_framework::dutch;
@@ -310,46 +300,4 @@ module typus_dov::tds_view_function {
 
         result
     }
-
-    /// [View Function Only] Gets the withdrawal information from Scallop, BCS-encoded.
-    /// WARNING: the withdraw process may actually happend inside
-    // public(package) fun get_scallop_withdrawal_bcs<D_TOKEN, R_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     version: &Version,
-    //     market: &mut Market,
-    //     spool: &mut Spool,
-    //     rewards_pool: &mut RewardsPool<R_TOKEN>,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ): vector<vector<u8>> {
-    //     let spool_account = typus_dov_single::get_mut_scallop_spool_account<D_TOKEN>(registry, index);
-    //     let stake_amount = spool_account::stake_amount(spool_account);
-    //     let reward = user::redeem_rewards(
-    //         spool,
-    //         rewards_pool,
-    //         spool_account,
-    //         clock,
-    //         ctx,
-    //     );
-    //     let market_coin = user::unstake(
-    //         spool,
-    //         spool_account,
-    //         stake_amount,
-    //         clock,
-    //         ctx,
-    //     );
-    //     let fund = redeem::redeem(
-    //         version,
-    //         market,
-    //         market_coin,
-    //         clock,
-    //         ctx,
-    //     );
-    //     let result = vector[bcs::to_bytes(&fund), bcs::to_bytes(&reward)];
-    //     transfer::public_transfer(fund, @fee_address);
-    //     transfer::public_transfer(reward, @fee_address);
-
-    //     result
-    // }
 }

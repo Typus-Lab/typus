@@ -182,132 +182,35 @@ module typus_dov::tds_fee_pool_entry {
         );
     }
 
-    /// Event emitted when an authorized user is added to a shared fee pool.
+    #[deprecated]
     public struct AddSharedFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
-    /// Adds an authorized user to a shared fee pool.
-    /// This is an authorized function (via registry authority).
-    public entry fun add_shared_fee_pool_authorized_user(
-        registry: &mut Registry,
-        key: vector<u8>,
-        mut users: vector<address>,
-        ctx: &TxContext,
-    ) {
-        safety_check(registry, ctx);
-
-        // main logic
-        let (
-            _id,
-            _num_of_vault,
-            _authority,
-            fee_pool,
-            _portfolio_vault_registry,
-            _deposit_vault_registry,
-            _auction_registry,
-            _bid_vault_registry,
-            _refund_vault_registry,
-            _additional_config_registry,
-            _version,
-            _transaction_suspended,
-        ) = typus_dov_single::get_mut_registry_inner(registry);
-        while (!vector::is_empty(&users)) {
-            let user = vector::pop_back(&mut users);
-            balance_pool::add_shared_authorized_user(fee_pool, key, user);
-        };
-
-        // emit event
-        emit(AddSharedFeePoolAuthorizedUserEvent {
-                signer: tx_context::sender(ctx),
-                users: authority::whitelist(balance_pool::shared_authority(fee_pool, key)),
-            }
-        );
-    }
-
-    /// Event emitted when an authorized user is removed from a shared fee pool.
+    #[deprecated]
+    public fun add_shared_fee_pool_authorized_user(
+        _registry: &mut Registry,
+        _key: vector<u8>,
+        _users: vector<address>,
+        _ctx: &TxContext,
+    ) { abort 0 }
+    #[deprecated]
     public struct RemoveSharedFeePoolAuthorizedUserEvent has copy, drop {
         signer: address,
         users: vector<address>,
     }
-    /// Removes an authorized user from a shared fee pool.
-    /// This is an authorized function (via registry authority).
-    public entry fun remove_shared_fee_pool_authorized_user(
-        registry: &mut Registry,
-        key: vector<u8>,
-        mut users: vector<address>,
-        ctx: &TxContext,
-    ) {
-        safety_check(registry, ctx);
-
-        // main logic
-        let (
-            _id,
-            _num_of_vault,
-            _authority,
-            fee_pool,
-            _portfolio_vault_registry,
-            _deposit_vault_registry,
-            _auction_registry,
-            _bid_vault_registry,
-            _refund_vault_registry,
-            _additional_config_registry,
-            _version,
-            _transaction_suspended,
-        ) = typus_dov_single::get_mut_registry_inner(registry);
-        while (!vector::is_empty(&users)) {
-            let user = vector::pop_back(&mut users);
-            balance_pool::remove_shared_authorized_user(fee_pool, key, user);
-        };
-
-        // emit event
-        emit(RemoveSharedFeePoolAuthorizedUserEvent {
-                signer: tx_context::sender(ctx),
-                users: authority::whitelist(balance_pool::shared_authority(fee_pool, key)),
-            }
-        );
-    }
-
-    /// Event emitted when a fee is taken from a shared fee pool.
+    #[deprecated]
+    public fun remove_shared_fee_pool_authorized_user(
+        _registry: &mut Registry,
+        _key: vector<u8>,
+        _users: vector<address>,
+        _ctx: &TxContext,
+    ) { abort 0 }
+    #[deprecated]
     public struct TakeSharedFeeEvent has copy, drop {
         signer: address,
         key: vector<u8>,
         token: TypeName,
         amount: u64,
-    }
-    /// Takes a fee from a shared fee pool.
-    /// This is an authorized function (via registry authority).
-    entry fun take_shared_fee<TOKEN>(
-        registry: &mut Registry,
-        key: vector<u8>,
-        amount: Option<u64>,
-        ctx: &mut TxContext,
-    ) {
-        safety_check(registry, ctx);
-
-        let (
-            _id,
-            _num_of_vault,
-            _authority,
-            fee_pool,
-            _portfolio_vault_registry,
-            _deposit_vault_registry,
-            _auction_registry,
-            _bid_vault_registry,
-            _refund_vault_registry,
-            _additional_config_registry,
-            _version,
-            _transaction_suspended,
-        ) = typus_dov_single::get_mut_registry_inner(registry);
-        let amount = balance_pool::take_shared<TOKEN>(fee_pool, key, amount, ctx);
-
-        // emit event
-        emit(TakeSharedFeeEvent {
-                signer: tx_context::sender(ctx),
-                key,
-                token: type_name::with_defining_ids<TOKEN>(),
-                amount,
-            }
-        );
     }
 }

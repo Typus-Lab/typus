@@ -445,7 +445,7 @@ module typus_dov::babe {
 
     const Decimals: u8 = 9;
     // Due to the package size, we changed it to a test_only function
-    #[test_only]
+    #[test_only, allow(deprecated_usage)]
     fun init(witness: BABE, ctx: &mut TxContext) {
         let (treasury_cap, coin_metadata) = coin::create_currency(
             witness,
@@ -477,7 +477,7 @@ module typus_dov::babe2 {
 
     const Decimals: u8 = 9;
     // Due to the package size, we changed it to a test_only function
-    #[test_only]
+    #[test_only, allow(deprecated_usage)]
     fun init(witness: BABE2, ctx: &mut TxContext) {
         let (treasury_cap, coin_metadata) = coin::create_currency(
             witness,

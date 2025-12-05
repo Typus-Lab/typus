@@ -551,7 +551,7 @@ module typus_dov::test_manager_cases {
             current_ts_ms()
         );
 
-        let mut activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
+        let activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
 
         let (index_0, index_1) = (0, 1);
         test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index_0, 4);

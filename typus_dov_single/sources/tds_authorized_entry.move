@@ -6,6 +6,7 @@ module typus_dov::tds_authorized_entry {
     use sui::coin::{Self, Coin};
     use sui::dynamic_field;
     use sui::event::emit;
+    use sui_system::sui_system::SuiSystemState;
 
     use protocol::market::Market;
     use protocol::version::Version;
@@ -313,15 +314,6 @@ module typus_dov::tds_authorized_entry {
             index,
             oracle,
         );
-    }
-
-    /// Event emitted when the active vault configuration is updated.
-    #[allow(unused_field)]
-    public struct UpdateActiveVaultConfigEvent has copy, drop {
-        signer: address,
-        index: u64,
-        previous: VaultConfig,
-        current: VaultConfig,
     }
 
     /// Event emitted when the warmup vault configuration is updated.
@@ -640,19 +632,6 @@ module typus_dov::tds_authorized_entry {
         );
     }
 
-    /// Deprecated function.
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun safu_otc<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        delivery_price: u64,
-        balance: Balance<B_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): (Option<TypusBidReceipt>, Balance<B_TOKEN>, vector<u64>) {
-        abort 0
-    }
-
     /// [Authorized Function] Handles a SAFU over-the-counter deal.
     public fun safu_otc_v2<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
@@ -945,44 +924,6 @@ module typus_dov::tds_authorized_entry {
         };
     }
 
-    /// Event emitted when a Scallop spool account is created.
-    #[allow(unused_field)]
-    public struct CreateScallopSpoolAccount has copy, drop {
-        signer: address,
-        index: u64,
-        spool_id: address,
-        spool_account_id: address,
-    }
-
-    /// Event emitted when Scallop integration is enabled.
-    #[allow(unused_field)]
-    public struct EnableScallop has copy, drop {
-        signer: address,
-        index: u64,
-    }
-    /// Event emitted when Scallop integration is disabled.
-    #[allow(unused_field)]
-    public struct DisableScallop has copy, drop {
-        signer: address,
-        index: u64,
-    }
-
-    /// Event emitted when funds are deposited to Scallop.
-    #[allow(unused_field)]
-    public struct DepositScallop has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-
-    /// Event emitted when funds are withdrawn from Scallop.
-    #[allow(unused_field)]
-    public struct WithdrawScallop has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-
     /// Event emitted when fixed incentives are added.
     public struct FixedIncentiviseEvent has copy, drop {
         signer: address,
@@ -1037,20 +978,6 @@ module typus_dov::tds_authorized_entry {
             token: type_name::with_defining_ids<I_TOKEN>(),
             amount,
         });
-    }
-
-    // ======= scallop basic lending =======
-    /// Event emitted when Scallop basic lending is enabled.
-    #[allow(unused_field)]
-    public struct EnableScallopBasicLending has copy, drop {
-        signer: address,
-        index: u64,
-    }
-    /// Event emitted when Scallop basic lending is disabled.
-    #[allow(unused_field)]
-    public struct DisableScallopBasicLending has copy, drop {
-        signer: address,
-        index: u64,
     }
 
     /// Event emitted when funds are deposited to Scallop for basic lending.
@@ -1123,7 +1050,6 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
-    // ======= additional lending =======
     /// Event emitted when additional lending is enabled.
     public struct EnableAdditionalLending has copy, drop {
         signer: address,
@@ -1169,185 +1095,6 @@ module typus_dov::tds_authorized_entry {
             index,
         });
     }
-
-    /// Event emitted when funds are deposited to additional lending.
-    #[allow(unused_field)]
-    public struct DepositAdditionalLending has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// Event emitted when funds are withdrawn from additional lending.
-    #[allow(unused_field)]
-    public struct WithdrawAdditionalLending has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// Event emitted when Suilend integration is enabled.
-    #[allow(unused_field)]
-    public struct EnableSuilend has copy, drop {
-        signer: address,
-        index: u64,
-    }
-    /// Event emitted when Suilend integration is disabled.
-    #[allow(unused_field)]
-    public struct DisableSuilend has copy, drop {
-        signer: address,
-        index: u64,
-    }
-
-    /// Event emitted when a Suilend obligation owner cap is created.
-    public struct CreateSuilendObligationOwnerCap has copy, drop {
-        signer: address,
-        index: u64,
-        lending_market_id: address,
-        obligation_owner_cap_id: address,
-    }
-    /// [Authorized Function] Creates a Suilend obligation owner cap.
-    // public fun create_suilend_obligation_owner_cap<D_TOKEN, B_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-    //     // main logic
-    //     let (lending_market_id, obligation_owner_cap_id) = typus_dov_single::create_suilend_obligation_owner_cap_(
-    //         registry,
-    //         index,
-    //         suilend_lending_market,
-    //         ctx,
-    //     );
-
-    //     // emit event
-    //     emit(CreateSuilendObligationOwnerCap {
-    //         signer: tx_context::sender(ctx),
-    //         index,
-    //         lending_market_id,
-    //         obligation_owner_cap_id,
-    //     });
-    // }
-
-    /// Event emitted when funds are deposited to Suilend.
-    public struct DepositSuilend has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Deposits funds to Suilend.
-    // public fun deposit_suilend<D_TOKEN, B_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-    //     // main logic
-    //     let u64_padding = typus_dov_single::deposit_suilend_<D_TOKEN>(
-    //         registry,
-    //         index,
-    //         suilend_lending_market,
-    //         reserve_array_index,
-    //         clock,
-    //         ctx,
-    //     );
-
-    //     // emit event
-    //     emit(DepositSuilend {
-    //         signer: tx_context::sender(ctx),
-    //         index,
-    //         u64_padding,
-    //     });
-    // }
-
-    /// [Authorized Function] Refreshes the reserve price in Suilend.
-    // public fun refresh_suilend_reserve_price(
-    //     lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     clock: &Clock,
-    //     price_info: &pyth::price_info::PriceInfoObject,
-    // ) {
-    //     lending_market::refresh_reserve_price(lending_market, reserve_array_index, clock, price_info);
-    // }
-
-    /// Event emitted when funds are withdrawn from Suilend.
-    public struct WithdrawSuilend has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Withdraws funds from Suilend.
-    // public fun withdraw_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     reward_index: Option<u64>,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-    //     // main logic
-    //     let u64_padding = typus_dov_single::withdraw_suilend_<D_TOKEN, R_TOKEN>(
-    //         registry,
-    //         index,
-    //         suilend_lending_market,
-    //         reserve_array_index,
-    //         reward_index,
-    //         clock,
-    //         ctx,
-    //     );
-
-    //     // emit event
-    //     emit(WithdrawSuilend {
-    //         signer: tx_context::sender(ctx),
-    //         index,
-    //         u64_padding,
-    //     });
-    // }
-
-    /// Event emitted when rewards are claimed from Suilend.
-    public struct RewardSuilend has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Claims rewards from Suilend.
-    // public fun reward_suilend<D_TOKEN, B_TOKEN, R_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     reward_index: u64,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
-
-    //     // main logic
-    //     let u64_padding = typus_dov_single::reward_suilend_<R_TOKEN>(
-    //         registry,
-    //         index,
-    //         suilend_lending_market,
-    //         reserve_array_index,
-    //         reward_index,
-    //         clock,
-    //         ctx,
-    //     );
-
-    //     // emit event
-    //     emit(RewardSuilend {
-    //         signer: tx_context::sender(ctx),
-    //         index,
-    //         u64_padding,
-    //     });
-    // }
 
     /// Event emitted when a Navi account cap is created.
     public struct CreateNaviAccountCap has copy, drop {
@@ -1422,26 +1169,7 @@ module typus_dov::tds_authorized_entry {
         index: u64,
         u64_padding: vector<u64>,
     }
-    #[deprecated, allow(unused_type_parameter)]
-    public fun withdraw_navi<D_TOKEN, B_TOKEN>(
-        _registry: &mut Registry,
-        _index: u64,
-        _oracle_config: &mut OracleConfig,
-        _price_oracle: &mut PriceOracle,
-        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        _pyth_price_info: &pyth::price_info::PriceInfoObject,
-        _feed_address: address,
-        _storage: &mut lending_core::storage::Storage,
-        _pool: &mut lending_core::pool::Pool<D_TOKEN>,
-        _asset: u8,
-        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        _clock: &Clock,
-        _ctx: &TxContext,
-    ) {
-        abort 0
-    }
-    public fun withdraw_navi_v2<D_TOKEN, B_TOKEN>(
+    public fun withdraw_navi_v3<D_TOKEN, B_TOKEN>(
         registry: &mut Registry,
         index: u64,
         oracle_config: &mut OracleConfig,
@@ -1454,6 +1182,7 @@ module typus_dov::tds_authorized_entry {
         asset: u8,
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -1473,6 +1202,7 @@ module typus_dov::tds_authorized_entry {
             asset,
             incentive_v2,
             incentive_v3,
+            system_state,
             clock,
             ctx,
         );
@@ -1484,7 +1214,6 @@ module typus_dov::tds_authorized_entry {
             u64_padding,
         });
     }
-
 
     /// Event emitted when rewards are claimed from Navi.
     public struct RewardNavi has copy, drop {
@@ -1518,6 +1247,7 @@ module typus_dov::tds_authorized_entry {
             clock,
         )
     }
+
     /// [Authorized Function] Post-claims rewards from Navi. This is the second step in a two-step process.
     public fun post_reward_navi<D_TOKEN, B_TOKEN, R_TOKEN>(
         registry: &mut Registry,
@@ -1548,7 +1278,7 @@ module typus_dov::tds_authorized_entry {
         u64_padding: vector<u64>,
     }
     /// [Authorized Function] Borrows funds from Navi.
-    public fun borrow_navi<TOKEN>(
+    public fun borrow_navi_v3<TOKEN>(
         registry: &mut Registry,
         index: u64,
         deposit_index: u64,
@@ -1562,6 +1292,7 @@ module typus_dov::tds_authorized_entry {
         asset: u8,
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
         amount: u64,
         clock: &Clock,
         ctx: &mut TxContext,
@@ -1583,6 +1314,7 @@ module typus_dov::tds_authorized_entry {
             asset,
             incentive_v2,
             incentive_v3,
+            system_state,
             amount,
             clock,
             ctx,
@@ -1813,7 +1545,6 @@ module typus_dov::tds_authorized_entry {
         (balance, u64_padding)
     }
 
-
     /// Event emitted after repaying Navi interest.
     public struct PostRepayNaviInterest has copy, drop {
         signer: address,
@@ -1869,41 +1600,12 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
-    #[allow(unused_field)]
-    public struct RepayNavi has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        deposit_index: u64,
-        oracle_config: &mut OracleConfig,
-        price_oracle: &mut PriceOracle,
-        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        pyth_price_info: &pyth::price_info::PriceInfoObject,
-        feed_address: address,
-        storage: &mut lending_core::storage::Storage,
-        pool: &mut lending_core::pool::Pool<D_TOKEN>,
-        asset: u8,
-        incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        coin: Coin<D_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        abort 0
-    }
-
     public struct UpdateInfoEvent has copy, drop {
         signer: address,
         index: u64,
         previous: Info,
         current: Info,
     }
-
     entry fun update_info(
         registry: &mut Registry,
         index: u64,
@@ -1931,4 +1633,185 @@ module typus_dov::tds_authorized_entry {
             current,
         });
     }
+
+    #[allow(unused_field)]
+    public struct EnableScallopBasicLending has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct DisableScallopBasicLending has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct DepositAdditionalLending has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct WithdrawAdditionalLending has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct EnableSuilend has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct DisableSuilend has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct CreateSuilendObligationOwnerCap has copy, drop {
+        signer: address,
+        index: u64,
+        lending_market_id: address,
+        obligation_owner_cap_id: address,
+    }
+    #[allow(unused_field)]
+    public struct DepositSuilend has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct WithdrawSuilend has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct RewardSuilend has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct RepayNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct CreateScallopSpoolAccount has copy, drop {
+        signer: address,
+        index: u64,
+        spool_id: address,
+        spool_account_id: address,
+    }
+    #[allow(unused_field)]
+    public struct EnableScallop has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct DisableScallop has copy, drop {
+        signer: address,
+        index: u64,
+    }
+    #[allow(unused_field)]
+    public struct DepositScallop has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct WithdrawScallop has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    #[allow(unused_field)]
+    public struct UpdateActiveVaultConfigEvent has copy, drop {
+        signer: address,
+        index: u64,
+        previous: VaultConfig,
+        current: VaultConfig,
+    }
+    #[deprecated, allow(unused_type_parameter)]
+    public fun safu_otc<D_TOKEN, B_TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _delivery_price: u64,
+        _balance: Balance<B_TOKEN>,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ): (Option<TypusBidReceipt>, Balance<B_TOKEN>, vector<u64>) { abort 0 }
+    #[deprecated, allow(unused_type_parameter)]
+    public fun withdraw_navi<D_TOKEN, B_TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _oracle_config: &mut OracleConfig,
+        _price_oracle: &mut PriceOracle,
+        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pyth_price_info: &pyth::price_info::PriceInfoObject,
+        _feed_address: address,
+        _storage: &mut lending_core::storage::Storage,
+        _pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        _asset: u8,
+        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        _clock: &Clock,
+        _ctx: &TxContext,
+    ) { abort 0 }
+    #[deprecated, allow(unused_type_parameter)]
+    public fun repay_navi<D_TOKEN, B_TOKEN, I_TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _deposit_index: u64,
+        _oracle_config: &mut OracleConfig,
+        _price_oracle: &mut PriceOracle,
+        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pyth_price_info: &pyth::price_info::PriceInfoObject,
+        _feed_address: address,
+        _storage: &mut lending_core::storage::Storage,
+        _pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        _asset: u8,
+        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        _coin: Coin<D_TOKEN>,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ) { abort 0 }
+    #[deprecated, allow(unused_type_parameter)]
+    public fun withdraw_navi_v2<D_TOKEN, B_TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _oracle_config: &mut OracleConfig,
+        _price_oracle: &mut PriceOracle,
+        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pyth_price_info: &pyth::price_info::PriceInfoObject,
+        _feed_address: address,
+        _storage: &mut lending_core::storage::Storage,
+        _pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        _asset: u8,
+        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ) { abort 0 }
+    #[deprecated, allow(unused_type_parameter)]
+    public fun borrow_navi<TOKEN>(
+        _registry: &mut Registry,
+        _index: u64,
+        _deposit_index: u64,
+        _oracle_config: &mut OracleConfig,
+        _price_oracle: &mut PriceOracle,
+        _supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        _pyth_price_info: &pyth::price_info::PriceInfoObject,
+        _feed_address: address,
+        _storage: &mut lending_core::storage::Storage,
+        _pool: &mut lending_core::pool::Pool<TOKEN>,
+        _asset: u8,
+        _incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        _incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        _amount: u64,
+        _clock: &Clock,
+        _ctx: &mut TxContext,
+    ) { abort 0 }
 }

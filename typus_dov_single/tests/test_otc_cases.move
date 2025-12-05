@@ -12,7 +12,6 @@ module typus_dov::test_otc_cases {
     const ADMIN: address = @0xFFFF;
     const BABE1: address = @0xBABE1;
     const BABE2: address = @0xBABE2;
-    const BABE3: address = @0xBABE3;
 
     public struct WITNESS_1 has drop {}
     public struct WITNESS_2 has drop {}

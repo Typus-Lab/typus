@@ -1,8 +1,7 @@
 #[test_only]
 module typus_dov::test_user_cases {
-    use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_from_address};
+    use sui::test_scenario::{end, ctx, sender, next_tx, return_shared, take_from_sender};
     use typus_dov::test_environment::{Self, current_ts_ms};
     use typus_dov::test_manager_entry;
     use typus_dov::test_tds_user_entry;
@@ -44,7 +43,7 @@ module typus_dov::test_user_cases {
         );
 
         let index = 0;
-        let mut activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
+        let activate_ts_ms = current_ts_ms() / 86400_000 * 86400_000;
 
         // deposit
         let ts_ms = activate_ts_ms;
@@ -151,7 +150,7 @@ module typus_dov::test_user_cases {
         test_tds_user_entry::test_exercise_<SUI, SUI>(&mut scenario, index, vector[receipt]);
 
         // activate
-        activate_ts_ms = ts_ms;
+        // activate_ts_ms = ts_ms;
         let oracle_price = 100000_0000_0000;
         test_manager_entry::test_activate_<SUI, SUI, SUI>(
             &mut scenario,
@@ -313,25 +312,25 @@ module typus_dov::test_user_cases {
 
         {
             let registry = test_environment::dov_registry(&scenario);
-            let result = tds_view_function::get_vault_data_bcs(&registry, vector[]);
-            let result = tds_view_function::get_vault_data_bcs(&registry, vector[0]);
-            let result = tds_view_function::get_vault_data_bcs(&registry, vector[1]);
+            let _result = tds_view_function::get_vault_data_bcs(&registry, vector[]);
+            let _result = tds_view_function::get_vault_data_bcs(&registry, vector[0]);
+            let _result = tds_view_function::get_vault_data_bcs(&registry, vector[1]);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
 
         {
             let registry = test_environment::dov_registry(&scenario);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[]);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[0]);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[1]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[0]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[1]);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
 
         {
             let registry = test_environment::dov_registry(&scenario);
-            let result = tds_view_function::get_auction_bids_bcs(&registry, 0);
+            let _result = tds_view_function::get_auction_bids_bcs(&registry, 0);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
@@ -339,8 +338,8 @@ module typus_dov::test_user_cases {
         {
             let registry = test_environment::dov_registry(&scenario);
             let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
-            let result = tds_view_function::get_deposit_shares_bcs(&registry, vector[receipt], sender(&scenario));
-            let result = tds_view_function::get_deposit_shares_bcs(&registry, vector[], sender(&scenario));
+            let _result = tds_view_function::get_deposit_shares_bcs(&registry, vector[receipt], sender(&scenario));
+            let _result = tds_view_function::get_deposit_shares_bcs(&registry, vector[], sender(&scenario));
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
@@ -348,15 +347,15 @@ module typus_dov::test_user_cases {
         {
             let registry = test_environment::dov_registry(&scenario);
             let receipt = take_from_sender<TypusBidReceipt>(&scenario);
-            let result = tds_view_function::get_my_bids_bcs(&registry, vector[receipt]);
-            let result = tds_view_function::get_my_bids_bcs(&registry, vector[]);
+            let _result = tds_view_function::get_my_bids_bcs(&registry, vector[receipt]);
+            let _result = tds_view_function::get_my_bids_bcs(&registry, vector[]);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
 
         {
             let registry = test_environment::dov_registry(&scenario);
-            let result = tds_view_function::get_refund_shares_bcs<SUI>(&registry, ctx(&mut scenario));
+            let _result = tds_view_function::get_refund_shares_bcs<SUI>(&registry, ctx(&mut scenario));
             return_shared(registry);
         };
 
@@ -366,9 +365,9 @@ module typus_dov::test_user_cases {
 
         {
             let registry = test_environment::dov_registry(&scenario);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[]);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[0]);
-            let result = tds_view_function::get_auction_bcs(&registry, vector[1]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[0]);
+            let _result = tds_view_function::get_auction_bcs(&registry, vector[1]);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);

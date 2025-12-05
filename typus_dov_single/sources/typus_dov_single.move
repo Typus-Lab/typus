@@ -14,6 +14,7 @@ module typus_dov::typus_dov_single {
     use sui::dynamic_object_field;
     use sui::event::emit;
     use sui::sui::SUI;
+    use sui_system::sui_system::SuiSystemState;
 
     use protocol::market::Market;
     use protocol::mint;
@@ -653,16 +654,6 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    /// Gets a mutable reference to a vault's Scallop Spool account.
-    /// WARNING: no authority check inside.
-    // public(package) fun get_mut_scallop_spool_account<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    // ): &mut SpoolAccount<MarketCoin<TOKEN>> {
-    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-    //     dynamic_field::borrow_mut(&mut additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)
-    // }
-
     /// Deposits assets from a DOV into Scallop's basic lending market.
     /// WARNING: no authority check inside.
     public(package) fun deposit_scallop_basic_lending_<TOKEN>(
@@ -771,148 +762,6 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    /// Creates a SuiLend Obligation Owner Cap for a specific vault to interact with the SuiLend protocol.
-    /// WARNING: no authority check inside.
-    // public(package) fun create_suilend_obligation_owner_cap_(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     ctx: &mut TxContext,
-    // ): (address, address) {
-    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-    //     let suilend_obligation_owner_cap = suilend::new_suilend_obligation_owner_cap(
-    //         suilend_lending_market,
-    //         ctx,
-    //     );
-    //     let suilend_obligation_owner_cap_id = object::id_address(&suilend_obligation_owner_cap);
-    //     dynamic_field::add(&mut additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP, suilend_obligation_owner_cap);
-
-    //     (object::id_address(suilend_lending_market), suilend_obligation_owner_cap_id)
-    // }
-
-    /// Deposits assets from a DOV into a SuiLend lending market to earn yield.
-    /// WARNING: no authority check inside.
-    // public(package) fun deposit_suilend_<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ): vector<u64> {
-    //     let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-    //     if (portfolio_vault.info.status == S_RECOUP) {
-    //         return vector[portfolio_vault.info.round]
-    //     };
-    //     assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-    //     assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 3, suilend_disabled(index));
-    //     let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-    //     if (!dynamic_field::exists_(&additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP)) {
-    //         let suilend_obligation_owner_cap = suilend::new_suilend_obligation_owner_cap(
-    //             suilend_lending_market,
-    //             ctx,
-    //         );
-    //         dynamic_field::add(&mut additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP, suilend_obligation_owner_cap);
-    //     };
-    //     let suilend_obligation_owner_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP);
-    //     let mut log = suilend::deposit<TOKEN>(
-    //         deposit_vault,
-    //         suilend_lending_market,
-    //         reserve_array_index,
-    //         suilend_obligation_owner_cap,
-    //         clock,
-    //         ctx,
-    //     );
-    //     vector::push_back(&mut log, portfolio_vault.info.round);
-
-    //     log
-    // }
-
-    /// Withdraws assets and optionally claims rewards from a SuiLend lending market back into the DOV.
-    /// WARNING: no authority check inside.
-    // public(package) fun withdraw_suilend_<D_TOKEN, R_TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     reward_index: Option<u64>,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ): vector<u64> {
-    //     let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<D_TOKEN>());
-    //     let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-    //     assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 3, suilend_disabled(index));
-    //     utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
-    //     let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-    //     let suilend_obligation_owner_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP);
-    //     let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
-    //     let mut log = if (reward_index.is_some()) {
-    //         let reward_index = reward_index.destroy_some();
-    //         suilend::withdraw<D_TOKEN, R_TOKEN>(
-    //             &mut registry.fee_pool,
-    //             deposit_vault,
-    //             incentive,
-    //             suilend_lending_market,
-    //             reserve_array_index,
-    //             reward_index,
-    //             suilend_obligation_owner_cap,
-    //             additional_lending_flag != 1,
-    //             clock,
-    //             ctx,
-    //         )
-    //     } else {
-    //         suilend::withdraw_without_reward<D_TOKEN>(
-    //             &mut registry.fee_pool,
-    //             deposit_vault,
-    //             incentive,
-    //             suilend_lending_market,
-    //             reserve_array_index,
-    //             suilend_obligation_owner_cap,
-    //             additional_lending_flag != 1,
-    //             clock,
-    //             ctx,
-    //         )
-    //     };
-    //     vector::push_back(&mut log, portfolio_vault.info.round);
-
-    //     log
-    // }
-
-    /// Claims rewards from SuiLend for a vault's deposited assets.
-    /// WARNING: no authority check inside.
-    // public(package) fun reward_suilend_<TOKEN>(
-    //     registry: &mut Registry,
-    //     index: u64,
-    //     suilend_lending_market: &mut LendingMarket<MAIN_POOL>,
-    //     reserve_array_index: u64,
-    //     reward_index: u64,
-    //     clock: &Clock,
-    //     ctx: &mut TxContext,
-    // ): vector<u64> {
-    //     let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-    //     assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 3, suilend_disabled(index));
-    //     let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-    //     let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-    //     let suilend_obligation_owner_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_SUILEND_OBLIGATION_OWNER_CAP);
-    //     let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
-    //     let mut log = suilend::reward<TOKEN>(
-    //         &mut registry.fee_pool,
-    //         deposit_vault,
-    //         suilend_lending_market,
-    //         reserve_array_index,
-    //         reward_index,
-    //         suilend_obligation_owner_cap,
-    //         additional_lending_flag != 1,
-    //         clock,
-    //         ctx,
-    //     );
-    //     vector::push_back(&mut log, portfolio_vault.info.round);
-
-    //     log
-    // }
-
     /// Creates a NAVI Account Cap for a specific vault to interact with the NAVI protocol.
     /// WARNING: no authority check inside.
     public(package) fun create_navi_account_cap_(
@@ -990,8 +839,9 @@ module typus_dov::typus_dov_single {
         asset: u8,
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
         clock: &Clock,
-        ctx: &TxContext,
+        ctx: &mut TxContext,
     ): vector<u64> {
         if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
             dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
@@ -1020,7 +870,7 @@ module typus_dov::typus_dov_single {
                 lending_core::account::account_owner(navi_account_cap),
             ) as u64),
         );
-        let balance = lending_core::incentive_v3::withdraw_with_account_cap(
+        let balance = lending_core::incentive_v3::withdraw_with_account_cap_v2(
             clock,
             price_oracle,
             storage,
@@ -1030,6 +880,8 @@ module typus_dov::typus_dov_single {
             incentive_v2,
             incentive_v3,
             navi_account_cap,
+            system_state,
+            ctx,
         );
         let mut log = vault::deposit_from_lending(
             &mut registry.fee_pool,
@@ -1219,6 +1071,7 @@ module typus_dov::typus_dov_single {
         asset: u8,
         incentive_v2: &mut lending_core::incentive_v2::Incentive,
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
         amount: u64,
         clock: &Clock,
         ctx: &mut TxContext,
@@ -1240,7 +1093,7 @@ module typus_dov::typus_dov_single {
             pyth_price_info,
             feed_address,
         );
-        let balance = lending_core::incentive_v3::borrow_with_account_cap(
+        let balance = lending_core::incentive_v3::borrow_with_account_cap_v2(
             clock,
             price_oracle,
             storage,
@@ -1250,6 +1103,8 @@ module typus_dov::typus_dov_single {
             incentive_v2,
             incentive_v3,
             navi_account_cap,
+            system_state,
+            ctx,
         );
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
         let (receipt, mut log) = vault::raise_fund<TOKEN>(
@@ -4051,9 +3906,9 @@ module typus_dov::typus_dov_single {
     public(package) fun calculate_strike(price: u64, strike_bp: u64, strike_increment: u64): u64 {
         let temp = price * strike_bp / 10000;
         if (temp % strike_increment == 0) {
-            return temp
+            temp
         } else {
-            return temp / strike_increment * strike_increment + strike_increment
+            temp / strike_increment * strike_increment + strike_increment
         }
     }
 
@@ -4376,9 +4231,9 @@ module typus_dov::typus_dov_single {
                     available_incentive_amount
                 }
             };
-            return (incentive_usage, bid_value+fee-incentive_usage)
+            (incentive_usage, bid_value + fee - incentive_usage)
         } else {
-            return (0, bid_value+fee)
+            (0, bid_value + fee)
         }
     }
 
@@ -5783,9 +5638,7 @@ module typus_dov::typus_dov_single {
     fun not_yet_expired(index: u64): u64 { abort index }
     fun recoup_not_yet_started(index: u64): u64 { abort index }
     fun scallop_basic_lending_disabled(index: u64): u64 { abort index }
-    fun scallop_disabled(index: u64): u64 { abort index }
     fun strike_required(index: u64): u64 { abort index }
-    fun suilend_disabled(index: u64): u64 { abort index }
     fun transaction_already_resumed(index: u64): u64 { abort index }
     fun transaction_already_suspended(index: u64): u64 { abort index }
     fun transaction_suspended(index: u64): u64 { abort index }

@@ -1,7 +1,7 @@
 [package]
 name = "typus_dov"
-version = "3.0.1"
-published-at = "0x91235d393df2d32482897c6c7fef19e81f8a2918229f16d7711a4ad18367d0cf"
+version = "3.0.2"
+published-at = "0xd02e49d7227d497d73ee5f71c0a35f78c2a24bff66145fb0935772fc53b393b4"
 edition = "2024.alpha"
 
 [dependencies.typus_nft]
