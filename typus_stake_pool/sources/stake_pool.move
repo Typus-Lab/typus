@@ -529,6 +529,18 @@ module typus_stake_pool::stake_pool {
         let incentive_balance: Balance<I_TOKEN> = dynamic_field::remove(&mut stake_pool.id, incentive_token);
         assert!(info.unallocated_amount == incentive_balance.value(), E_PENDING_REWARD_EXISTED);
 
+        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        user_shares_v2.do_mut!<address, LpUserShare>(|_user_address, user_share| {
+            if (user_share.last_incentive_price_index.contains(&incentive_token)) {
+                user_share.last_incentive_price_index.remove(&incentive_token);
+            };
+            user_share.deactivating_shares.do_mut!(|deactivating_shares| {
+                if (deactivating_shares.unsubscribed_incentive_price_index.contains(&incentive_token)) {
+                    deactivating_shares.unsubscribed_incentive_price_index.remove(&incentive_token);
+                };
+            });
+        });
+
         emit(RemoveIncentiveTokenEvent {
             sender: tx_context::sender(ctx),
             index,
