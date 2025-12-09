@@ -68,10 +68,10 @@ module typus_stake_pool::admin {
         });
     }
 
-    // #[test_only]
-    // public(package) fun test_init(ctx: &mut TxContext) {
-    //     init(ctx);
-    // }
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
 
     // ======== Authority ========
 
@@ -182,41 +182,49 @@ module typus_stake_pool::admin {
         while (i < vector::length(&version.fee_pool.fee_infos)) {
             let fee_info = vector::borrow_mut(&mut version.fee_pool.fee_infos, i);
             if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                transfer::public_transfer(
-                    coin::from_balance<TOKEN>(
-                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
-                        ctx,
-                    ),
-                    @typus_perp_fee_address,
-                );
-                emit(SendFeeEvent {
-                    token: type_name::with_defining_ids<TOKEN>(),
-                    amount: fee_info.value,
-                });
-                fee_info.value = 0;
+                if (fee_info.value > 0) {
+                    transfer::public_transfer(
+                        coin::from_balance<TOKEN>(
+                            balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
+                            ctx,
+                        ),
+                        @typus_perp_fee_address,
+                    );
+                    emit(SendFeeEvent {
+                        token: type_name::with_defining_ids<TOKEN>(),
+                        amount: fee_info.value,
+                    });
+                    fee_info.value = 0;
+                };
+                return
             };
             i = i + 1;
         };
     }
     /// Charges a protocol fee.
-    /// WARNING: no authority check inside
     public(package) fun charge_fee<TOKEN>(
         version: &mut Version,
         balance: Balance<TOKEN>,
     ) {
+        let amount = balance.value();
         let mut i = 0;
         while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = &mut version.fee_pool.fee_infos[i];
             if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                fee_info.value = fee_info.value + balance.value();
+                fee_info.value = fee_info.value + amount;
                 balance::join(
                     dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
+                emit(ProtocolFeeEvent {
+                    token: type_name::with_defining_ids<TOKEN>(),
+                    amount,
+                });
                 return
             };
             i = i + 1;
         };
+        // if not found, add new fee info
         version.fee_pool.fee_infos.push_back(
             FeeInfo {
                 token: type_name::with_defining_ids<TOKEN>(),
@@ -224,60 +232,16 @@ module typus_stake_pool::admin {
             },
         );
         dynamic_field::add(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
+        emit(ProtocolFeeEvent {
+            token: type_name::with_defining_ids<TOKEN>(),
+            amount,
+        });
     }
-    /// Sends the liquidator fees to the fee address.
-    /// Safe with constant address as receiver
-    entry fun send_liquidator_fee<TOKEN>(
-        version: &mut Version,
-        ctx: &mut TxContext,
-    ) {
-        version_check(version);
-
-        let mut i = 0;
-        while (i < vector::length(&version.liquidator_fee_pool.fee_infos)) {
-            let fee_info = vector::borrow_mut(&mut version.liquidator_fee_pool.fee_infos, i);
-            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                transfer::public_transfer(
-                    coin::from_balance<TOKEN>(
-                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>())),
-                        ctx,
-                    ),
-                    @typus_perp_fee_address,
-                );
-                emit(SendFeeEvent {
-                    token: type_name::with_defining_ids<TOKEN>(),
-                    amount: fee_info.value,
-                });
-                fee_info.value = 0;
-            };
-            i = i + 1;
-        };
-    }
-    /// Charges a liquidator fee.
-    /// WARNING: no authority check inside
-    public(package) fun charge_liquidator_fee<TOKEN>(
-        version: &mut Version,
-        balance: Balance<TOKEN>,
-    ) {
-        let mut i = 0;
-        while (i < version.liquidator_fee_pool.fee_infos.length()) {
-            let fee_info = &mut version.liquidator_fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                fee_info.value = fee_info.value + balance.value();
-                balance::join(
-                    dynamic_field::borrow_mut(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>()),
-                    balance,
-                );
-                return
-            };
-            i = i + 1;
-        };
-        version.liquidator_fee_pool.fee_infos.push_back(
-            FeeInfo {
-                token: type_name::with_defining_ids<TOKEN>(),
-                value: balance.value(),
-            },
-        );
-        dynamic_field::add(&mut version.liquidator_fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
+    /// An event that is emitted when protocol fees are charged.
+    public struct ProtocolFeeEvent has copy, drop {
+        /// The type name of the token.
+        token: TypeName,
+        /// The amount of fees charged.
+        amount: u64,
     }
 }
