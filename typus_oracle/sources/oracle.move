@@ -1,4 +1,6 @@
 module typus_oracle::oracle {
+    use sui::bcs;
+    use sui::bls12381::bls12381_min_pk_verify;
     use sui::clock::{Self, Clock};
     use sui::dynamic_field;
     use sui::event::emit;
@@ -30,6 +32,13 @@ module typus_oracle::oracle {
     const ENotPyth: vector<u8> = b"Not Pyth";
     #[error]
     const EOracleExpired: vector<u8> = b"Oracle Expired";
+    #[error]
+    const EInvalidMessage: vector<u8> = b"Invalid Message";
+    #[error]
+    const EInvalidSignature: vector<u8> = b"Invalid Signature";
+    #[error]
+    const ETokenTypeMismatched: vector<u8> = b"Token Type Mismatched";
+
 
     // ======== Structs =========
 
@@ -185,6 +194,20 @@ module typus_oracle::oracle {
         }
     }
 
+    entry fun update_bls_public_key(
+        oracle: &mut Oracle,
+        _manager_cap: &ManagerCap,
+        public_key: vector<u8>,
+    ) {
+        version_check(oracle);
+
+        if (dynamic_field::exists_(&oracle.id, string::utf8(b"bls_public_key"))) {
+            *dynamic_field::borrow_mut(&mut oracle.id, string::utf8(b"bls_public_key")) = public_key;
+        } else {
+            dynamic_field::add(&mut oracle.id, string::utf8(b"bls_public_key"), public_key);
+        };
+    }
+
     public fun new_oracle<B_TOKEN, Q_TOKEN>(
         _manager_cap: &ManagerCap,
         base_token: String,
@@ -261,6 +284,15 @@ module typus_oracle::oracle {
     ) {
         version_check(oracle);
         oracle.time_interval = time_interval;
+        emit(UpdateTimeIntervalEvent{
+            oracle_id: object::id(oracle),
+            time_interval,
+        })
+    }
+
+    public struct UpdateTimeIntervalEvent has copy, drop {
+        oracle_id: ID,
+        time_interval: u64,
     }
 
     public fun update_token(
@@ -272,6 +304,17 @@ module typus_oracle::oracle {
         version_check(oracle);
         oracle.quote_token = quote_token;
         oracle.base_token = base_token;
+        emit(UpdateTokenNameEvent{
+            oracle_id: object::id(oracle),
+            quote_token,
+            base_token,
+        })
+    }
+
+    public struct UpdateTokenNameEvent has copy, drop {
+        oracle_id: ID,
+        quote_token: String,
+        base_token: String,
     }
 
     entry fun update_pyth_oracle(
@@ -286,6 +329,17 @@ module typus_oracle::oracle {
         // add quote
         let id = object::id(quote_price_info_object);
         dynamic_field::add(&mut oracle.id, string::utf8(b"quote_price_info_object"), id);
+        emit(UpdatePythOracleEvent {
+            oracle_id: object::id(oracle),
+            base_price_info_object: option::some(object::id(base_price_info_object)),
+            quote_price_info_object: option::some(object::id(quote_price_info_object)),
+        })
+    }
+
+    public struct UpdatePythOracleEvent has copy, drop {
+        oracle_id: ID,
+        base_price_info_object: Option<ID>,
+        quote_price_info_object: Option<ID>,
     }
 
     entry fun update_pyth_oracle_usd(
@@ -298,19 +352,29 @@ module typus_oracle::oracle {
         assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), ENotPyth);
         let id = object::id(base_price_info_object);
         oracle.pyth = option::some(id);
+        emit(UpdatePythOracleEvent {
+            oracle_id: object::id(oracle),
+            base_price_info_object: option::some(object::id(base_price_info_object)),
+            quote_price_info_object: option::none(),
+        })
     }
 
     entry fun update_pyth_oracle_usd_reciprocal(
         oracle: &mut Oracle,
         _manager_cap: &ManagerCap,
-        base_price_info_object: &PriceInfoObject,
+        quote_price_info_object: &PriceInfoObject,
     ) {
         version_check(oracle);
         // only quote token is USD
         assert!(oracle.quote_token == ascii::string(b"USD"), ENotPyth);
-        let id = object::id(base_price_info_object);
+        let id = object::id(quote_price_info_object);
         oracle.pyth = option::none();
         dynamic_field::add(&mut oracle.id, string::utf8(b"reciprocal_pyth"), id);
+        emit(UpdatePythOracleEvent {
+            oracle_id: object::id(oracle),
+            base_price_info_object: option::none(),
+            quote_price_info_object: option::some(object::id(quote_price_info_object)),
+        })
     }
 
     // ======== Permissionless Functions =========
@@ -402,6 +466,45 @@ module typus_oracle::oracle {
             id: object::id(oracle),
             price,
             ts_ms: clock.timestamp_ms(),
+        });
+    }
+
+    public fun update_with_signature(
+        oracle: &mut Oracle,
+        signature: vector<u8>,
+        message: vector<u8>,
+        token_type: vector<u8>,
+        price: u64,
+        twap_price: u64,
+        timestamp_ms: u64,
+        clock: &Clock,
+        ctx: & TxContext
+    ) {
+        version_check(oracle);
+
+        let mut message_bytes = vector[];
+        message_bytes.append(token_type);
+        message_bytes.append( bcs::to_bytes(&price));
+        message_bytes.append( bcs::to_bytes(&twap_price));
+        message_bytes.append( bcs::to_bytes(&timestamp_ms));
+        assert!(message_bytes == message, EInvalidMessage);
+
+        let clock_ms = clock.timestamp_ms();
+
+        let public_key = dynamic_field::borrow(&oracle.id, string::utf8(b"bls_public_key"));
+        assert!(bls12381_min_pk_verify(&signature, public_key, &message), EInvalidSignature);
+        assert!(oracle.base_token_type.as_string() == ascii::string(token_type), ETokenTypeMismatched);
+        assert!(clock_ms.diff(timestamp_ms) < oracle.time_interval, EOracleExpired);
+
+        oracle.price = price;
+        oracle.twap_price = twap_price;
+        oracle.ts_ms = clock_ms;
+        oracle.epoch = tx_context::epoch(ctx);
+
+        emit(PriceEvent {
+            id: object::id(oracle),
+            price,
+            ts_ms: clock_ms,
         });
     }
 
