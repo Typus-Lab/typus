@@ -1,11 +1,8 @@
 module typus_dov::tds_witness_entry {
-    use std::type_name;
-    use std::bcs;
     use std::string::{Self, String};
 
     use sui::balance::Balance;
-    use sui::clock::{Self, Clock};
-    use sui::bls12381;
+    use sui::clock::Clock;
     use sui::event::emit;
 
     use typus_dov::typus_dov_single::{Self, Registry};
@@ -13,25 +10,9 @@ module typus_dov::tds_witness_entry {
     use typus::witness_lock::{Self, HotPotato};
     use typus::ecosystem::Version as TypusEcosystemVersion;
 
-    const C_PUBLIC_KEY: vector<u8> = b"";
-
-    const E_INVALID_SIGNATURE: u64 = 0;
-    const E_EXPIRED_SIGNATURE: u64 = 1;
-
-    /// Performs a safety check for witness-authorized functions.
-    fun safety_check<W: drop, D_TOKEN, B_TOKEN>(
-        witness: W,
-        registry: &Registry,
-        index: u64,
-    ) {
-        typus_dov_single::version_check(registry);
-        typus_dov_single::validate_witness(registry, witness, index);
-        typus_dov_single::portfolio_vault_token_check<D_TOKEN, B_TOKEN>(registry, index);
-    }
-
     /// Executes an OTC deal with a witness.
     /// WARNING: without authority check inside.
-    #[allow(implicit_const_copy)]
+    #[deprecated, allow(unused)]
     public fun otc<W: drop, D_TOKEN, B_TOKEN>(
         witness: W,
         signature: vector<u8>,
@@ -44,60 +25,61 @@ module typus_dov::tds_witness_entry {
         clock: &Clock,
         ctx: &mut TxContext,
     ): (Option<TypusBidReceipt>, Option<Balance<B_TOKEN>>, vector<u64>) {
-        // without authority check
-        safety_check<W, D_TOKEN, B_TOKEN>(witness, registry, index);
+        // // without authority check
+        // safety_check<W, D_TOKEN, B_TOKEN>(witness, registry, index);
 
-        let mut msg = vector[];
-        msg.append(bcs::to_bytes(&index));
-        msg.append(bcs::to_bytes(&price));
-        msg.append(bcs::to_bytes(&size));
-        msg.append(bcs::to_bytes(&balance));
-        msg.append(bcs::to_bytes(&ts_ms));
-        assert!(
-            bls12381::bls12381_min_pk_verify(&signature, &C_PUBLIC_KEY, &msg),
-            E_INVALID_SIGNATURE
-        );
-        assert!(clock::timestamp_ms(clock) <= ts_ms + 20_000, E_EXPIRED_SIGNATURE);
-        // main logic
-        let (
-            _id,
-            _num_of_vault,
-            _authority,
-            _fee_pool,
-            portfolio_vault_registry,
-            _deposit_vault_registry,
-            _auction_registry,
-            _bid_vault_registry,
-            _refund_vault_registry,
-            _additional_config_registry,
-            _version,
-            _transaction_suspended,
-        ) = typus_dov_single::get_mut_registry_inner(registry);
-        let bid_fee_bp = typus_dov_single::get_bid_fee_bp(portfolio_vault_registry, index);
-        let fee_balance_value = ((balance.value() as u128) * (bid_fee_bp as u128) / 10000) as u64;
-        let fee_balance = balance.split(fee_balance_value);
-        let (receipt, balance, log) = typus_dov_single::witness_otc_<D_TOKEN, B_TOKEN>(
-            registry,
-            index,
-            price,
-            size,
-            balance,
-            fee_balance,
-            clock,
-            ctx,
-        );
-        typus_dov_single::emit_witness_otc_event(
-            type_name::with_defining_ids<W>(),
-            registry,
-            index,
-            log[0],
-            log[1],
-            log[2],
-            log[3],
-            ctx,
-        );
+        // let mut msg = vector[];
+        // msg.append(bcs::to_bytes(&index));
+        // msg.append(bcs::to_bytes(&price));
+        // msg.append(bcs::to_bytes(&size));
+        // msg.append(bcs::to_bytes(&balance));
+        // msg.append(bcs::to_bytes(&ts_ms));
+        // assert!(
+        //     bls12381::bls12381_min_pk_verify(&signature, &C_PUBLIC_KEY, &msg),
+        //     E_INVALID_SIGNATURE
+        // );
+        // assert!(clock::timestamp_ms(clock) <= ts_ms + 20_000, E_EXPIRED_SIGNATURE);
+        // // main logic
+        // let (
+        //     _id,
+        //     _num_of_vault,
+        //     _authority,
+        //     _fee_pool,
+        //     portfolio_vault_registry,
+        //     _deposit_vault_registry,
+        //     _auction_registry,
+        //     _bid_vault_registry,
+        //     _refund_vault_registry,
+        //     _additional_config_registry,
+        //     _version,
+        //     _transaction_suspended,
+        // ) = typus_dov_single::get_mut_registry_inner(registry);
+        // let bid_fee_bp = typus_dov_single::get_bid_fee_bp(portfolio_vault_registry, index);
+        // let fee_balance_value = ((balance.value() as u128) * (bid_fee_bp as u128) / 10000) as u64;
+        // let fee_balance = balance.split(fee_balance_value);
+        // let (receipt, balance, log) = typus_dov_single::witness_otc_<D_TOKEN, B_TOKEN>(
+        //     registry,
+        //     index,
+        //     price,
+        //     size,
+        //     balance,
+        //     fee_balance,
+        //     clock,
+        //     ctx,
+        // );
+        // typus_dov_single::emit_witness_otc_event(
+        //     type_name::with_defining_ids<W>(),
+        //     registry,
+        //     index,
+        //     log[0],
+        //     log[1],
+        //     log[2],
+        //     log[3],
+        //     ctx,
+        // );
 
-        (receipt, balance, log)
+        // (receipt, balance, log)
+        abort 0
     }
 
     const TYPUS_GALAXY_DOV_ALPHALEND_WITNESS: vector<u8> = b"37853e40e10a44aa9ded5a7bf9c3e2d973830f290dfd03cfbfd76213dd1b8627::dov_alphalend::WITNESS";

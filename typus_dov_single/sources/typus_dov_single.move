@@ -67,7 +67,7 @@ module typus_dov::typus_dov_single {
     const S_SETTLE: u64 = 5;
 
     // ======== Info u64_padding index ========
-    const I_INFO_CURRENT_LENDING_PROTOCOL: u64 = 0; // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend
+    const I_INFO_CURRENT_LENDING_PROTOCOL: u64 = 0; // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend, 6: shared navi, 7: hybrid navi
     const I_INFO_SAFU_VAULT_INDEX_ADD_ONE_UP: u64 = 1; // 0: none, n: safu vault index = n - 1
 
     // ======== Config u64_padding index ========
@@ -78,8 +78,9 @@ module typus_dov::typus_dov_single {
     // const I_CONFIG_ENABLE_SCALLOP_BASIC_LENDING: u64 = 4; // scallop basic lending
     const I_CONFIG_ENABLE_ADDITIONAL_LENDING: u64 = 5; // cranker ignore
     // const I_CONFIG_ENABLE_SUILEND: u64 = 6; // suilend
-    const I_CONFIG_NEXT_LENDING_PROTOCOL: u64 = 7; // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi
+    const I_CONFIG_NEXT_LENDING_PROTOCOL: u64 = 7; // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend, 6: shared navi, 7: hybrid navi
     const I_CONFIG_INCENTIVE_FEE_FLAGGED: u64 = 8;
+    const I_CONFIG_SHARED_NAVI_AMOUNT: u64 = 9;
 
     // ======== Active Vault Config u64_padding index ========
     const I_ACTIVE_VAULT_CONFIG_ROUND: u64 = 0;
@@ -824,6 +825,116 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    public(package) fun deposit_shared_navi_<TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
+        if (portfolio_vault.info.status == S_RECOUP) {
+            return vector[portfolio_vault.info.round]
+        };
+        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, navi_disabled(index));
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
+        if (!dynamic_field::exists_(&registry.id, K_NAVI_ACCOUNT_CAP)) {
+            let navi_account_cap = lending_core::lending::create_account(ctx);
+            dynamic_field::add(&mut registry.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
+        };
+        let navi_account_cap = dynamic_field::borrow(&registry.id, K_NAVI_ACCOUNT_CAP);
+        let (balance, mut log) = vault::withdraw_for_lending(deposit_vault);
+        if (balance.value() == 0) {
+            balance::destroy_zero(balance);
+            return vector::empty()
+        };
+        log.push_back(balance.value());
+        lending_core::incentive_v3::deposit_with_account_cap(
+            clock,
+            storage,
+            pool,
+            asset,
+            coin::from_balance(balance, ctx),
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+        );
+        vector::push_back(&mut log, portfolio_vault.info.round);
+
+        log
+    }
+
+    public(package) fun deposit_hybrid_navi_<TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
+        if (portfolio_vault.info.status == S_RECOUP) {
+            return vector[portfolio_vault.info.round]
+        };
+        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 7, navi_disabled(index));
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
+        let (mut balance, mut log) = vault::withdraw_for_lending(deposit_vault);
+        if (balance.value() == 0) {
+            balance::destroy_zero(balance);
+            return vector::empty()
+        };
+        let shared_navi_amount = utils::get_u64_padding_value(
+            &portfolio_vault.config.u64_padding,
+            I_CONFIG_SHARED_NAVI_AMOUNT,
+        );
+        let shared_navi_balance = balance.split(shared_navi_amount);
+        log.push_back(balance.value());
+        log.push_back(shared_navi_amount);
+        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
+        if (!dynamic_field::exists_(&additional_config.id, K_NAVI_ACCOUNT_CAP)) {
+            let navi_account_cap = lending_core::lending::create_account(ctx);
+            dynamic_field::add(&mut additional_config.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
+        };
+        let navi_account_cap = dynamic_field::borrow(&additional_config.id, K_NAVI_ACCOUNT_CAP);
+        lending_core::incentive_v3::deposit_with_account_cap(
+            clock,
+            storage,
+            pool,
+            asset,
+            coin::from_balance(balance, ctx),
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+        );
+        if (!dynamic_field::exists_(&registry.id, K_NAVI_ACCOUNT_CAP)) {
+            let navi_account_cap = lending_core::lending::create_account(ctx);
+            dynamic_field::add(&mut registry.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
+        };
+        let navi_account_cap = dynamic_field::borrow(&registry.id, K_NAVI_ACCOUNT_CAP);
+        lending_core::incentive_v3::deposit_with_account_cap(
+            clock,
+            storage,
+            pool,
+            asset,
+            coin::from_balance(shared_navi_balance, ctx),
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+        );
+        vector::push_back(&mut log, portfolio_vault.info.round);
+
+        log
+    }
+
     /// Withdraws assets from a NAVI lending pool back into the DOV.
     /// WARNING: no authority check inside.
     public(package) fun withdraw_navi_<TOKEN>(
@@ -896,6 +1007,170 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    public(package) fun withdraw_shared_navi_<TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
+            dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
+        };
+        let navi_account_cap = dynamic_field::remove(&mut registry.id, K_NAVI_ACCOUNT_CAP);
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
+        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, navi_disabled(index));
+        utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
+        let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
+        oracle_pro::update_single_price(
+            clock,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+        );
+        let amount = lending_core::pool::unnormal_amount(
+            pool,
+            (lending_core::logic::user_collateral_balance(
+                storage,
+                asset,
+                lending_core::account::account_owner(&navi_account_cap),
+            ) as u64),
+        );
+        let balance = lending_core::incentive_v3::withdraw_with_account_cap_v2(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            amount + 1,
+            incentive_v2,
+            incentive_v3,
+            &navi_account_cap,
+            system_state,
+            ctx,
+        );
+        let mut log = vault::deposit_from_lending(
+            &mut registry.fee_pool,
+            deposit_vault,
+            incentive,
+            balance,
+            balance::zero<TOKEN>(),
+            additional_lending_flag != 1,
+        );
+        vector::push_back(&mut log, portfolio_vault.info.round);
+        dynamic_field::add(&mut registry.id, K_NAVI_ACCOUNT_CAP, navi_account_cap);
+
+        log
+    }
+
+    public(package) fun withdraw_hybrid_navi_<TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        if (!dynamic_field::exists_(&registry.id, type_name::with_defining_ids<TOKEN>())) {
+            dynamic_field::add(&mut registry.id, type_name::with_defining_ids<TOKEN>(), balance::zero<TOKEN>());
+        };
+        let shared_navi_account_cap = dynamic_field::remove(&mut registry.id, K_NAVI_ACCOUNT_CAP);
+        let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
+        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
+        utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
+        oracle_pro::update_single_price(
+            clock,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+        );
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
+        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
+        let navi_account_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_NAVI_ACCOUNT_CAP);
+        let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
+        let amount = lending_core::pool::unnormal_amount(
+            pool,
+            (lending_core::logic::user_collateral_balance(
+                storage,
+                asset,
+                lending_core::account::account_owner(navi_account_cap),
+            ) as u64),
+        );
+        let mut balance = lending_core::incentive_v3::withdraw_with_account_cap_v2(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            amount + 1,
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+            system_state,
+            ctx,
+        );
+        let amount = lending_core::pool::unnormal_amount(
+            pool,
+            (lending_core::logic::user_collateral_balance(
+                storage,
+                asset,
+                lending_core::account::account_owner(&shared_navi_account_cap),
+            ) as u64),
+        );
+        let shared_balance = lending_core::incentive_v3::withdraw_with_account_cap_v2(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            amount + 1,
+            incentive_v2,
+            incentive_v3,
+            &shared_navi_account_cap,
+            system_state,
+            ctx,
+        );
+        balance.join(shared_balance);
+        let mut log = vault::deposit_from_lending(
+            &mut registry.fee_pool,
+            deposit_vault,
+            incentive,
+            balance,
+            balance::zero<TOKEN>(),
+            additional_lending_flag != 1,
+        );
+        vector::push_back(&mut log, portfolio_vault.info.round);
+        dynamic_field::add(&mut registry.id, K_NAVI_ACCOUNT_CAP, shared_navi_account_cap);
+
+        log
+    }
+
     /// Claims rewards from NAVI for a vault's deposited assets.
     /// WARNING: no authority check inside.
     public(package) fun reward_navi_<TOKEN>(
@@ -908,10 +1183,30 @@ module typus_dov::typus_dov_single {
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
     ): Balance<TOKEN> {
-        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
         let navi_account_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_NAVI_ACCOUNT_CAP);
+
+        lending_core::incentive_v3::claim_reward_with_account_cap(
+            clock,
+            incentive_v3,
+            storage,
+            reward_fund,
+            coin_types,
+            rule_ids,
+            navi_account_cap,
+        )
+    }
+
+    public(package) fun reward_shared_navi_<TOKEN>(
+        registry: &mut Registry,
+        storage: &mut lending_core::storage::Storage,
+        reward_fund: &mut lending_core::incentive_v3::RewardFund<TOKEN>,
+        coin_types: vector<std::ascii::String>,
+        rule_ids: vector<address>,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+    ): Balance<TOKEN> {
+        let navi_account_cap = dynamic_field::borrow_mut(&mut registry.id, K_NAVI_ACCOUNT_CAP);
 
         lending_core::incentive_v3::claim_reward_with_account_cap(
             clock,
@@ -932,10 +1227,23 @@ module typus_dov::typus_dov_single {
         incentive_v3: &mut lending_core::incentive_v3::Incentive,
         clock: &Clock,
     ): vector<lending_core::incentive_v3::ClaimableReward> {
-        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
         let additional_config = get_additional_config(&registry.additional_config_registry, index);
         let navi_account_cap = dynamic_field::borrow(&additional_config.id, K_NAVI_ACCOUNT_CAP);
+
+        lending_core::incentive_v3::get_user_claimable_rewards(
+            clock,
+            storage,
+            incentive_v3,
+            lending_core::account::account_owner(navi_account_cap),
+        )
+    }
+    public(package) fun get_reward_shared_navi_parameters(
+        registry: &Registry,
+        storage: &mut lending_core::storage::Storage,
+        incentive_v3: &lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+    ): vector<lending_core::incentive_v3::ClaimableReward> {
+        let navi_account_cap = dynamic_field::borrow(&registry.id, K_NAVI_ACCOUNT_CAP);
 
         lending_core::incentive_v3::get_user_claimable_rewards(
             clock,
@@ -1122,6 +1430,69 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    public(package) fun borrow_shared_navi_<TOKEN>(
+        registry: &mut Registry,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        let mut receipt_key = K_TYPUS_DEPOSIT_RECEIPT;
+        receipt_key.append(bcs::to_bytes(&b"_"));
+        receipt_key.append(bcs::to_bytes(&deposit_index));
+        let receipts = if (dynamic_field::exists_(&registry.id, receipt_key)) {
+            vector[dynamic_field::remove(&mut registry.id, receipt_key)]
+        } else {
+            vector[]
+        };
+        let navi_account_cap = dynamic_field::borrow_mut(&mut registry.id, K_NAVI_ACCOUNT_CAP);
+        oracle_pro::update_single_price(
+            clock,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+        );
+        let balance = lending_core::incentive_v3::borrow_with_account_cap_v2(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            amount,
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+            system_state,
+            ctx,
+        );
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
+        let (receipt, log) = vault::raise_fund<TOKEN>(
+            &mut registry.fee_pool,
+            deposit_vault,
+            receipts,
+            balance,
+            false,
+            false,
+            ctx,
+        );
+        dynamic_field::add(&mut registry.id, receipt_key, receipt);
+
+        log
+    }
+
     /// Unsubscribes from a NAVI lending position, effectively closing it.
     /// WARNING: no authority check inside.
     public(package) fun unsubscribe_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
@@ -1150,74 +1521,6 @@ module typus_dov::typus_dov_single {
         b_balance.destroy_zero();
         i_balance.destroy_zero();
         dynamic_field::add(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT, receipt.destroy_some());
-        vector::push_back(&mut log, portfolio_vault.info.round);
-
-        log
-    }
-
-    /// Repays a borrowed amount to a NAVI lending pool.
-    /// WARNING: no authority check inside.
-    public(package) fun repay_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
-        registry: &mut Registry,
-        collateral_index: u64,
-        deposit_index: u64,
-        oracle_config: &mut OracleConfig,
-        price_oracle: &mut PriceOracle,
-        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        pyth_price_info: &pyth::price_info::PriceInfoObject,
-        feed_address: address,
-        storage: &mut lending_core::storage::Storage,
-        pool: &mut lending_core::pool::Pool<D_TOKEN>,
-        asset: u8,
-        incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        balance: Balance<D_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): vector<u64> {
-        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
-        let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
-        let receipt = dynamic_field::remove(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT);
-        let navi_account_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_NAVI_ACCOUNT_CAP);
-        oracle_pro::update_single_price(
-            clock,
-            oracle_config,
-            price_oracle,
-            supra_oracle_holder,
-            pyth_price_info,
-            feed_address,
-        );
-        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
-        let (receipt, mut d_balance, b_balance, i_balance, mut log) = vault::reduce_fund<D_TOKEN, B_TOKEN, I_TOKEN>(
-            &mut registry.fee_pool,
-            deposit_vault,
-            vector[receipt],
-            std::u64::max_value!(),
-            0,
-            true,
-            true,
-            false,
-            ctx,
-        );
-        d_balance.join(balance);
-        let balance = lending_core::incentive_v3::repay_with_account_cap(
-            clock,
-            price_oracle,
-            storage,
-            pool,
-            asset,
-            coin::from_balance(d_balance, ctx),
-            incentive_v2,
-            incentive_v3,
-            navi_account_cap,
-        );
-        std::debug::print(&log);
-        utils::transfer_balance(balance, ctx.sender(), ctx);
-        utils::transfer_balance(b_balance, ctx.sender(), ctx);
-        utils::transfer_balance(i_balance, ctx.sender(), ctx);
-        std::debug::print(&receipt);
-        receipt.destroy_none();
         vector::push_back(&mut log, portfolio_vault.info.round);
 
         log
@@ -1288,6 +1591,67 @@ module typus_dov::typus_dov_single {
         log
     }
 
+    public(package) fun repay_shared_navi_interest_<TOKEN, I_TOKEN>(
+        registry: &mut Registry,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        warmup_amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        let mut receipt_key = K_TYPUS_DEPOSIT_RECEIPT;
+        receipt_key.append(bcs::to_bytes(&b"_"));
+        receipt_key.append(bcs::to_bytes(&deposit_index));
+        let receipt = dynamic_field::remove(&mut registry.id, receipt_key);
+        let navi_account_cap = dynamic_field::borrow_mut(&mut registry.id, K_NAVI_ACCOUNT_CAP);
+        oracle_pro::update_single_price(
+            clock,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+        );
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
+        let (receipt, mut d_balance, b_balance, i_balance, log) = vault::reduce_fund<TOKEN, TOKEN, I_TOKEN>(
+            &mut registry.fee_pool,
+            deposit_vault,
+            vector[receipt],
+            warmup_amount,
+            0,
+            true,
+            true,
+            false,
+            ctx,
+        );
+        d_balance.join(b_balance);
+        let balance = lending_core::incentive_v3::repay_with_account_cap(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            coin::from_balance(d_balance, ctx),
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+        );
+        utils::transfer_balance(balance, ctx.sender(), ctx);
+        i_balance.destroy_zero();
+        dynamic_field::add(&mut registry.id, receipt_key, receipt.destroy_some());
+
+        log
+    }
+
     /// A pre-processing step for repaying NAVI interest, wrapping the incentive balance in a `HotPotato`.
     /// This is part of a two-step transaction pattern.
     public(package) fun pre_repay_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
@@ -1317,6 +1681,35 @@ module typus_dov::typus_dov_single {
         b_balance.destroy_zero();
         dynamic_field::add(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT, receipt.destroy_some());
         vector::push_back(&mut log, portfolio_vault.info.round);
+
+        (witness_lock::wrap(version, i_balance, C_TYPUS_MOMENTUM_WITNESS.to_string()), log)
+    }
+
+    public(package) fun pre_repay_shared_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        deposit_index: u64,
+        ctx: &mut TxContext,
+    ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
+        let mut receipt_key = K_TYPUS_DEPOSIT_RECEIPT;
+        receipt_key.append(bcs::to_bytes(&b"_"));
+        receipt_key.append(bcs::to_bytes(&deposit_index));
+        let receipt = dynamic_field::remove(&mut registry.id, receipt_key);
+        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
+        let (receipt, d_balance, b_balance, i_balance, log) = vault::reduce_fund<D_TOKEN, B_TOKEN, I_TOKEN>(
+            &mut registry.fee_pool,
+            deposit_vault,
+            vector[receipt],
+            0,
+            0,
+            false,
+            false,
+            true,
+            ctx,
+        );
+        d_balance.destroy_zero();
+        b_balance.destroy_zero();
+        dynamic_field::add(&mut registry.id, receipt_key, receipt.destroy_some());
 
         (witness_lock::wrap(version, i_balance, C_TYPUS_MOMENTUM_WITNESS.to_string()), log)
     }
@@ -1368,6 +1761,50 @@ module typus_dov::typus_dov_single {
         );
         utils::transfer_balance(balance, ctx.sender(), ctx);
         vector::push_back(&mut log, portfolio_vault.info.round);
+
+        log
+    }
+
+    public(package) fun post_repay_shared_navi_interest_<TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        balance: HotPotato<Balance<TOKEN>>,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): vector<u64> {
+        let navi_account_cap = dynamic_field::borrow_mut(&mut registry.id, K_NAVI_ACCOUNT_CAP);
+        oracle_pro::update_single_price(
+            clock,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+        );
+        let balance = witness_lock::unwrap(version, balance, WITNESS {});
+        let log = vector[balance.value()];
+        let balance = lending_core::incentive_v3::repay_with_account_cap(
+            clock,
+            price_oracle,
+            storage,
+            pool,
+            asset,
+            coin::from_balance(balance, ctx),
+            incentive_v2,
+            incentive_v3,
+            navi_account_cap,
+        );
+        utils::transfer_balance(balance, ctx.sender(), ctx);
 
         log
     }
@@ -2076,6 +2513,7 @@ module typus_dov::typus_dov_single {
         risk_level: Option<u64>,
         deposit_incentive_bp_divisor_decimal: Option<u64>,
         incentive_fee_bp: Option<u64>,
+        shared_navi_amount: Option<u64>,
         ctx: &TxContext,
     ): (Config, Config) {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
@@ -2160,6 +2598,13 @@ module typus_dov::typus_dov_single {
                 &mut portfolio_vault.config.u64_padding,
                 I_CONFIG_DEPOSIT_INCENTIVE_BP_DIVISOR_DECIMAL,
                 option::destroy_some(deposit_incentive_bp_divisor_decimal),
+            );
+        };
+        if (option::is_some(&shared_navi_amount)) {
+            utils::set_u64_padding_value(
+                &mut portfolio_vault.config.u64_padding,
+                I_CONFIG_SHARED_NAVI_AMOUNT,
+                option::destroy_some(shared_navi_amount),
             );
         };
 
@@ -2312,42 +2757,6 @@ module typus_dov::typus_dov_single {
         utils::set_u64_padding_value(&mut active_vault_config.u64_padding, I_ACTIVE_VAULT_CONFIG_ROUND, portfolio_vault.info.round);
 
         (oracle_price, oracle_price_decimal, active_vault_config)
-    }
-
-    /// Updates the configuration of an ongoing Dutch auction.
-    /// WARNING: no authority check inside.
-    public(package) fun update_auction_config_(
-        registry: &mut Registry,
-        index: u64,
-        start_ts_ms: u64,
-        end_ts_ms: u64,
-        decay_speed: u64,
-        initial_price: u64,
-        final_price: u64,
-        fee_bp: u64,
-        incentive_bp: u64,
-        token_decimal: u64, // bid token
-        size_decimal: u64, // deposit token / contract size
-        able_to_remove_bid: bool,
-        clock: &Clock,
-        ctx: &TxContext,
-    ) {
-        let auction = get_mut_auction(&mut registry.auction_registry, index);
-        dutch::update_auction_config(
-            auction,
-            start_ts_ms,
-            end_ts_ms,
-            decay_speed,
-            initial_price,
-            final_price,
-            fee_bp,
-            incentive_bp,
-            token_decimal,
-            size_decimal,
-            able_to_remove_bid,
-            clock,
-            ctx,
-        );
     }
 
     /// Activates a vault for a new round. This function sets up the vault's parameters for the upcoming auction,
@@ -3138,86 +3547,84 @@ module typus_dov::typus_dov_single {
         (vector[price, delivery_size, bidder_bid_value, bidder_fee])
     }
 
-    /// Executes an OTC trade authorized by a witness, allowing for off-chain agreements to be settled on-chain.
-    /// WARNING: no authority check inside.
-    public(package) fun witness_otc_<D_TOKEN, B_TOKEN>(
-        registry: &mut Registry,
-        index: u64,
-        delivery_price: u64,
-        mut delivery_size: u64,
-        mut bidder_balance: Balance<B_TOKEN>,
-        mut bidder_fee_balance: Balance<B_TOKEN>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ): (Option<TypusBidReceipt>, Option<Balance<B_TOKEN>>, vector<u64>) {
-        let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
-        let bid_vault = get_mut_bid_vault(&mut registry.bid_vault_registry, index);
+    // public(package) fun witness_otc_<D_TOKEN, B_TOKEN>(
+    //     registry: &mut Registry,
+    //     index: u64,
+    //     delivery_price: u64,
+    //     mut delivery_size: u64,
+    //     mut bidder_balance: Balance<B_TOKEN>,
+    //     mut bidder_fee_balance: Balance<B_TOKEN>,
+    //     clock: &Clock,
+    //     ctx: &mut TxContext,
+    // ): (Option<TypusBidReceipt>, Option<Balance<B_TOKEN>>, vector<u64>) {
+    //     let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
+    //     let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
+    //     let bid_vault = get_mut_bid_vault(&mut registry.bid_vault_registry, index);
 
-        // safety check
-        if (auction_exists(&registry.auction_registry, index)
-            || portfolio_vault.info.status != S_DELIVERY
-        ) {
-            bidder_balance.join(bidder_fee_balance);
-            return (option::none(), option::some(bidder_balance), vector[0, 0, 0, 0])
-        };
-        // assert!(!auction_exists(&registry.auction_registry, index), E_AUCTION_ALREADY_STARTED);
-        // assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, E_INVALID_ACTION);
+    //     // safety check
+    //     if (auction_exists(&registry.auction_registry, index)
+    //         || portfolio_vault.info.status != S_DELIVERY
+    //     ) {
+    //         bidder_balance.join(bidder_fee_balance);
+    //         return (option::none(), option::some(bidder_balance), vector[0, 0, 0, 0])
+    //     };
+    //     // assert!(!auction_exists(&registry.auction_registry, index), E_AUCTION_ALREADY_STARTED);
+    //     // assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, E_INVALID_ACTION);
 
-        // main logic
-        let mut refund = option::none();
-        let remaining_size =  portfolio_vault.info.delivery_infos.max_size - portfolio_vault.info.delivery_infos.total_delivery_size;
-        if (delivery_size > remaining_size) {
-            let difference = delivery_size - remaining_size;
-            let bidder_balance_value = bidder_balance.value();
-            let bidder_fee_balance_value = bidder_fee_balance.value();
-            let mut refund_balance = balance::zero();
-            refund_balance.join(bidder_balance.split(bidder_balance_value * difference / delivery_size));
-            refund_balance.join(bidder_fee_balance.split(bidder_fee_balance_value * difference / delivery_size));
-            refund.fill(refund_balance);
-            delivery_size = remaining_size;
-        };
-        let bidder_fee = balance::value(&bidder_fee_balance);
-        balance_pool::put(&mut registry.fee_pool, bidder_fee_balance);
-        let bidder_bid_value = balance::value(&bidder_balance);
-        let premium_balance = bidder_balance;
+    //     // main logic
+    //     let mut refund = option::none();
+    //     let remaining_size =  portfolio_vault.info.delivery_infos.max_size - portfolio_vault.info.delivery_infos.total_delivery_size;
+    //     if (delivery_size > remaining_size) {
+    //         let difference = delivery_size - remaining_size;
+    //         let bidder_balance_value = bidder_balance.value();
+    //         let bidder_fee_balance_value = bidder_fee_balance.value();
+    //         let mut refund_balance = balance::zero();
+    //         refund_balance.join(bidder_balance.split(bidder_balance_value * difference / delivery_size));
+    //         refund_balance.join(bidder_fee_balance.split(bidder_fee_balance_value * difference / delivery_size));
+    //         refund.fill(refund_balance);
+    //         delivery_size = remaining_size;
+    //     };
+    //     let bidder_fee = balance::value(&bidder_fee_balance);
+    //     balance_pool::put(&mut registry.fee_pool, bidder_fee_balance);
+    //     let bidder_bid_value = balance::value(&bidder_balance);
+    //     let premium_balance = bidder_balance;
 
-        portfolio_vault.info.delivery_infos.total_delivery_size =
-            portfolio_vault.info.delivery_infos.total_delivery_size + delivery_size;
-        portfolio_vault.info.delivery_infos.total_bidder_bid_value =
-            portfolio_vault.info.delivery_infos.total_bidder_bid_value + bidder_bid_value;
-        portfolio_vault.info.delivery_infos.total_bidder_fee =
-            portfolio_vault.info.delivery_infos.total_bidder_fee + bidder_fee;
-        vector::push_back(
-            &mut portfolio_vault.info.delivery_infos.delivery_info,
-            DeliveryInfo {
-                auction_type: 1,
-                delivery_price,
-                delivery_size,
-                bidder_bid_value,
-                bidder_fee,
-                incentive_bid_value: 0,
-                incentive_fee: 0,
-                ts_ms: clock::timestamp_ms(clock),
-                u64_padding: vector::empty(),
-            }
-        );
-        let receipt = vault::public_new_bid(
-            bid_vault,
-            delivery_size,
-            ctx,
-        );
-        vault::delivery<D_TOKEN, B_TOKEN>(
-            deposit_vault,
-            bid_vault,
-            premium_balance,
-        );
-        if (portfolio_vault.info.delivery_infos.total_delivery_size == portfolio_vault.info.delivery_infos.max_size) {
-            portfolio_vault.info.status = S_RECOUP;
-        };
+    //     portfolio_vault.info.delivery_infos.total_delivery_size =
+    //         portfolio_vault.info.delivery_infos.total_delivery_size + delivery_size;
+    //     portfolio_vault.info.delivery_infos.total_bidder_bid_value =
+    //         portfolio_vault.info.delivery_infos.total_bidder_bid_value + bidder_bid_value;
+    //     portfolio_vault.info.delivery_infos.total_bidder_fee =
+    //         portfolio_vault.info.delivery_infos.total_bidder_fee + bidder_fee;
+    //     vector::push_back(
+    //         &mut portfolio_vault.info.delivery_infos.delivery_info,
+    //         DeliveryInfo {
+    //             auction_type: 1,
+    //             delivery_price,
+    //             delivery_size,
+    //             bidder_bid_value,
+    //             bidder_fee,
+    //             incentive_bid_value: 0,
+    //             incentive_fee: 0,
+    //             ts_ms: clock::timestamp_ms(clock),
+    //             u64_padding: vector::empty(),
+    //         }
+    //     );
+    //     let receipt = vault::public_new_bid(
+    //         bid_vault,
+    //         delivery_size,
+    //         ctx,
+    //     );
+    //     vault::delivery<D_TOKEN, B_TOKEN>(
+    //         deposit_vault,
+    //         bid_vault,
+    //         premium_balance,
+    //     );
+    //     if (portfolio_vault.info.delivery_infos.total_delivery_size == portfolio_vault.info.delivery_infos.max_size) {
+    //         portfolio_vault.info.status = S_RECOUP;
+    //     };
 
-        (option::some(receipt), refund, vector[delivery_price, delivery_size, bidder_bid_value, bidder_fee])
-    }
+    //     (option::some(receipt), refund, vector[delivery_price, delivery_size, bidder_bid_value, bidder_fee])
+    // }
 
     /// Recoups unsold assets from the auction and returns them to the deposit vault.
     /// WARNING: no authority check inside.
@@ -4897,6 +5304,7 @@ module typus_dov::typus_dov_single {
     }
 
     /// Event emitted when a witnessed OTC trade occurs.
+    #[deprecated]
     public struct WitnessOtcEvent has copy, drop {
         witness: TypeName,
         signer: address,
@@ -4910,32 +5318,31 @@ module typus_dov::typus_dov_single {
         b_token_decimal: u64,
         u64_padding: vector<u64>,
     }
-    /// Emits a `WitnessOtcEvent`.
-    public(package) fun emit_witness_otc_event(
-        witness: TypeName,
-        registry: &Registry,
-        index: u64,
-        delivery_price: u64,
-        delivery_size: u64,
-        bidder_bid_value: u64,
-        bidder_fee: u64,
-        ctx: &TxContext,
-    ) {
-        let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        emit(WitnessOtcEvent {
-            witness,
-            signer: tx_context::sender(ctx),
-            index,
-            round: portfolio_vault.info.round,
-            delivery_price,
-            delivery_size,
-            o_token_decimal: portfolio_vault.info.o_token_decimal,
-            bidder_bid_value,
-            bidder_fee,
-            b_token_decimal: portfolio_vault.info.b_token_decimal,
-            u64_padding: vector::empty(),
-        });
-    }
+    // public(package) fun emit_witness_otc_event(
+    //     witness: TypeName,
+    //     registry: &Registry,
+    //     index: u64,
+    //     delivery_price: u64,
+    //     delivery_size: u64,
+    //     bidder_bid_value: u64,
+    //     bidder_fee: u64,
+    //     ctx: &TxContext,
+    // ) {
+    //     let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
+    //     emit(WitnessOtcEvent {
+    //         witness,
+    //         signer: tx_context::sender(ctx),
+    //         index,
+    //         round: portfolio_vault.info.round,
+    //         delivery_price,
+    //         delivery_size,
+    //         o_token_decimal: portfolio_vault.info.o_token_decimal,
+    //         bidder_bid_value,
+    //         bidder_fee,
+    //         b_token_decimal: portfolio_vault.info.b_token_decimal,
+    //         u64_padding: vector::empty(),
+    //     });
+    // }
 
     /// Event emitted when unsold assets are recouped after an auction.
     public struct RecoupEvent has copy, drop {

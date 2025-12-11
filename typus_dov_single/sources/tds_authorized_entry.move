@@ -24,6 +24,15 @@ module typus_dov::tds_authorized_entry {
     use typus::witness_lock::HotPotato;
 
     /// Performs a safety check for authorized functions that do not involve tokens.
+    fun safety_check_without_index(
+        registry: &Registry,
+        ctx: &TxContext,
+    ) {
+        typus_dov_single::version_check(registry);
+        typus_dov_single::validate_registry_authority(registry, ctx);
+    }
+
+    /// Performs a safety check for authorized functions that do not involve tokens.
     fun safety_check_without_token(
         registry: &Registry,
         index: u64,
@@ -258,6 +267,7 @@ module typus_dov::tds_authorized_entry {
         risk_level: Option<u64>,
         deposit_incentive_bp_divisor_decimal: Option<u64>,
         incentive_fee_bp: Option<u64>,
+        shared_navi_amount: Option<u64>,
         ctx: &TxContext,
     ) {
         safety_check_without_token(registry, index, ctx);
@@ -287,6 +297,7 @@ module typus_dov::tds_authorized_entry {
             risk_level,
             deposit_incentive_bp_divisor_decimal,
             incentive_fee_bp,
+            shared_navi_amount,
             ctx,
         );
 
@@ -401,7 +412,7 @@ module typus_dov::tds_authorized_entry {
         });
     }
 
-    /// Event emitted when the auction configuration is updated.
+    #[deprecated]
     public struct UpdateAuctionConfigEvent has copy, drop {
         signer: address,
         index: u64,
@@ -416,7 +427,7 @@ module typus_dov::tds_authorized_entry {
         size_decimal: u64,
         able_to_remove_bid: bool,
     }
-    /// [Authorized Function] Updates the auction configuration.
+    #[deprecated, allow(unused)]
     public fun update_auction_config(
         registry: &mut Registry,
         index: u64,
@@ -432,42 +443,7 @@ module typus_dov::tds_authorized_entry {
         able_to_remove_bid: bool,
         clock: &Clock,
         ctx: &TxContext,
-    ) {
-        safety_check_without_token(registry, index, ctx);
-
-        typus_dov_single::update_auction_config_(
-            registry,
-            index,
-            start_ts_ms,
-            end_ts_ms,
-            decay_speed,
-            initial_price,
-            final_price,
-            fee_bp,
-            incentive_bp,
-            token_decimal,
-            size_decimal,
-            able_to_remove_bid,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(UpdateAuctionConfigEvent {
-            signer: tx_context::sender(ctx),
-            index,
-            start_ts_ms,
-            end_ts_ms,
-            decay_speed,
-            initial_price,
-            final_price,
-            fee_bp,
-            incentive_bp,
-            token_decimal,
-            size_decimal,
-            able_to_remove_bid,
-        });
-    }
+    ) { abort 0 }
 
     /// [Authorized Function] Activates a vault.
     public fun activate<D_TOKEN, B_TOKEN, I_TOKEN>(
@@ -1162,6 +1138,83 @@ module typus_dov::tds_authorized_entry {
             u64_padding,
         });
     }
+    public struct DepositSharedNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun deposit_shared_navi<D_TOKEN, B_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::deposit_shared_navi_<D_TOKEN>(
+            registry,
+            index,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(DepositSharedNavi {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
+    public struct DepositHybridNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    /// [Authorized Function] Deposits funds to Navi.
+    public fun deposit_hybrid_navi<D_TOKEN, B_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::deposit_hybrid_navi_<D_TOKEN>(
+            registry,
+            index,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(DepositHybridNavi {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
 
     /// Event emitted when funds are withdrawn from Navi.
     public struct WithdrawNavi has copy, drop {
@@ -1214,6 +1267,106 @@ module typus_dov::tds_authorized_entry {
             u64_padding,
         });
     }
+    public struct WithdrawSharedNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun withdraw_shared_navi<D_TOKEN, B_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::withdraw_shared_navi_<D_TOKEN>(
+            registry,
+            index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            system_state,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(WithdrawSharedNavi {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
+    public struct WithdrawHybridNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun withdraw_hybrid_navi<D_TOKEN, B_TOKEN>(
+        registry: &mut Registry,
+        index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<D_TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check<D_TOKEN, B_TOKEN>(registry, index, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::withdraw_hybrid_navi_<D_TOKEN>(
+            registry,
+            index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            system_state,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(WithdrawHybridNavi {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
 
     /// Event emitted when rewards are claimed from Navi.
     public struct RewardNavi has copy, drop {
@@ -1246,6 +1399,39 @@ module typus_dov::tds_authorized_entry {
             incentive_v3,
             clock,
         )
+    }
+    public struct RewardSharedNavi has copy, drop {
+        signer: address,
+        u64_padding: vector<u64>,
+    }
+    public fun reward_shared_navi<TOKEN>(
+        registry: &mut Registry,
+        storage: &mut lending_core::storage::Storage,
+        reward_fund: &mut lending_core::incentive_v3::RewardFund<TOKEN>,
+        coin_types: vector<std::ascii::String>,
+        rule_ids: vector<address>,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        clock: &Clock,
+        ctx: &TxContext,
+    ): Balance<TOKEN> {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let balance = typus_dov_single::reward_shared_navi_<TOKEN>(
+            registry,
+            storage,
+            reward_fund,
+            coin_types,
+            rule_ids,
+            incentive_v3,
+            clock,
+        );
+        emit(RewardSharedNavi {
+            signer: tx_context::sender(ctx),
+            u64_padding: vector[balance.value()],
+        });
+
+        balance
     }
 
     /// [Authorized Function] Post-claims rewards from Navi. This is the second step in a two-step process.
@@ -1297,7 +1483,7 @@ module typus_dov::tds_authorized_entry {
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        safety_check_without_token(registry, index, ctx);
+        safety_check_without_index(registry, ctx);
 
         // main logic
         let u64_padding = typus_dov_single::borrow_navi_<TOKEN>(
@@ -1327,6 +1513,58 @@ module typus_dov::tds_authorized_entry {
             u64_padding,
         });
     }
+    public struct BorrowSharedNavi has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun borrow_shared_navi<TOKEN>(
+        registry: &mut Registry,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        system_state: &mut SuiSystemState,
+        amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::borrow_shared_navi_<TOKEN>(
+            registry,
+            deposit_index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            system_state,
+            amount,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(BorrowSharedNavi {
+            signer: tx_context::sender(ctx),
+            index: deposit_index,
+            u64_padding,
+        });
+    }
 
     /// Event emitted when a user unsubscribes from a Navi vault.
     public struct UnsubscribeNavi has copy, drop {
@@ -1341,7 +1579,7 @@ module typus_dov::tds_authorized_entry {
         deposit_index: u64,
         ctx: &mut TxContext,
     ) {
-        safety_check_without_token(registry, index, ctx);
+        safety_check_without_index(registry, ctx);
 
         // main logic
         let u64_padding = typus_dov_single::unsubscribe_navi_<D_TOKEN, B_TOKEN, I_TOKEN>(
@@ -1384,7 +1622,7 @@ module typus_dov::tds_authorized_entry {
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        safety_check_without_token(registry, index, ctx);
+        safety_check_without_index(registry, ctx);
 
         // main logic
         let u64_padding = typus_dov_single::repay_navi_interest_<TOKEN, I_TOKEN>(
@@ -1410,6 +1648,224 @@ module typus_dov::tds_authorized_entry {
         emit(RepayNaviInterest {
             signer: tx_context::sender(ctx),
             index,
+            u64_padding,
+        });
+    }
+    public struct RepaySharedNaviInterest has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun repay_shared_navi_interest<TOKEN, I_TOKEN>(
+        registry: &mut Registry,
+        deposit_index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        warmup_amount: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::repay_shared_navi_interest_<TOKEN, I_TOKEN>(
+            registry,
+            deposit_index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            warmup_amount,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(RepaySharedNaviInterest {
+            signer: tx_context::sender(ctx),
+            index: deposit_index,
+            u64_padding,
+        });
+    }
+
+    /// Event emitted before repaying Navi interest.
+    public struct PreRepayNaviInterest has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    /// [Authorized Function] Pre-repays Navi interest. This is the first step in a two-step process.
+    public fun pre_repay_navi_interest<D_TOKEN, B_TOKEN, I_TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        index: u64,
+        deposit_index: u64,
+        ctx: &mut TxContext,
+    ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let (balance, u64_padding) = typus_dov_single::pre_repay_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
+            version,
+            registry,
+            index,
+            deposit_index,
+            ctx,
+        );
+
+        // emit event
+        emit(PreRepayNaviInterest {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+
+        (balance, u64_padding)
+    }
+    public struct PreRepaySharedNaviInterest has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    public fun pre_repay_shared_navi_interest<D_TOKEN, B_TOKEN, I_TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        deposit_index: u64,
+        ctx: &mut TxContext,
+    ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let (balance, u64_padding) = typus_dov_single::pre_repay_shared_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
+            version,
+            registry,
+            deposit_index,
+            ctx,
+        );
+
+        // emit event
+        emit(PreRepaySharedNaviInterest {
+            signer: tx_context::sender(ctx),
+            index: deposit_index,
+            u64_padding,
+        });
+
+        (balance, u64_padding)
+    }
+
+    /// Event emitted after repaying Navi interest.
+    public struct PostRepayNaviInterest has copy, drop {
+        signer: address,
+        index: u64,
+        u64_padding: vector<u64>,
+    }
+    /// [Authorized Function] Post-repays Navi interest. This is the second step in a two-step process.
+    public fun post_repay_navi_interest_<TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        index: u64,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        balance: HotPotato<Balance<TOKEN>>,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::post_repay_navi_interest_<TOKEN>(
+            version,
+            registry,
+            index,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            balance,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(PostRepayNaviInterest {
+            signer: tx_context::sender(ctx),
+            index,
+            u64_padding,
+        });
+    }
+    public struct PostRepaySharedNaviInterest has copy, drop {
+        signer: address,
+        u64_padding: vector<u64>,
+    }
+    public fun post_repay_shared_navi_interest_<TOKEN>(
+        version: &TypusEcosystemVersion,
+        registry: &mut Registry,
+        oracle_config: &mut OracleConfig,
+        price_oracle: &mut PriceOracle,
+        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
+        pyth_price_info: &pyth::price_info::PriceInfoObject,
+        feed_address: address,
+        storage: &mut lending_core::storage::Storage,
+        pool: &mut lending_core::pool::Pool<TOKEN>,
+        asset: u8,
+        incentive_v2: &mut lending_core::incentive_v2::Incentive,
+        incentive_v3: &mut lending_core::incentive_v3::Incentive,
+        balance: HotPotato<Balance<TOKEN>>,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ) {
+        safety_check_without_index(registry, ctx);
+
+        // main logic
+        let u64_padding = typus_dov_single::post_repay_shared_navi_interest_<TOKEN>(
+            version,
+            registry,
+            oracle_config,
+            price_oracle,
+            supra_oracle_holder,
+            pyth_price_info,
+            feed_address,
+            storage,
+            pool,
+            asset,
+            incentive_v2,
+            incentive_v3,
+            balance,
+            clock,
+            ctx,
+        );
+
+        // emit event
+        emit(PostRepaySharedNaviInterest {
+            signer: tx_context::sender(ctx),
             u64_padding,
         });
     }
@@ -1504,96 +1960,6 @@ module typus_dov::tds_authorized_entry {
 
         // emit event
         emit(WithdrawCollateralNavi {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-    }
-
-    /// Event emitted before repaying Navi interest.
-    public struct PreRepayNaviInterest has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Pre-repays Navi interest. This is the first step in a two-step process.
-    public fun pre_repay_navi_interest<D_TOKEN, B_TOKEN, I_TOKEN>(
-        version: &TypusEcosystemVersion,
-        registry: &mut Registry,
-        index: u64,
-        deposit_index: u64,
-        ctx: &mut TxContext,
-    ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
-        safety_check_without_token(registry, index, ctx);
-
-        // main logic
-        let (balance, u64_padding) = typus_dov_single::pre_repay_navi_interest_<D_TOKEN, B_TOKEN, I_TOKEN>(
-            version,
-            registry,
-            index,
-            deposit_index,
-            ctx,
-        );
-
-        // emit event
-        emit(PreRepayNaviInterest {
-            signer: tx_context::sender(ctx),
-            index,
-            u64_padding,
-        });
-
-        (balance, u64_padding)
-    }
-
-    /// Event emitted after repaying Navi interest.
-    public struct PostRepayNaviInterest has copy, drop {
-        signer: address,
-        index: u64,
-        u64_padding: vector<u64>,
-    }
-    /// [Authorized Function] Post-repays Navi interest. This is the second step in a two-step process.
-    public fun post_repay_navi_interest_<TOKEN>(
-        version: &TypusEcosystemVersion,
-        registry: &mut Registry,
-        index: u64,
-        oracle_config: &mut OracleConfig,
-        price_oracle: &mut PriceOracle,
-        supra_oracle_holder: &SupraOracle::SupraSValueFeed::OracleHolder,
-        pyth_price_info: &pyth::price_info::PriceInfoObject,
-        feed_address: address,
-        storage: &mut lending_core::storage::Storage,
-        pool: &mut lending_core::pool::Pool<TOKEN>,
-        asset: u8,
-        incentive_v2: &mut lending_core::incentive_v2::Incentive,
-        incentive_v3: &mut lending_core::incentive_v3::Incentive,
-        balance: HotPotato<Balance<TOKEN>>,
-        clock: &Clock,
-        ctx: &mut TxContext,
-    ) {
-        safety_check_without_token(registry, index, ctx);
-
-        // main logic
-        let u64_padding = typus_dov_single::post_repay_navi_interest_<TOKEN>(
-            version,
-            registry,
-            index,
-            oracle_config,
-            price_oracle,
-            supra_oracle_holder,
-            pyth_price_info,
-            feed_address,
-            storage,
-            pool,
-            asset,
-            incentive_v2,
-            incentive_v3,
-            balance,
-            clock,
-            ctx,
-        );
-
-        // emit event
-        emit(PostRepayNaviInterest {
             signer: tx_context::sender(ctx),
             index,
             u64_padding,
