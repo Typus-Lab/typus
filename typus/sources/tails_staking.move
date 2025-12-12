@@ -762,7 +762,7 @@ module typus::tails_staking {
         ctx: &TxContext,
     ) {
         let user = tx_context::sender(ctx);
-        verify_staking(version, tails_staking_registry, user, tails);
+        assert!(verify_staking(version, tails_staking_registry, user, tails), EStakingInfoNotFound);
 
         if (!tails_staking_registry.tails.contains(tails)) {
             abort EStakingInfoNotFound
@@ -898,7 +898,7 @@ module typus::tails_staking {
         ctx: &TxContext,
     ) {
         let user = tx_context::sender(ctx);
-        verify_staking(version, tails_staking_registry, user, tails);
+        assert!(verify_staking(version, tails_staking_registry, user, tails), EStakingInfoNotFound);
 
         assert!(coin.value() == tails_staking_registry.config[IExpDownFee], EInvalidFee);
         version.charge_fee(coin.into_balance());
