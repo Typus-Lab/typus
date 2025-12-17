@@ -15,7 +15,7 @@ module typus_perp::trading {
     use typus_perp::competition::CompetitionConfig;
     use typus_perp::error;
     use typus_perp::escrow;
-    use typus_perp::lp_pool::{Self, Registry as PoolRegistry, LiquidityPool, RemoveLiquidityTokenProcess};
+    use typus_perp::lp_pool::{Self, Registry as PoolRegistry, LiquidityPool};
     use typus_perp::math::{Self, amount_to_usd, usd_to_amount};
     use typus_perp::position::{Self, TradingOrder, Position};
     use typus_perp::profit_vault::ProfitVault;
@@ -302,12 +302,14 @@ module typus_perp::trading {
 
         assert!(
             trading_fee_config[I_MAX_TRADING_FEE_MBP] >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
-            && trading_fee_config.length() == 5,
+            && trading_fee_config.length() == 5
+            && trading_fee_config[I_SCALE] > 0,
             error::invalid_trading_fee_config()
         );
         assert!(
             option_trading_fee_config[I_MAX_TRADING_FEE_MBP] >= option_trading_fee_config[I_BASE_TRADING_FEE_MBP]
-            && option_trading_fee_config.length() == 5,
+            && option_trading_fee_config.length() == 5
+            && option_trading_fee_config[I_SCALE] > 0,
             error::invalid_trading_fee_config()
         );
 
@@ -477,7 +479,8 @@ module typus_perp::trading {
             assert!(
                 symbol_market.market_config.trading_fee_config[I_MAX_TRADING_FEE_MBP]
                     >= symbol_market.market_config.trading_fee_config[I_BASE_TRADING_FEE_MBP]
-                        && symbol_market.market_config.trading_fee_config.length() == 5,
+                        && symbol_market.market_config.trading_fee_config.length() == 5
+                            && symbol_market.market_config.trading_fee_config[I_SCALE] > 0,
                 error::invalid_trading_fee_config()
             );
         };
@@ -507,7 +510,8 @@ module typus_perp::trading {
             assert!(
                 trading_fee_config[I_MAX_TRADING_FEE_MBP]
                     >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
-                        && trading_fee_config.length() == 5,
+                        && trading_fee_config.length() == 5
+                            && trading_fee_config[I_SCALE] > 0,
                 error::invalid_trading_fee_config()
             );
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP, trading_fee_config[I_BASE_TRADING_FEE_MBP]);
@@ -762,7 +766,7 @@ module typus_perp::trading {
     }
 
     /// [User Function] Creates a new trading order.
-    public fun create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+    public fun create_trading_order<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -772,12 +776,6 @@ module typus_perp::trading {
         clock: &Clock,
         market_index: u64,
         pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        tails_staking_registry: &TailsStakingRegistry,
-        competition_config: &CompetitionConfig,
         // order parameters
         linked_position_id: Option<u64>,
         collateral: Coin<C_TOKEN>, // collateral_amount: u64,
@@ -1114,178 +1112,6 @@ module typus_perp::trading {
             coin::from_balance(collateral, ctx)
         }
     }
-
-    // public fun create_trading_order_with_tp_sl<C_TOKEN, BASE_TOKEN>(
-    //     // for share objects
-    //     version: &mut Version,
-    //     registry: &mut MarketRegistry,
-    //     pool_registry: &mut PoolRegistry,
-    //     typus_oracle_c_token: &Oracle,
-    //     typus_oracle_trading_symbol: &Oracle,
-    //     clock: &Clock,
-    //     market_index: u64,
-    //     pool_index: u64,
-    //     // tails
-    //     typus_ecosystem_version: &TypusEcosystemVersion,
-    //     typus_user_registry: &mut TypusUserRegistry,
-    //     typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-    //     tails_staking_registry: &TailsStakingRegistry,
-    //     competition_config: &CompetitionConfig,
-    //     // order parameters
-    //     collateral: Coin<C_TOKEN>, // collateral_amount: u64,
-    //     is_long: bool,
-    //     order_size: u64,
-    //     trigger_price: u64,
-    //     // tp sl parameters
-    //     tp_price: vector<u64>,
-    //     tp_size: vector<u64>,
-    //     sl_price: vector<u64>,
-    //     sl_size: vector<u64>,
-    //     ctx: &mut TxContext,
-    // ) {
-    //     let linked_position_id = {
-    //         // check oracle matched
-    //         let market = registry.markets.borrow_mut(market_index);
-    //         assert!(market.is_active, error::markets_inactive());
-    //         assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-    //         lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true);
-
-    //         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-    //         assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-    //         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-    //         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
-
-    //         // check order can be filled immediately
-    //         let (trading_pair_oracle_price, _) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
-    //         let filled_immediately = if (is_long) {
-    //             trigger_price >= trading_pair_oracle_price
-    //         } else {
-    //             trigger_price <= trading_pair_oracle_price
-    //         };
-    //         assert!(filled_immediately, error::order_not_filled_immediately());
-
-    //         // check tp sl order price valid
-    //         let tp_sl_side = !is_long;
-    //         tp_price.do_ref!(|price|{
-    //             let order_price_valid = if (tp_sl_side) {
-    //                 // short entry with TP/SL (TP = long)
-    //                 *price < trading_pair_oracle_price && *price < trigger_price
-    //             } else {
-    //                 // long entry with TP/SL (TP = short)
-    //                 *price > trading_pair_oracle_price && *price > trigger_price
-    //             };
-    //             assert!(order_price_valid, error::invalid_order_price());
-    //         });
-    //         sl_price.do_ref!(|price|{
-    //             let order_price_valid = if (tp_sl_side) {
-    //                 // short entry with TP/SL (SL = long)
-    //                 *price > trading_pair_oracle_price && *price > trigger_price
-    //             } else {
-    //                 // long entry with TP/SL (SL = short)
-    //                 *price < trading_pair_oracle_price && *price < trigger_price
-    //             };
-    //             assert!(order_price_valid, error::invalid_order_price());
-    //         });
-    //         symbol_market.market_info.next_position_id
-    //     };
-
-    //     create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
-    //         // for share objects
-    //         version,
-    //         registry,
-    //         pool_registry,
-    //         typus_oracle_c_token,
-    //         typus_oracle_trading_symbol,
-    //         clock,
-    //         market_index,
-    //         pool_index,
-    //         // tails
-    //         typus_ecosystem_version,
-    //         typus_user_registry,
-    //         typus_leaderboard_registry,
-    //         tails_staking_registry,
-    //         competition_config,
-    //         // order parameters
-    //         option::none(),
-    //         collateral,
-    //         false,
-    //         is_long,
-    //         false,
-    //         order_size,
-    //         trigger_price,
-    //         ctx,
-    //     );
-
-    //     // tp orders
-    //     let length = tp_price.length();
-    //     let mut i = 0;
-    //     while (i < length) {
-    //         let price = tp_price[i];
-    //         let size = tp_size[i];
-    //         create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
-    //             // for share objects
-    //             version,
-    //             registry,
-    //             pool_registry,
-    //             typus_oracle_c_token,
-    //             typus_oracle_trading_symbol,
-    //             clock,
-    //             market_index,
-    //             pool_index,
-    //             // tails
-    //             typus_ecosystem_version,
-    //             typus_user_registry,
-    //             typus_leaderboard_registry,
-    //             tails_staking_registry,
-    //             competition_config,
-    //             // order parameters
-    //             option::some(linked_position_id),
-    //             coin::zero<C_TOKEN>(ctx),
-    //             true,
-    //             !is_long,
-    //             false,
-    //             size,
-    //             price,
-    //             ctx,
-    //         );
-    //         i = i + 1;
-    //     };
-
-    //     // sl orders
-    //     let length = sl_price.length();
-    //     let mut i = 0;
-    //     while (i < length) {
-    //         let price = sl_price[i];
-    //         let size = sl_size[i];
-    //         create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
-    //             // for share objects
-    //             version,
-    //             registry,
-    //             pool_registry,
-    //             typus_oracle_c_token,
-    //             typus_oracle_trading_symbol,
-    //             clock,
-    //             market_index,
-    //             pool_index,
-    //             // tails
-    //             typus_ecosystem_version,
-    //             typus_user_registry,
-    //             typus_leaderboard_registry,
-    //             tails_staking_registry,
-    //             competition_config,
-    //             // order parameters
-    //             option::some(linked_position_id),
-    //             coin::zero<C_TOKEN>(ctx),
-    //             true,
-    //             !is_long,
-    //             true,
-    //             size,
-    //             price,
-    //             ctx,
-    //         );
-    //         i = i + 1;
-    //     };
-    // }
 
     public struct ReleaseCollateralEvent has copy, drop {
         user: address,
@@ -1679,7 +1505,7 @@ module typus_perp::trading {
         u64_padding: vector<u64>
     }
     /// [User Function] Creates a new trading order with a bid receipt as collateral.
-    public fun create_trading_order_with_bid_receipt_v3<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+    public fun create_trading_order_with_bid_receipt<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -1929,7 +1755,7 @@ module typus_perp::trading {
 
 
     /// [User Function] Reduces the size of an option collateral position.
-    public fun reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+    public fun reduce_option_collateral_position_size<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -2155,7 +1981,7 @@ module typus_perp::trading {
         u64_padding: vector<u64>
     }
     /// [Authorized Function] Matches trading orders.
-    public fun match_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+    public fun match_trading_order<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -2475,7 +2301,7 @@ module typus_perp::trading {
         u64_padding: vector<u64>
     }
     /// [Authorized Function] Reduces a position by the manager.
-    public fun manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
+    public fun manager_reduce_position<C_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -2710,7 +2536,7 @@ module typus_perp::trading {
         u64_padding: vector<u64>
     }
     /// [Authorized Function] Closes an option position by the manager.
-    public fun manager_close_option_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+    public fun manager_close_option_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         // for share objects
         version: &mut Version,
         registry: &mut MarketRegistry,
@@ -2760,7 +2586,7 @@ module typus_perp::trading {
         let (collateral_oracle_price, _collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, _trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
 
-        reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+        reduce_option_collateral_position_size<C_TOKEN, B_TOKEN, BASE_TOKEN>(
             // for share objects
             version,
             registry,
@@ -2795,261 +2621,6 @@ module typus_perp::trading {
             u64_padding: vector::empty(),
         });
     }
-
-    // ======= Remove Liquidity Token Process =======
-    // (1) * n
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun manager_remove_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        tails_staking_registry: &TailsStakingRegistry,
-        competition_config: &CompetitionConfig,
-        // other parameters
-        position_id: u64,
-        is_option_position: bool,
-        process: RemoveLiquidityTokenProcess,
-        ctx: &mut TxContext
-    ): RemoveLiquidityTokenProcess {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
-        // lp_pool::check_remove_liquidity_token_process_status(&process, 0);
-        // {
-        //     let market = registry.markets.borrow(market_index);
-        //     assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        //     assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-
-        //     let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        //     let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        //     liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        //     let symbol_market = object_table::borrow<TypeName, SymbolMarket>(&market.symbol_markets, base_token);
-        //     assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
-        // };
-
-        // if (is_option_position) {
-        //     reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        //         // for share objects
-        //         version,
-        //         registry,
-        //         pool_registry,
-        //         dov_registry,
-        //         typus_oracle_c_token,
-        //         typus_oracle_trading_symbol,
-        //         clock,
-        //         market_index,
-        //         pool_index,
-        //         // tails
-        //         typus_ecosystem_version,
-        //         typus_user_registry,
-        //         typus_leaderboard_registry,
-        //         tails_staking_registry,
-        //         competition_config,
-        //         // position related arguments
-        //         position_id,
-        //         option::none(),
-        //         ctx,
-        //     );
-        // } else {
-        //     manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
-        //         // for share objects
-        //         version,
-        //         registry,
-        //         pool_registry,
-        //         typus_oracle_c_token,
-        //         typus_oracle_trading_symbol,
-        //         clock,
-        //         market_index,
-        //         pool_index,
-        //         // tails
-        //         typus_ecosystem_version,
-        //         typus_user_registry,
-        //         typus_leaderboard_registry,
-        //         tails_staking_registry,
-        //         competition_config,
-        //         // other parameters
-        //         position_id,
-        //         10000,
-        //         ctx,
-        //     );
-        // };
-
-        // process
-    }
-
-    // (2)
-    #[allow(unused_field)]
-    public struct ManagerUpdateProcessStatusAfterPositionEvent has copy, drop {
-        market_index: u64,
-        pool_index: u64,
-        liquidity_token: TypeName,
-        trading_base_token: TypeName,
-    }
-    // public(package) fun manager_update_process_status_after_position<C_TOKEN, BASE_TOKEN>(
-    //     // for share objects
-    //     version: &Version,
-    //     registry: &MarketRegistry,
-    //     pool_registry: &PoolRegistry,
-    //     dov_registry: &DovRegistry,
-    //     typus_oracle_c_token: &Oracle,
-    //     typus_oracle_trading_symbol: &Oracle,
-    //     clock: &Clock,
-    //     market_index: u64,
-    //     pool_index: u64,
-    //     mut process: RemoveLiquidityTokenProcess,
-    //     ctx: &TxContext
-    // ): RemoveLiquidityTokenProcess {
-    //     abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
-        // lp_pool::check_remove_liquidity_token_process_status(&process, 0);
-        // let result = get_liquidation_info<C_TOKEN, BASE_TOKEN>(
-        // // for share objects
-        //     version,
-        //     registry,
-        //     pool_registry,
-        //     dov_registry,
-        //     typus_oracle_c_token,
-        //     typus_oracle_trading_symbol,
-        //     clock,
-        //     market_index,
-        //     pool_index,
-        //     true,
-        //     ctx
-        // );
-        // emit(ManagerUpdateProcessStatusAfterPositionEvent {
-        //     market_index,
-        //     pool_index,
-        //     liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
-        //     trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
-        // });
-        // if (result.length() == 0) {
-        //     lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, true);
-        //     let market = registry.markets.borrow(market_index);
-        //     let removed_symbol_markets = lp_pool::get_remove_liquidity_token_process_token(&process, true);
-        //     if (removed_symbol_markets.length() == market.symbols.length()) {
-        //         lp_pool::update_remove_liquidity_token_process_status(&mut process, 1);
-        //     };
-        //     return process
-        // };
-
-        // process
-    // }
-
-    // (3) * n
-    #[allow(unused)]
-    public fun manager_remove_order<C_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        market_index: u64,
-        pool_index: u64,
-        // other parameters
-        order_user: address,
-        order_id: u64,
-        trigger_price: u64,
-        process: RemoveLiquidityTokenProcess,
-        ctx: &mut TxContext
-    ): RemoveLiquidityTokenProcess {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
-        // lp_pool::check_remove_liquidity_token_process_status(&process, 1);
-        // {
-        //     let market = registry.markets.borrow(market_index);
-        //     assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        //     assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-        // };
-
-        // let margin = cancel_trading_order<C_TOKEN, BASE_TOKEN>(
-        //     version,
-        //     registry,
-        //     market_index,
-        //     order_id,
-        //     trigger_price,
-        //     option::some(order_user),
-        //     ctx,
-        // );
-        // let market = registry.markets.borrow_mut(market_index);
-        // let collateral_balance = margin.into_balance();
-        // return_to_user(&mut market.id, collateral_balance, order_user, ctx);
-
-        // process
-    }
-
-    // (4)
-    #[allow(unused_field)]
-    public struct ManagerUpdateProcessStatusAfterOrderEvent has copy, drop {
-        market_index: u64,
-        pool_index: u64,
-        liquidity_token: TypeName,
-        trading_base_token: TypeName,
-    }
-    // public(package) fun manager_update_process_status_after_order<C_TOKEN, BASE_TOKEN>(
-    //     // for share objects
-    //     version: &Version,
-    //     registry: &MarketRegistry,
-    //     pool_registry: &PoolRegistry,
-    //     market_index: u64,
-    //     pool_index: u64,
-    //     mut process: RemoveLiquidityTokenProcess,
-    //     ctx: &TxContext
-    // ): RemoveLiquidityTokenProcess {
-    //     // safety check
-    //     admin::verify(version, ctx);
-    //     lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, false);
-    //     lp_pool::check_remove_liquidity_token_process_status(&process, 1);
-
-    //     let mut length = 0;
-
-    //     let mut i = 0;
-    //     while (i < 4) {
-    //         let result = get_active_orders_by_order_tag_and_ctoken<C_TOKEN, BASE_TOKEN>(
-    //             version,
-    //             registry,
-    //             market_index,
-    //             i,
-    //         );
-    //         length = length + result.length();
-    //         i = i + 1;
-    //     };
-
-        // emit(ManagerUpdateProcessStatusAfterOrderEvent {
-        //     market_index,
-        //     pool_index,
-        //     liquidity_token: type_name::with_defining_ids<C_TOKEN>(),
-        //     trading_base_token: type_name::with_defining_ids<BASE_TOKEN>(),
-        // });
-
-    //     if (length == 0) {
-    //         lp_pool::update_remove_liquidity_token_process_token<BASE_TOKEN>(&mut process, false);
-    //         let market = registry.markets.borrow(market_index);
-    //         let removed_symbol_markets = lp_pool::get_remove_liquidity_token_process_token(&process, true);
-    //         if (removed_symbol_markets.length() == market.symbols.length()) {
-    //             lp_pool::update_remove_liquidity_token_process_status(&mut process, 2);
-    //         };
-    //         return process
-    //     };
-
-    //     process
-    // }
 
     /// ==========================
 
@@ -3958,8 +3529,9 @@ module typus_perp::trading {
         clock: &Clock,
         ctx: &mut TxContext
     ): (Balance<C_TOKEN>, vector<u64>, vector<u64>) {
-        let user = position::get_order_user(&order);
-        let linked_position_id = position::get_order_linked_position_id(&order);
+        let user = order.get_order_user();
+        let order_id = order.get_order_id();
+        let linked_position_id = order.get_order_linked_position_id();
         let is_long = position::get_order_side(&order);
         let (original_position, original_reserve) = get_linked_position(symbol_market, linked_position_id, user);
         let (original_position_size, original_position_side) = if (original_position.is_some()) {
@@ -4044,9 +3616,17 @@ module typus_perp::trading {
             math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_PROFIT_VAULT_FLAG) == 1
             && !profit_vault.is_whitelist(position.get_position_user())
         ) {
+            let base_token_type = position.get_position_symbol().base_token();
             let realized_profit_value = realized_profit.value();
             let profit = realized_profit.split(realized_profit_value);
-            profit_vault.put_user_profit(position.get_position_user(), profit, clock);
+            profit_vault.put_user_profit<C_TOKEN>(
+                position.get_position_user(),
+                profit,
+                base_token_type,
+                position.get_position_id(),
+                order_id,
+                clock
+            );
         };
 
         // put referral rebate
@@ -4204,7 +3784,6 @@ module typus_perp::trading {
             symbol_market.market_info.cumulative_funding_rate_index_sign,
             symbol_market.market_info.cumulative_funding_rate_index,
             trading_fee_mbp,
-            0,
             clock,
             ctx
         );
@@ -5455,200 +5034,6 @@ module typus_perp::trading {
     }
 
     fun deprecated() { abort 0 }
-    #[allow(dead_code, unused_variable, unused_type_parameter, lint(self_transfer))]
-    public fun create_trading_order<C_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // order parameters
-        linked_position_id: Option<u64>,
-        collateral: Coin<C_TOKEN>, // collateral_amount: u64,
-        reduce_only: bool,
-        is_long: bool,
-        is_stop_order: bool,
-        size: u64,
-        trigger_price: u64,
-        ctx: &mut TxContext,
-    ) {
-        deprecated();
-        transfer::public_transfer(collateral, tx_context::sender(ctx));
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun match_trading_order<C_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // other parameters
-        order_type_tag: u8,
-        trigger_price: u64,
-        max_operation_count: u64,
-        ctx: &mut TxContext
-    ) {
-        deprecated();
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun manager_reduce_position<C_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        position_id: u64,
-        reduced_ratio_bp: u64,
-        ctx: &mut TxContext
-    ) {
-        deprecated();
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter, lint(self_transfer))]
-    public fun create_trading_order_with_bid_receipt<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // order parameters: linked_position_id should always be None in this function
-        collateral_bid_receipt: TypusBidReceipt, // size: u64, dov_index: u64,
-        is_long: bool,
-        user: address,
-        ctx: &mut TxContext,
-    ) {
-        deprecated();
-        transfer::public_transfer(collateral_bid_receipt, tx_context::sender(ctx));
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter, lint(self_transfer))]
-    public fun create_trading_order_with_bid_receipt_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        tails_staking_registry: &TailsStakingRegistry,
-        competition_config: &CompetitionConfig,
-        // order parameters: linked_position_id should always be None in this function
-        collateral_bid_receipt: TypusBidReceipt, // size: u64, dov_index: u64,
-        is_long: bool,
-        user: address,
-        ctx: &mut TxContext,
-    ) {
-        deprecated();
-        transfer::public_transfer(collateral_bid_receipt, tx_context::sender(ctx));
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter, unused_let_mut)]
-    public fun reduce_option_collateral_position_size<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // position related arguments
-        position_id: u64,
-        mut order_size: Option<u64>, // in contract size decimal. if none => close position
-        ctx: &mut TxContext,
-    ) {
-        deprecated();
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun manager_remove_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // other parameters
-        position_id: u64,
-        is_option_position: bool,
-        process: RemoveLiquidityTokenProcess,
-        ctx: &mut TxContext
-    ): RemoveLiquidityTokenProcess {
-        deprecated();
-        process
-    }
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun manager_close_option_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        dov_registry: &mut DovRegistry,
-        typus_oracle_c_token: &Oracle,
-        typus_oracle_trading_symbol: &Oracle,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // tails
-        typus_ecosystem_version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        typus_leaderboard_registry: &mut TypusLeaderboardRegistry,
-        // other parameters
-        position_id: u64,
-        ctx: &mut TxContext
-    ) {
-        deprecated();
-    }
     // ======== Test Only Functions ========
 
     #[test_only]

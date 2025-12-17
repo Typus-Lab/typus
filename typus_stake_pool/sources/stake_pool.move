@@ -21,7 +21,7 @@ module typus_stake_pool::stake_pool {
     const C_INCENTIVE_INDEX_DECIMAL: u64 = 9;
 
     // ======== Keys ========
-    const K_LP_USER_SHARES_V2: vector<u8> = b"lp_user_shares_v2";
+    const K_LP_USER_SHARES: vector<u8> = b"lp_user_shares";
     const K_STAKED_TLP: vector<u8> = b"staked_tlp";
 
     // ======== Errors ========
@@ -201,7 +201,7 @@ module typus_stake_pool::stake_pool {
 
         // field for user share
         // dynamic_field::add(&mut id, string::utf8(K_LP_USER_SHARES), table::new<address, vector<LpUserShare>>(ctx));
-        dynamic_field::add(&mut id, string::utf8(K_LP_USER_SHARES_V2), keyed_big_vector::new<address, LpUserShare>(1000, ctx));
+        dynamic_field::add(&mut id, string::utf8(K_LP_USER_SHARES), keyed_big_vector::new<address, LpUserShare>(1000, ctx));
 
         // object field for StakePool
         let stake_pool = StakePool {
@@ -270,13 +270,13 @@ module typus_stake_pool::stake_pool {
         let incentive = get_incentive(stake_pool, &incentive_token);
         let current_incentive_index = incentive.info.incentive_price_index;
 
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let total_users = user_shares_v2.length();
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        let total_users = user_shares.length();
 
         let mut total_incentive_value = 0;
         let mut compound_users = 0;
 
-        user_shares_v2.do_mut!(|_user: address, lp_user_share: &mut LpUserShare| {
+        user_shares.do_mut!(|_user: address, lp_user_share: &mut LpUserShare| {
             let (incentive_value, _) = calculate_incentive(current_incentive_index, &incentive_token, lp_user_share);
             lp_user_share.update_last_incentive_price_index(incentive_token, current_incentive_index);
             // accumulate incentive_value
@@ -529,8 +529,8 @@ module typus_stake_pool::stake_pool {
         let incentive_balance: Balance<I_TOKEN> = dynamic_field::remove(&mut stake_pool.id, incentive_token);
         assert!(info.unallocated_amount == incentive_balance.value(), E_PENDING_REWARD_EXISTED);
 
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        user_shares_v2.do_mut!<address, LpUserShare>(|_user_address, user_share| {
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        user_shares.do_mut!<address, LpUserShare>(|_user_address, user_share| {
             if (user_share.last_incentive_price_index.contains(&incentive_token)) {
                 user_share.last_incentive_price_index.remove(&incentive_token);
             };
@@ -732,7 +732,7 @@ module typus_stake_pool::stake_pool {
         u64_padding: vector<u64>
     }
     /// [Authorized Function] Withdraws incentive tokens.
-    public fun withdraw_incentive_v2<I_TOKEN>(
+    public fun withdraw_incentive<I_TOKEN>(
         version: &Version,
         registry: &mut StakePoolRegistry,
         index: u64,
@@ -812,13 +812,13 @@ module typus_stake_pool::stake_pool {
 
         let last_incentive_price_index = get_last_incentive_price_index(stake_pool);
 
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
 
-        if (user_shares_v2.contains(user)) {
-            let lp_user_share = user_shares_v2.borrow_by_key<address, LpUserShare>(user);
+        if (user_shares.contains(user)) {
+            let lp_user_share = user_shares.borrow_by_key<address, LpUserShare>(user);
             assert!(harvest_progress_updated(last_incentive_price_index, lp_user_share.last_incentive_price_index), E_OUTDATED_HARVEST_STATUS);
 
-            let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
+            let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
             lp_user_share.stake_ts_ms = current_ts_ms;
             assert!(lp_user_share.snapshot_ts_ms == current_ts_ms, E_TIMESTAMP_MISMATCHED); // check snapshot already
             lp_user_share.total_shares = lp_user_share.total_shares + balance_value;
@@ -860,10 +860,10 @@ module typus_stake_pool::stake_pool {
                 last_incentive_price_index: lp_user_share.last_incentive_price_index,
                 u64_padding: lp_user_share.u64_padding
             });
-            user_shares_v2.push_back(user, lp_user_share);
+            user_shares.push_back(user, lp_user_share);
         };
 
-        stake_pool.pool_info.depositors_count = user_shares_v2.length();
+        stake_pool.pool_info.depositors_count = user_shares.length();
         stake_pool.pool_info.total_share = stake_pool.pool_info.total_share + balance_value;
     }
 
@@ -928,8 +928,8 @@ module typus_stake_pool::stake_pool {
 
         let new_tlp_price = stake_pool.pool_info.new_tlp_price;
 
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
 
         let shares = lp_user_share.active_shares;
         let last_ts_ms = lp_user_share.snapshot_ts_ms;
@@ -994,8 +994,8 @@ module typus_stake_pool::stake_pool {
         let last_incentive_price_index = get_last_incentive_price_index(stake_pool);
 
         let user = tx_context::sender(ctx);
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
         let user_share_id = lp_user_share.user_share_id;
 
         let unsubscribed_shares = if (unsubscribed_shares.is_some()) {
@@ -1063,8 +1063,8 @@ module typus_stake_pool::stake_pool {
 
         let current_ts_ms = clock::timestamp_ms(clock);
         let user = tx_context::sender(ctx);
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
         let user_share_id = lp_user_share.user_share_id;
 
         assert!(harvest_progress_updated(last_incentive_price_index, lp_user_share.last_incentive_price_index), E_OUTDATED_HARVEST_STATUS);
@@ -1097,7 +1097,7 @@ module typus_stake_pool::stake_pool {
             && lp_user_share.total_shares == 0
             && lp_user_share.active_shares == 0
         ) {
-            let lp_user_share = user_shares_v2.swap_remove_by_key(user);
+            let lp_user_share = user_shares.swap_remove_by_key(user);
             let LpUserShare {
                 user: _,
                 user_share_id: _,
@@ -1173,8 +1173,8 @@ module typus_stake_pool::stake_pool {
         let current_incentive_index = incentive.info.incentive_price_index;
 
         let user = tx_context::sender(ctx);
-        let user_shares_v2 = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
-        let lp_user_share = user_shares_v2.borrow_by_key_mut<address, LpUserShare>(user);
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
         let user_share_id = lp_user_share.user_share_id;
 
         let (incentive_value, current_incentive_index) = calculate_incentive(current_incentive_index, &incentive_token, lp_user_share);
@@ -1284,7 +1284,7 @@ module typus_stake_pool::stake_pool {
         user: address,
     ): vector<u8> {
         let stake_pool = get_stake_pool(&registry.id, index);
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
 
         // check exist
         if (!all_lp_user_shares.contains(user)) {
@@ -1312,7 +1312,7 @@ module typus_stake_pool::stake_pool {
         user_share_id: u64,
     ): vector<u8> {
         let stake_pool = get_stake_pool(&registry.id, index);
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
 
         let mut result = vector::empty<u8>();
 
@@ -1429,41 +1429,10 @@ module typus_stake_pool::stake_pool {
 
     #[test_only]
     public(package) fun get_user_share_id(stake_pool: &StakePool, user: address): u64 {
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
         let user_shares = all_lp_user_shares.borrow_by_key<address, LpUserShare>(user);
         user_shares.user_share_id
     }
-
-    // #[test_only]
-    // public(package) fun test_get_lp_user_share_info<I_TOKEN>(
-    //     registry: &StakePoolRegistry,
-    //     index: u64,
-    //     ctx: &TxContext
-    // ): (vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
-    //     let stake_pool = get_stake_pool(&registry.id, index);
-    //     let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
-    //     let all_lp_user_shares
-    //         = dynamic_field::borrow<String, Table<address, vector<LpUserShare>>>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
-    //     let user_shares = table::borrow(all_lp_user_shares, tx_context::sender(ctx));
-    //     let mut i = 0;
-    //     let mut user_share_id = vector::empty();
-    //     let mut share = vector::empty();
-    //     let mut stake_ts_ms = vector::empty();
-    //     let mut unlock_incentive_price_index = vector::empty();
-    //     let mut last_incentive_price_index = vector::empty();
-    //     let mut last_harvest_ts_ms = vector::empty();
-    //     let length = user_shares.length();
-    //     while (i < length) {
-    //         user_share_id.push_back(user_shares[i].user_share_id);
-    //         share.push_back(user_shares[i].share);
-    //         stake_ts_ms.push_back(user_shares[i].stake_ts_ms);
-    //         last_incentive_price_index.push_back(*user_shares[i].last_incentive_price_index.get(&incentive_token_type));
-    //         last_harvest_ts_ms.push_back(*user_shares[i].last_harvest_ts_ms.get(&incentive_token_type));
-    //         unlock_incentive_price_index.push_back(*user_shares[i].unlock_incentive_price_index.get(&incentive_token_type));
-    //         i = i + 1;
-    //     };
-    //     (user_share_id, share, stake_ts_ms, unlock_incentive_price_index, last_incentive_price_index, last_harvest_ts_ms)
-    // }
 
     #[test_only]
     public(package) fun test_get_single_lp_user_share_info<I_TOKEN>(
@@ -1473,7 +1442,7 @@ module typus_stake_pool::stake_pool {
     ): (u64, u64, u64, u64, u64) {
         let stake_pool = get_stake_pool(&registry.id, index);
         let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
-        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES_V2));
+        let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
         let user_shares = all_lp_user_shares.borrow_by_key<address, LpUserShare>(tx_context::sender(ctx));
         return (
             user_shares.user_share_id,

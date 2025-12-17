@@ -206,30 +206,6 @@ module typus_perp::lp_pool {
     const I_LENDING_NAVI: u64 = 1;
     const K_NAVI_ACCOUNT_CAP: vector<u8> = b"navi_account_cap";
 
-    // hot potato for controlling remove_liquidity_token process
-    // status code:
-    // 0: hot potato created -> should call manager_remove_position
-    // 1: positions removed -> should call manager_remove_order
-    // 2: orders removed -> should call flash_withdraw (switch status to 3) -> swap
-    // 3: liquidity token swapped -> should call repay_liquidity (check d_tvl < 2%)
-    #[allow(unused)]
-    public struct RemoveLiquidityTokenProcess {
-        /// The type name of the liquidity token being removed.
-        liquidity_token: TypeName,
-        /// A vector of the base tokens of the removed positions.
-        removed_positions_base_token: vector<TypeName>,
-        /// A vector of the base tokens of the removed orders.
-        removed_orders_base_token: vector<TypeName>,
-        /// The address of the oracle for the removed token.
-        removed_token_oracle_id: address,
-        /// The value of the removed liquidity in USD.
-        removed_usd: u64,
-        /// The value of the repaid liquidity in USD.
-        repaid_usd: u64,
-        /// The status of the removal process.
-        status: u64,
-    }
-
     // feature: redeem -> lock x ts_ms -> claim (burn)
     const K_DEACTIVATING_SHARES: vector<u8> = b"deactivating_shares";
     /// A struct for deactivating shares.
@@ -247,7 +223,7 @@ module typus_perp::lp_pool {
     // feature: manager emergency borrow tokens to lp pool => create receipt (not record )
     // => manager uses receipt to get tokens back
     /// A receipt for a manager's emergency deposit.
-    public struct ManagerDepositReceiptV2 has key, store {
+    public struct ManagerDepositReceipt has key, store {
         id: UID,
         /// The index of the pool.
         index: u64, // pool_index
@@ -678,7 +654,7 @@ module typus_perp::lp_pool {
         let liquidity_pool = get_mut_liquidity_pool(registry, index);
         balance::join(dynamic_field::borrow_mut(&mut liquidity_pool.id, token_type), balance);
 
-        let receipt = ManagerDepositReceiptV2 {
+        let receipt = ManagerDepositReceipt {
             id: object::new(ctx),
             index,
             token_type,
@@ -709,13 +685,13 @@ module typus_perp::lp_pool {
         version: &Version,
         registry: &mut Registry,
         index: u64,
-        receipt: ManagerDepositReceiptV2,
+        receipt: ManagerDepositReceipt,
         ctx: &mut TxContext
     ) {
         let token_type = type_name::with_defining_ids<TOKEN>();
 
         // destruct receipt
-        let ManagerDepositReceiptV2 {
+        let ManagerDepositReceipt {
             id,
             index: receipt_pool_index,
             token_type: receipt_token_type,
@@ -1897,214 +1873,6 @@ module typus_perp::lp_pool {
     //     }
     // }
 
-    // ====== Remove Liquidity Token Process ======
-    #[allow(unused)]
-    public struct StartRemoveLiquidityTokenProcessEvent has copy, drop {
-        index: u64,
-        liquidity_token: TypeName,
-        u64_padding: vector<u64>
-    }
-    #[allow(unused)]
-    public fun start_remove_liquidity_token_process<TOKEN>(
-        version: &Version,
-        registry: &Registry,
-        index: u64,
-        oracle: &Oracle,
-        ctx: &TxContext
-    ): RemoveLiquidityTokenProcess {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // check_token_pool_status<TOKEN>(registry, index, false);
-        // let liquidity_pool = get_liquidity_pool(registry, index);
-        // let token_config = get_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>()).config;
-        // let removed_token_oracle_id = object::id_address(oracle);
-        // assert!(removed_token_oracle_id == token_config.oracle_id, error::oracle_mismatched());
-        // emit(StartRemoveLiquidityTokenProcessEvent {
-        //     index,
-        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
-        //     u64_padding: vector::empty()
-        // });
-        // RemoveLiquidityTokenProcess {
-        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
-        //     removed_positions_base_token: vector::empty(),
-        //     removed_orders_base_token: vector::empty(),
-        //     removed_token_oracle_id,
-        //     removed_usd: 0,
-        //     repaid_usd: 0,
-        //     status: 0,
-        // }
-    }
-    #[allow(unused)]
-    public struct ManagerFlashRemoveLiquidityEvent has copy, drop {
-        index: u64,
-        liquidity_token: TypeName,
-        price: u64,
-        price_decimal: u64,
-        remove_amount: u64,
-        removed_usd: u64,
-        u64_padding: vector<u64>
-    }
-    #[allow(unused)]
-    public fun manager_flash_remove_liquidity<TOKEN>(
-        version: &Version,
-        registry: &mut Registry,
-        index: u64,
-        oracle: &Oracle,
-        mut process: RemoveLiquidityTokenProcess,
-        clock: &Clock,
-        ctx: &TxContext
-    ): (Balance<TOKEN>, RemoveLiquidityTokenProcess) {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // check_token_pool_status<TOKEN>(registry, index, false);
-        // check_remove_liquidity_token_process_status(&process, 2);
-
-        // let token_type = type_name::with_defining_ids<TOKEN>();
-        // let liquidity_pool = get_mut_liquidity_pool(registry, index);
-        // let pool_amount = dynamic_field::borrow<TypeName, Balance<TOKEN>>(&liquidity_pool.id, token_type).value();
-        // let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
-        // let removed_token_oracle_id = object::id_address(oracle);
-        // assert!(removed_token_oracle_id == token_pool.config.oracle_id, error::oracle_mismatched());
-        // token_pool.state.liquidity_amount = token_pool.state.liquidity_amount - pool_amount;
-        // let (price, decimal) = oracle.get_price_with_interval_ms(clock, 0);
-        // process.removed_usd = math::amount_to_usd(
-        //     pool_amount,
-        //     token_pool.config.liquidity_token_decimal,
-        //     price,
-        //     decimal
-        // );
-        // let balance = balance::split(
-        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<TOKEN>()),
-        //     pool_amount
-        // );
-        // update_remove_liquidity_token_process_status(&mut process, 3);
-        // update_tvl(version, liquidity_pool, token_type, oracle, clock);
-        // emit(ManagerFlashRemoveLiquidityEvent {
-        //     index,
-        //     liquidity_token: token_type,
-        //     price,
-        //     price_decimal: decimal,
-        //     remove_amount: pool_amount,
-        //     removed_usd: process.removed_usd,
-        //     u64_padding: vector::empty(),
-        // });
-        // (balance, process)
-    }
-    #[allow(unused)]
-    public struct ManagerFlashRepayLiquidityEvent has copy, drop {
-        index: u64,
-        liquidity_token: TypeName,
-        price: u64,
-        price_decimal: u64,
-        repaid_amount: u64,
-        repaid_usd: u64,
-        u64_padding: vector<u64>
-    }
-    #[allow(unused)]
-    public fun manager_flash_repay_liquidity<TOKEN>(
-        version: &Version,
-        registry: &mut Registry,
-        index: u64,
-        oracle: &Oracle,
-        mut process: RemoveLiquidityTokenProcess,
-        balance: Balance<TOKEN>,
-        clock: &Clock,
-        ctx: &TxContext
-    ): RemoveLiquidityTokenProcess {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // check_remove_liquidity_token_process_status(&process, 3);
-
-        // let token_type = type_name::with_defining_ids<TOKEN>();
-        // let liquidity_pool = get_mut_liquidity_pool(registry, index);
-        // let token_pool = get_mut_token_pool(liquidity_pool, &type_name::with_defining_ids<TOKEN>());
-        // assert!(token_pool.state.is_active, error::token_pool_inactive());
-
-        // let repaid_token_oracle_id = object::id_address(oracle);
-        // assert!(repaid_token_oracle_id == token_pool.config.oracle_id, error::oracle_mismatched());
-
-        // let repaid_amount = balance.value();
-        // token_pool.state.liquidity_amount = token_pool.state.liquidity_amount + repaid_amount;
-
-        // let (price, decimal) = oracle.get_price_with_interval_ms(clock, 0);
-
-        // let repaid_usd = math::amount_to_usd(
-        //     repaid_amount,
-        //     token_pool.config.liquidity_token_decimal,
-        //     price,
-        //     decimal
-        // );
-        // emit(ManagerFlashRepayLiquidityEvent {
-        //     index,
-        //     liquidity_token: token_type,
-        //     price,
-        //     price_decimal: decimal,
-        //     repaid_amount,
-        //     repaid_usd,
-        //     u64_padding: vector::empty(),
-        // });
-        // process.repaid_usd = process.repaid_usd + repaid_usd;
-        // balance::join(
-        //     dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut liquidity_pool.id, type_name::with_defining_ids<TOKEN>()),
-        //     balance
-        // );
-        // update_tvl(version, liquidity_pool, token_type, oracle, clock);
-        // process
-    }
-    #[allow(unused)]
-    public struct CompleteRemoveLiquidityTokenProcessEvent has copy, drop {
-        index: u64,
-        liquidity_token: TypeName,
-        removed_usd: u64,
-        repaid_usd: u64,
-        u64_padding: vector<u64>
-    }
-    #[allow(unused)]
-    public fun complete_remove_liquidity_token_process<TOKEN>(
-        version: &Version,
-        registry: &mut Registry,
-        index: u64,
-        process: RemoveLiquidityTokenProcess,
-        ctx: &TxContext
-    ) {
-        abort 0
-        // // safety check
-        // admin::verify(version, ctx);
-        // check_remove_liquidity_token_process_status(&process, 3);
-        // let mut complete = false;
-        // if (process.repaid_usd <= process.removed_usd) {
-        //     let d_tvl = process.removed_usd - process.repaid_usd;
-        //     if (process.removed_usd > 0) {
-        //         let friction_bp = ((d_tvl as u128) * 10000 / (process.removed_usd as u128) as u64);
-        //         if (friction_bp < 200) { complete = true };
-        //     } else {
-        //         complete = true;
-        //     };
-        // } else { complete = true };
-        // assert!(complete, error::friction_too_large());
-        // let RemoveLiquidityTokenProcess {
-        //     liquidity_token: _,
-        //     removed_positions_base_token: _,
-        //     removed_orders_base_token: _,
-        //     removed_token_oracle_id: _,
-        //     removed_usd,
-        //     repaid_usd,
-        //     status: _,
-        // } = process;
-
-        // manager_remove_liquidity_token<TOKEN>(version, registry, index, ctx);
-
-        // emit(CompleteRemoveLiquidityTokenProcessEvent {
-        //     index,
-        //     liquidity_token: type_name::with_defining_ids<TOKEN>(),
-        //     removed_usd,
-        //     repaid_usd,
-        //     u64_padding: vector::empty()
-        // });
-    }
 
     /// An event that is emitted when a manager removes a liquidity token.
     public struct ManagerRemoveLiquidityTokenEvent has copy, drop {
@@ -3658,30 +3426,7 @@ module typus_perp::lp_pool {
 
     public(package) fun get_borrow_rate_decimal(): u64 { C_BORROW_RATE_DECIMAL }
 
-    #[allow(dead_code, unused_variable, unused_type_parameter)]
-    public fun burn_lp<TOKEN, LP_TOKEN>(
-        version: &mut Version,
-        registry: &mut Registry,
-        index: u64,
-        treasury_caps: &mut TreasuryCaps,
-        oracle: &Oracle,
-        // coin
-        coin: Coin<LP_TOKEN>, // burn_amount: u64,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ): Coin<TOKEN> {
-        deprecated();
-        coin.destroy_zero();
-        coin::zero<TOKEN>(ctx)
-    }
     fun deprecated() { abort 0 }
-
-    #[allow(unused_field)]
-    public struct ManagerDepositReceipt has key, store {
-        id: UID,
-        token_type: TypeName,
-        amount: u64
-    }
 
     public(package) fun get_user_deactivating_shares<LP_TOKEN>(
         registry: &Registry,

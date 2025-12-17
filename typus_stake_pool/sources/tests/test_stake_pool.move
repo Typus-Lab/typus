@@ -124,28 +124,34 @@ module typus_stake_pool::test_stake_pool {
     fun test_deactivate_incentive_token_<I_TOKEN>(scenario: &mut Scenario, index: u64) {
         let mut registry = registry(scenario);
         let version = version(scenario);
+        let clock = new_clock(scenario);
         stake_pool::deactivate_incentive_token<I_TOKEN>(
             &version,
             &mut registry,
             index,
+            &clock,
             ctx(scenario)
         );
         return_shared(registry);
         return_shared(version);
+        clock::destroy_for_testing(clock);
         next_tx(scenario, ADMIN);
     }
 
     fun test_activate_incentive_token_<I_TOKEN>(scenario: &mut Scenario, index: u64) {
         let mut registry = registry(scenario);
         let version = version(scenario);
+        let clock = new_clock(scenario);
         stake_pool::activate_incentive_token<I_TOKEN>(
             &version,
             &mut registry,
             index,
+            &clock,
             ctx(scenario)
         );
         return_shared(registry);
         return_shared(version);
+        clock::destroy_for_testing(clock);
         next_tx(scenario, ADMIN);
     }
 
@@ -169,7 +175,7 @@ module typus_stake_pool::test_stake_pool {
         let mut registry = registry(scenario);
         let version = version(scenario);
         let clock = new_clock(scenario);
-        let incentive_coin = stake_pool::withdraw_incentive_v2<I_TOKEN>(
+        let incentive_coin = stake_pool::withdraw_incentive<I_TOKEN>(
             &version,
             &mut registry,
             index,
@@ -200,7 +206,6 @@ module typus_stake_pool::test_stake_pool {
             &mut registry,
             index,
             lp_token,
-            option::none(),
             &clock,
             ctx(scenario)
         );
@@ -220,7 +225,6 @@ module typus_stake_pool::test_stake_pool {
             &version,
             &mut registry,
             index,
-            0, // deprecated
             unsubscribed_shares,
             &clock,
             ctx(scenario)
@@ -246,7 +250,6 @@ module typus_stake_pool::test_stake_pool {
             &ecosystem_version,
             &mut typus_user_registry,
             index,
-            0, // deprecated
             &clock,
             ctx(scenario)
         );
@@ -259,38 +262,21 @@ module typus_stake_pool::test_stake_pool {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_unstake_<LP_TOKEN>(scenario: &mut Scenario, index: u64, mut user_share_id: Option<u64>, unstake_ts_ms: u64): u64 {
+    fun test_unstake_<LP_TOKEN>(scenario: &mut Scenario, index: u64, unstake_ts_ms: u64): u64 {
         let mut registry = registry(scenario);
         let version = version(scenario);
         let mut clock = new_clock(scenario);
         update_clock(&mut clock, unstake_ts_ms);
 
         let mut balance = balance::zero<LP_TOKEN>();
-        if (user_share_id.is_some()) {
-            let unstake_coin = stake_pool::unstake<LP_TOKEN>(
-                &version,
-                &mut registry,
-                index,
-                user_share_id.extract(),
-                &clock,
-                ctx(scenario),
-            );
-            balance.join(unstake_coin.into_balance());
-        } else {
-            let mut user_share_id = stake_pool::get_user_share_id(
-                stake_pool::test_get_stake_pool(&registry, index),
-                sender(scenario)
-            );
-            let unstake_coin = stake_pool::unstake<LP_TOKEN>(
-                &version,
-                &mut registry,
-                index,
-                user_share_id,
-                &clock,
-                ctx(scenario),
-            );
-            balance.join(unstake_coin.into_balance());
-        };
+        let unstake_coin = stake_pool::unstake<LP_TOKEN>(
+            &version,
+            &mut registry,
+            index,
+            &clock,
+            ctx(scenario),
+        );
+        balance.join(unstake_coin.into_balance());
 
         let unstake_balance_value = balance.value();
         transfer::public_transfer(coin::from_balance(balance, ctx(scenario)), sender(scenario));
@@ -335,7 +321,6 @@ module typus_stake_pool::test_stake_pool {
             &version,
             &mut registry,
             index,
-            0, // deprecated
             &clock,
             ctx(scenario),
         );
@@ -363,13 +348,6 @@ module typus_stake_pool::test_stake_pool {
     ) {
         let mut registry = registry(scenario);
         let version = version(scenario);
-        stake_pool::hotfix_pool_info_u64_padding(
-            &version,
-            &mut registry,
-            index,
-            vector[tlp_price, usd_per_exp, 0],
-            ctx(scenario)
-        );
         stake_pool::update_pool_info_u64_padding(
             &version,
             &mut registry,
@@ -448,16 +426,16 @@ module typus_stake_pool::test_stake_pool {
         let incentive_amount = 1000_0000_00000;
         test_deposit_incentive_<SUI>(&mut scenario, index, incentive_amount);
         {
-            let version = version(&mut scenario);
-            let mut registry = registry(&mut scenario);
+            let version = version(&scenario);
+            let mut registry = registry(&scenario);
             stake_pool::update_unlock_countdown_ts_ms(&version, &mut registry, index, 1, ctx(&mut scenario));
             return_shared(version);
             return_shared(registry);
         };
         next_tx(&mut scenario, ADMIN);
         {
-            let version = version(&mut scenario);
-            let mut registry = registry(&mut scenario);
+            let version = version(&scenario);
+            let mut registry = registry(&scenario);
             let clock = new_clock(&mut scenario);
             stake_pool::update_incentive_config<SUI>(
                 &version,
@@ -616,7 +594,7 @@ module typus_stake_pool::test_stake_pool {
         next_tx(&mut scenario, USER_1);
         test_unsubscribe_<TEST_TLP>(&mut scenario, index, option::some(1_0000_00000), ts_ms);
         next_tx(&mut scenario, USER_1);
-        let unstake_user_1 = test_unstake_<TEST_TLP>(&mut scenario, index, option::none(), ts_ms);
+        test_unstake_<TEST_TLP>(&mut scenario, index, ts_ms);
 
         let unstake_ts_ms_0 = CURRENT_TS_MS + UNLOCK_COUNTDOWN_TS_MS;
         next_tx(&mut scenario, USER_2);
@@ -630,7 +608,7 @@ module typus_stake_pool::test_stake_pool {
             = test_harvest_per_user_share_<TEST_TLP>(&mut scenario, index, unstake_ts_ms_0);
         next_tx(&mut scenario, USER_2);
         let unstake_user_2
-            = test_unstake_<TEST_TLP>(&mut scenario, index, option::some(1), unstake_ts_ms_0);
+            = test_unstake_<TEST_TLP>(&mut scenario, index, unstake_ts_ms_0);
         assert!(unstake_user_2 == 0, 1); // nothing happened due to no deactivating shares
 
         // unstake USER_1 all shares
@@ -644,7 +622,7 @@ module typus_stake_pool::test_stake_pool {
         let (_harvest_balance_value, _incentive_price_index)
             = test_harvest_per_user_share_<TEST_TLP>(&mut scenario, index, unstake_ts_ms_1);
         next_tx(&mut scenario, USER_1);
-        let unstake_user_1 = test_unstake_<TEST_TLP>(&mut scenario, index, option::none(), unstake_ts_ms_1);
+        let unstake_user_1 = test_unstake_<TEST_TLP>(&mut scenario, index, unstake_ts_ms_1);
         assert!(unstake_user_1 == 1_0000_00000, 1);
 
         let ts_ms = CURRENT_TS_MS + INCENTIVE_INTERVAL_TS_MS * 5 + UNLOCK_COUNTDOWN_TS_MS;
@@ -671,7 +649,7 @@ module typus_stake_pool::test_stake_pool {
         let (_harvest_balance_value, _incentive_price_index)
             = test_harvest_per_user_share_<TEST_TLP>(&mut scenario, index, ts_ms);
         next_tx(&mut scenario, USER_1);
-        let unstake_user_1 = test_unstake_<TEST_TLP>(&mut scenario, index, option::none(), ts_ms);
+        test_unstake_<TEST_TLP>(&mut scenario, index, ts_ms);
 
         end(scenario);
     }
@@ -701,7 +679,7 @@ module typus_stake_pool::test_stake_pool {
 
         next_tx(&mut scenario, ADMIN);
         {
-            let registry = registry(&mut scenario);
+            let registry = registry(&scenario);
             let result = stake_pool::get_user_shares(&registry, index, USER_1);
             return_shared(registry);
             assert!(result.length() > 0, 0);
@@ -709,7 +687,7 @@ module typus_stake_pool::test_stake_pool {
 
         next_tx(&mut scenario, USER_1);
         {
-            let registry = registry(&mut scenario);
+            let registry = registry(&scenario);
             let result = stake_pool::get_user_shares(&registry, index, USER_1);
             return_shared(registry);
             assert!(result.length() > 0, 0);
@@ -717,7 +695,7 @@ module typus_stake_pool::test_stake_pool {
 
         next_tx(&mut scenario, USER_2);
         {
-            let registry = registry(&mut scenario);
+            let registry = registry(&scenario);
             let result = stake_pool::get_user_shares_by_user_share_id(&registry, index, 1);
             return_shared(registry);
             assert!(result.length() > 0, 0);

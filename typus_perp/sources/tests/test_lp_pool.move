@@ -12,7 +12,7 @@ module typus_perp::test_lp_pool {
     use typus_perp::babe::{Self, BABE};
     use typus_perp::babe2::{Self, BABE2};
     use typus_perp::error;
-    use typus_perp::lp_pool::{Self, Registry, ManagerDepositReceiptV2};
+    use typus_perp::lp_pool::{Self, Registry, ManagerDepositReceipt};
     use typus_perp::math;
     use typus_perp::scallop_tests;
     use typus_perp::tlp::{Self, TLP};
@@ -665,7 +665,7 @@ module typus_perp::test_lp_pool {
     ) {
         let version = version(scenario);
         let mut registry = registry(scenario);
-        let manager_deposit_receipt_v2 = take_from_sender<ManagerDepositReceiptV2>(scenario);
+        let manager_deposit_receipt_v2 = take_from_sender<ManagerDepositReceipt>(scenario);
 
         lp_pool::manager_emergency_withdraw<TOKEN, TLP>(
             &version,

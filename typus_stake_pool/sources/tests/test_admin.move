@@ -53,21 +53,6 @@ module typus_stake_pool::test_admin {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_charge_liquidator_fee_<T>(scenario: &mut Scenario, amount: u64) {
-        let coin = mint_test_coin<T>(scenario, amount);
-        let mut version = version(scenario);
-        admin::charge_liquidator_fee<T>(&mut version, coin.into_balance());
-        return_shared(version);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_send_liquidator_fee_<T>(scenario: &mut Scenario) {
-        let mut version = version(scenario);
-        admin::send_liquidator_fee<T>(&mut version, ctx(scenario));
-        return_shared(version);
-        next_tx(scenario, ADMIN);
-    }
-
     fun test_add_authorized_user_(scenario: &mut Scenario, user_address: address) {
         let mut version = version(scenario);
         admin::add_authorized_user(&mut version, user_address, ctx(scenario));
@@ -86,18 +71,12 @@ module typus_stake_pool::test_admin {
     public(package) fun test_admin() {
         let mut scenario = begin_test();
         test_send_fee_<SUI>(&mut scenario); // nothing happened
-        test_send_liquidator_fee_<SUI>(&mut scenario); // nothing happened
         test_charge_fee_<SUI>(&mut scenario, 100_0000_00000);
         test_charge_fee_<SUI>(&mut scenario, 100_0000_00000);
         test_charge_fee_<BABE>(&mut scenario, 100_0000_00000);
         test_send_fee_<SUI>(&mut scenario);
         test_send_fee_<SUI>(&mut scenario); // nothing happened
         test_send_fee_<BABE>(&mut scenario);
-        test_charge_liquidator_fee_<SUI>(&mut scenario, 100_0000_00000);
-        test_charge_liquidator_fee_<SUI>(&mut scenario, 100_0000_00000);
-        test_charge_liquidator_fee_<BABE>(&mut scenario, 100_0000_00000);
-        test_send_liquidator_fee_<SUI>(&mut scenario);
-        test_send_liquidator_fee_<BABE>(&mut scenario);
         test_add_authorized_user_(&mut scenario, @0xEEEE);
         test_remove_authorized_user_(&mut scenario, @0xEEEE);
 

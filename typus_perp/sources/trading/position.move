@@ -1417,7 +1417,6 @@ module typus_perp::position {
         cumulative_funding_rate_index_sign: bool,
         cumulative_funding_rate_index: u64,
         trading_fee_mbp: u64,
-        referral_fee_rebate_bp: u64,
         clock: &Clock,
         ctx: &mut TxContext
     ): (Position, Balance<C_TOKEN>, Balance<C_TOKEN>, Balance<C_TOKEN>, Balance<C_TOKEN>, u64) {

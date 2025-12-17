@@ -494,7 +494,7 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_create_trading_order_v2_<C_TOKEN, BASE_TOKEN>(
+    fun test_create_trading_order_<C_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         reduce_only: bool,
         is_long: bool,
@@ -513,11 +513,6 @@ module typus_perp::test_trading {
         let mut registry = registry(scenario);
         let mut pool_registry = lp_pool_registry(scenario);
         let clock = new_clock(scenario);
-        let ecosystem_version = ecosystem_version(scenario);
-        let mut typus_user_registry = typus_user_registry(scenario);
-        let mut leaderboard_registry = leaderboard_registry(scenario);
-        let tails_staking_registry = tails_staking_registry(scenario);
-        let competition_config = competition_config(scenario);
         let collateral = mint_test_coin<C_TOKEN>(scenario, collateral_amount);
 
         if (c_oracle_id == trading_oracle_id) {
@@ -526,7 +521,7 @@ module typus_perp::test_trading {
             next_tx(scenario, ADMIN);
             update_oracle(scenario, &mut oracle_c_token, c_token_price, ts_ms);
             next_tx(scenario, sender_address);
-            trading::create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+            trading::create_trading_order<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -535,11 +530,6 @@ module typus_perp::test_trading {
                 &clock,
                 MARKET_INDEX,
                 0, // pool_index
-                &ecosystem_version,
-                &mut typus_user_registry,
-                &mut leaderboard_registry,
-                &tails_staking_registry,
-                &competition_config,
                 // order parameters
                 linked_position_id,
                 collateral,
@@ -559,7 +549,7 @@ module typus_perp::test_trading {
             update_oracle(scenario, &mut oracle_c_token, c_token_price, ts_ms);
             update_oracle(scenario, &mut oracle_trading_symbol, t_token_price, ts_ms);
             next_tx(scenario, sender_address);
-            trading::create_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+            trading::create_trading_order<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -568,11 +558,6 @@ module typus_perp::test_trading {
                 &clock,
                 MARKET_INDEX,
                 0, // pool_index
-                &ecosystem_version,
-                &mut typus_user_registry,
-                &mut leaderboard_registry,
-                &tails_staking_registry,
-                &competition_config,
                 // order parameters
                 linked_position_id,
                 collateral,
@@ -590,12 +575,7 @@ module typus_perp::test_trading {
         return_shared(registry);
         return_shared(pool_registry);
         return_shared(version);
-        return_shared(ecosystem_version);
         clock::destroy_for_testing(clock);
-        return_shared(typus_user_registry);
-        return_shared(leaderboard_registry);
-        return_shared(competition_config);
-        return_shared(tails_staking_registry);
         next_tx(scenario, ADMIN);
     }
 
@@ -829,7 +809,7 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_manager_reduce_position_v2_<C_TOKEN, BASE_TOKEN>(
+    fun test_manager_reduce_position_<C_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         c_oracle_id: ID,
         trading_oracle_id: ID,
@@ -849,7 +829,7 @@ module typus_perp::test_trading {
 
         if (c_oracle_id == trading_oracle_id) {
             let typus_oracle_c_token = oracle(scenario, c_oracle_id);
-            trading::manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
+            trading::manager_reduce_position<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -872,7 +852,7 @@ module typus_perp::test_trading {
         } else {
             let typus_oracle_c_token = oracle(scenario, c_oracle_id);
             let typus_oracle_trading_symbol = oracle(scenario, trading_oracle_id);
-            trading::manager_reduce_position_v2<C_TOKEN, BASE_TOKEN>(
+            trading::manager_reduce_position<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -907,7 +887,7 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_match_trading_order_v2_<C_TOKEN, BASE_TOKEN>(
+    fun test_match_trading_order_<C_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         c_oracle_id: ID,
         trading_oracle_id: ID,
@@ -933,7 +913,7 @@ module typus_perp::test_trading {
         if (c_oracle_id == trading_oracle_id) {
             let mut typus_oracle_c_token = oracle(scenario, c_oracle_id);
             update_oracle(scenario, &mut typus_oracle_c_token, c_token_price, ts_ms);
-            trading::match_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+            trading::match_trading_order<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -959,7 +939,7 @@ module typus_perp::test_trading {
             let mut typus_oracle_trading_symbol = oracle(scenario, trading_oracle_id);
             update_oracle(scenario, &mut typus_oracle_c_token, c_token_price, ts_ms);
             update_oracle(scenario, &mut typus_oracle_trading_symbol, t_token_price, ts_ms);
-            trading::match_trading_order_v2<C_TOKEN, BASE_TOKEN>(
+            trading::match_trading_order<C_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1085,7 +1065,7 @@ module typus_perp::test_trading {
             next_tx(scenario, ADMIN);
             update_oracle(scenario, &mut typus_oracle_c_token, trading_oracle_price, ts_ms);
             next_tx(scenario, USER_1);
-            trading::create_trading_order_with_bid_receipt_v3<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::create_trading_order_with_bid_receipt<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1111,7 +1091,7 @@ module typus_perp::test_trading {
             next_tx(scenario, ADMIN);
             update_oracle(scenario, &mut typus_oracle_trading_symbol, trading_oracle_price, ts_ms);
             next_tx(scenario, USER_1);
-            trading::create_trading_order_with_bid_receipt_v3<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::create_trading_order_with_bid_receipt<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1146,7 +1126,7 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_reduce_option_collateral_position_size_v2_<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+    fun test_reduce_option_collateral_position_size_<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         c_oracle_id: ID,
         trading_oracle_id: ID,
@@ -1171,7 +1151,7 @@ module typus_perp::test_trading {
             next_tx(scenario, ADMIN);
             update_oracle(scenario, &mut typus_oracle_c_token, trading_oracle_price, ts_ms);
             next_tx(scenario, USER_1);
-            trading::reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::reduce_option_collateral_position_size<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1197,7 +1177,7 @@ module typus_perp::test_trading {
             next_tx(scenario, ADMIN);
             update_oracle(scenario, &mut typus_oracle_trading_symbol, trading_oracle_price, ts_ms);
             next_tx(scenario, USER_1);
-            trading::reduce_option_collateral_position_size_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::reduce_option_collateral_position_size<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1346,7 +1326,7 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_manager_close_option_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+    fun test_manager_close_option_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         c_oracle_id: ID,
         trading_oracle_id: ID,
@@ -1369,7 +1349,7 @@ module typus_perp::test_trading {
         if (c_oracle_id == trading_oracle_id) {
             let mut typus_oracle_c_token = oracle(scenario, c_oracle_id);
             update_oracle(scenario, &mut typus_oracle_c_token, c_oracle_price, ts_ms);
-            trading::manager_close_option_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::manager_close_option_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1393,7 +1373,7 @@ module typus_perp::test_trading {
             let mut typus_oracle_trading_symbol = oracle(scenario, trading_oracle_id);
             update_oracle(scenario, &mut typus_oracle_c_token, c_oracle_price, ts_ms);
             update_oracle(scenario, &mut typus_oracle_trading_symbol, trading_oracle_price, ts_ms);
-            trading::manager_close_option_position_v2<C_TOKEN, B_TOKEN, BASE_TOKEN>(
+            trading::manager_close_option_position<C_TOKEN, B_TOKEN, BASE_TOKEN>(
                 &mut version,
                 &mut registry,
                 &mut pool_registry,
@@ -1879,7 +1859,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 9_0000_0000); // 10 contract size, SUIUSD = 9
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -1959,7 +1939,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 10_0000_0000); // 10 contract size, SUIUSD = 10 => should be filled immediately
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -1978,7 +1958,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<SUI, SUI>(
+        test_match_trading_order_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -1989,7 +1969,7 @@ module typus_perp::test_trading {
             max_operation_count,
             ts_ms
         );
-        test_create_trading_order_v2_<BABE, SUI>(
+        test_create_trading_order_<BABE, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2008,7 +1988,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<BABE, SUI>(
+        test_match_trading_order_<BABE, SUI>(
             &mut scenario,
             babe_oracle_id,
             sui_oracle_id,
@@ -2022,7 +2002,7 @@ module typus_perp::test_trading {
 
         next_tx(&mut scenario, USER_2);
         let (reduce_only, is_long, is_stop_order) = (false, false, false);
-        test_create_trading_order_v2_<BABE, SUI>(
+        test_create_trading_order_<BABE, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2042,7 +2022,7 @@ module typus_perp::test_trading {
         let order_type_tag = 1;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<BABE, SUI>(
+        test_match_trading_order_<BABE, SUI>(
             &mut scenario,
             babe_oracle_id,
             sui_oracle_id,
@@ -2056,7 +2036,7 @@ module typus_perp::test_trading {
 
         next_tx(&mut scenario, USER_2);
         let (reduce_only, is_long, is_stop_order) = (true, true, false);
-        test_create_trading_order_v2_<BABE, SUI>(
+        test_create_trading_order_<BABE, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2254,7 +2234,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 9_0000_0000); // 10 contract size, SUIUSD = 9 => should not be filled
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2273,7 +2253,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 10_0000_0000); // 10 contract size, SUIUSD = 10 => should be filled immediately
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2293,7 +2273,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<SUI, SUI>(
+        test_match_trading_order_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2310,7 +2290,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (true, false, false);
         let (size, trigger_price) = (10_0000_00000, 11_0000_0000); // 10 contract size, SUIUSD = 11
         let collateral_amount = 0_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2340,7 +2320,7 @@ module typus_perp::test_trading {
         // manager reduce position id 0
         let position_id = 0;
         let reduced_ratio_bp = 1_0000; // reduce 100%
-        test_manager_reduce_position_v2_<SUI, SUI>(
+        test_manager_reduce_position_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2353,7 +2333,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 9_0000_0000); // 10 contract size, SUIUSD = 9 => should not be filled
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2376,7 +2356,7 @@ module typus_perp::test_trading {
         let sui_token_price = 10_0000_0000;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<SUI, SUI>(
+        test_match_trading_order_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2395,7 +2375,7 @@ module typus_perp::test_trading {
         let sui_token_price = 9_0000_0000;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<SUI, SUI>(
+        test_match_trading_order_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2413,7 +2393,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 10_0000_0000); // 10 contract size, SUIUSD = 10 => should be filled immediately
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<BABE, SUI>(
+        test_create_trading_order_<BABE, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2434,7 +2414,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<BABE, SUI>(
+        test_match_trading_order_<BABE, SUI>(
             &mut scenario,
             babe_oracle_id,
             sui_oracle_id,
@@ -2566,7 +2546,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 9_0000_0000); // 10 contract size, SUIUSD = 9 => should not be filled
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2585,7 +2565,7 @@ module typus_perp::test_trading {
         let (reduce_only, is_long, is_stop_order) = (false, true, false);
         let (size, trigger_price) = (10_0000_00000, 10_0000_0000); // 10 contract size, SUIUSD = 10 => should be filled immediately
         let collateral_amount = 1_0000_00000; // 1 SUI as collateral
-        test_create_trading_order_v2_<SUI, SUI>(
+        test_create_trading_order_<SUI, SUI>(
             &mut scenario,
             reduce_only,
             is_long,
@@ -2605,7 +2585,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let ts_ms = CURRENT_TS_MS;
         let max_operation_count = 10;
-        test_match_trading_order_v2_<SUI, SUI>(
+        test_match_trading_order_<SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2680,7 +2660,7 @@ module typus_perp::test_trading {
         let current_trading_price = 10_0000_0000;
         let order_size = 10_0000_00000;
         let ts_ms = CURRENT_TS_MS + 1;
-        test_reduce_option_collateral_position_size_v2_<SUI, SUI, SUI>(
+        test_reduce_option_collateral_position_size_<SUI, SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2695,7 +2675,7 @@ module typus_perp::test_trading {
 
         next_tx(&mut scenario, USER_1);
         let ts_ms = EXPIRATION_TS_MS + 1;
-        test_reduce_option_collateral_position_size_v2_<SUI, SUI, SUI>(
+        test_reduce_option_collateral_position_size_<SUI, SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,
@@ -2755,7 +2735,7 @@ module typus_perp::test_trading {
         test_update_funding_rate_<SUI>(&mut scenario, sui_oracle_id, current_trading_price, ts_ms);
 
         let position_id = 0;
-        test_manager_close_option_position_v2<SUI, SUI, SUI>(
+        test_manager_close_option_position<SUI, SUI, SUI>(
             &mut scenario,
             sui_oracle_id,
             sui_oracle_id,

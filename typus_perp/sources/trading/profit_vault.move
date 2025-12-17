@@ -24,7 +24,10 @@ module typus_perp::profit_vault {
     }
 
     public struct UserProfit has copy, drop, store {
-        token: TypeName,
+        collateral_token: TypeName,
+        base_token: TypeName,
+        position_id: u64,
+        order_id: u64,
         amount: u64,
         create_ts_ms: u64,
     }
@@ -148,7 +151,7 @@ module typus_perp::profit_vault {
                 user_profit: profits.remove(idx),
                 create_ts_ms: current_ts_ms
             };
-            assert!(token_type == locked_user_profit.user_profit.token, error::collateral_token_type_mismatched());
+            assert!(token_type == locked_user_profit.user_profit.collateral_token, error::collateral_token_type_mismatched());
             let locked_balance_value = locked_user_profit.user_profit.amount;
             if (lock_vault.user_profits.contains(user)) {
                 let lock_profits = lock_vault.user_profits.borrow_mut(user);
@@ -196,7 +199,7 @@ module typus_perp::profit_vault {
             let profits = lock_vault.user_profits.borrow_mut(user);
             assert!(idx < profits.length(), error::invalid_idx());
             let locked_user_profit = profits.remove(idx);
-            assert!(token_type == locked_user_profit.user_profit.token, error::collateral_token_type_mismatched());
+            assert!(token_type == locked_user_profit.user_profit.collateral_token, error::collateral_token_type_mismatched());
             let locked_balance_value = locked_user_profit.user_profit.amount;
             if (profit_vault.user_profits.contains(user)) {
                 let user_profits = profit_vault.user_profits.borrow_mut(user);
@@ -229,15 +232,21 @@ module typus_perp::profit_vault {
         user: address,
         user_profit: UserProfit,
     }
-    public(package) fun put_user_profit<TOKEN>(
+    public(package) fun put_user_profit<C_TOKEN>(
         profit_vault: &mut ProfitVault,
         user: address,
-        balance: Balance<TOKEN>,
+        balance: Balance<C_TOKEN>,
+        base_token_type: TypeName,
+        position_id: u64,
+        order_id: u64,
         clock: &Clock,
     ) {
-        let token_type = type_name::with_defining_ids<TOKEN>();
+        let collateral_token_type = type_name::with_defining_ids<C_TOKEN>();
         let user_profit = UserProfit {
-            token: token_type,
+            collateral_token: collateral_token_type,
+            base_token: base_token_type,
+            position_id,
+            order_id,
             amount: balance.value(),
             create_ts_ms: clock.timestamp_ms(),
         };
@@ -247,10 +256,10 @@ module typus_perp::profit_vault {
         } else {
             profit_vault.user_profits.add(user, vector[user_profit]);
         };
-        if (dynamic_field::exists_(&profit_vault.id, token_type)) {
-            dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut profit_vault.id, token_type).join(balance);
+        if (dynamic_field::exists_(&profit_vault.id, collateral_token_type)) {
+            dynamic_field::borrow_mut<TypeName, Balance<C_TOKEN>>(&mut profit_vault.id, collateral_token_type).join(balance);
         } else {
-            dynamic_field::add(&mut profit_vault.id, token_type, balance);
+            dynamic_field::add(&mut profit_vault.id, collateral_token_type, balance);
         };
         emit(PutUserProfitEvent { user, user_profit });
     }
@@ -273,7 +282,7 @@ module typus_perp::profit_vault {
             let mut profits = profit_vault.user_profits.remove(user);
             while (profits.length() > 0) {
                 let user_profit = profits.pop_back();
-                if (user_profit.token == token_type
+                if (user_profit.collateral_token == token_type
                     && current_ts_ms >= user_profit.create_ts_ms + profit_vault.unlock_countdown_ts_ms
                 ) {
                     total_withdrawable = total_withdrawable + user_profit.amount;
