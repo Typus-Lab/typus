@@ -824,10 +824,23 @@ module typus_perp::trading {
             collateral_oracle_price,
             collateral_oracle_price_decimal
         );
+        let real_trigger_price = if (is_long) {
+            if (is_stop_order) {
+                trigger_price.max(trading_pair_oracle_price)
+            } else {
+                trigger_price.min(trading_pair_oracle_price)
+            }
+        } else {
+            if (is_stop_order) {
+                trigger_price.min(trading_pair_oracle_price)
+            } else {
+                trigger_price.max(trading_pair_oracle_price)
+            }
+        };
         let order_size_usd = amount_to_usd(
             size,
             symbol_market.market_info.size_decimal,
-            trigger_price, // use order price to calculate leverage
+            real_trigger_price, // use real_trigger_price to calculate leverage
             trading_pair_oracle_price_decimal
         );
         let leverage_mbp = if (collateral_usd > 0) {
@@ -989,30 +1002,6 @@ module typus_perp::trading {
             u64_padding: vector::empty()
         });
 
-        // check order filled
-        // if (filled) {
-        //     let (collateral_balance, _, _) = execute_order_<C_TOKEN>(
-        //         version,
-        //         // referrals,
-        //         market_index,
-        //         symbol_market,
-        //         liquidity_pool,
-        //         order,
-        //         market.protocol_fee_share_bp,
-        //         collateral_oracle_price,
-        //         collateral_oracle_price_decimal,
-        //         trading_pair_oracle_price,
-        //         trading_pair_oracle_price_decimal,
-        //         typus_ecosystem_version,
-        //         typus_user_registry,
-        //         typus_leaderboard_registry,
-        //         tails_staking_registry,
-        //         competition_config,
-        //         clock,
-        //         ctx,
-        //     );
-        //     return_to_user(&mut market.id, collateral_balance, user, ctx);
-        // } else {
         // update market info
         adjust_market_info_user_order_size(symbol_market, is_long, false, size);
 
@@ -1027,7 +1016,6 @@ module typus_perp::trading {
             let active_orders = active_orders_vec_map.get_mut(&trigger_price);
             active_orders.push_back(order);
         };
-        // };
     }
 
     public struct CancelTradingOrderEvent has copy, drop {
@@ -3615,6 +3603,7 @@ module typus_perp::trading {
         if (
             math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_PROFIT_VAULT_FLAG) == 1
             && !profit_vault.is_whitelist(position.get_position_user())
+            && realized_profit.value() > 0
         ) {
             let base_token_type = position.get_position_symbol().base_token();
             let realized_profit_value = realized_profit.value();
