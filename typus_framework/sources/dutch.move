@@ -135,7 +135,7 @@ module typus_framework::dutch {
         able_to_remove_bid: bool,
         ctx: &mut TxContext,
     ): Auction {
-        assert!(end_ts_ms >= start_ts_ms, EInvalidTimePeriod);
+        assert!(end_ts_ms > start_ts_ms, EInvalidTimePeriod);
         assert!(size > 0, EInvalidSize);
         assert!(decay_speed > 0, EInvalidDecaySpeed);
         assert!(initial_price >= final_price && final_price > 0, EInvalidAuctionPrice);
@@ -497,7 +497,7 @@ module typus_framework::dutch {
         // main logic
         let ts_ms = clock::timestamp_ms(clock);
         assert!(ts_ms < auction.start_ts_ms, EAuctionAlreadyStarted);
-        assert!(end_ts_ms >= start_ts_ms, EInvalidTimePeriod);
+        assert!(end_ts_ms > start_ts_ms, EInvalidTimePeriod);
         assert!(decay_speed > 0, EInvalidDecaySpeed);
         assert!(initial_price >= final_price && final_price > 0, EInvalidAuctionPrice);
         let prev_start_ts_ms = auction.start_ts_ms;
