@@ -10,6 +10,9 @@ module typus_dov::tds_witness_entry {
     use typus::witness_lock::{Self, HotPotato};
     use typus::ecosystem::Version as TypusEcosystemVersion;
 
+    #[error]
+    const EinvalidWitness: vector<u8> = b"invalid_witness";
+
     /// Executes an OTC deal with a witness.
     /// WARNING: without authority check inside.
     #[deprecated, allow(unused)]
@@ -87,17 +90,14 @@ module typus_dov::tds_witness_entry {
     /// A helper function to get the witness string for a given lending protocol.
     /// TODO: extend supported witnesses
     fun lending_witness(
-        index: u64,
         lending_index: u64
     ): String {
         // 0: none, 1: scallop spool, 2: scallop, 3: suilend, 4: navi, 5: alphalend
         if (lending_index == 5) {
-            string::utf8(TYPUS_GALAXY_DOV_ALPHALEND_WITNESS)
-        } else {
-            // abort!
-            typus_dov_single::invalid_witness(index);
-            string::utf8(b"")
-        }
+            return string::utf8(TYPUS_GALAXY_DOV_ALPHALEND_WITNESS)
+        };
+
+        abort EinvalidWitness
     }
 
     /// A generic witness struct.
@@ -151,7 +151,7 @@ module typus_dov::tds_witness_entry {
         // main logic
         let (cap, cap_hot_potato) = typus_dov_single::borrow_lending_account_cap_<CAP>(registry, index, lending_index);
 
-        let witness = lending_witness(index, lending_index);
+        let witness = lending_witness(lending_index);
         let wrapped_cap = witness_lock::wrap(typus_ecosystem_version, cap, witness);
 
         (wrapped_cap, cap_hot_potato)
@@ -201,7 +201,7 @@ module typus_dov::tds_witness_entry {
         let (balance, u64_padding) = typus_dov_single::withdraw_for_lending_<D_TOKEN>(registry, index, lending_index);
         emit(DepositLending {signer: tx_context::sender(ctx), index, lending_index, u64_padding });
 
-        let witness = lending_witness(index, lending_index);
+        let witness = lending_witness(lending_index);
         witness_lock::wrap(typus_ecosystem_version, balance, witness)
     }
 

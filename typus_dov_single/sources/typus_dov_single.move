@@ -46,7 +46,6 @@ module typus_dov::typus_dov_single {
     use typus_oracle::oracle::{Self, Oracle};
     use typus::ecosystem::Version as TypusEcosystemVersion;
     use typus::leaderboard::{Self, TypusLeaderboardRegistry};
-    use typus::linked_set;
     use typus::tgld::TgldRegistry;
     use typus::user::{Self, TypusUserRegistry};
     use typus::witness_lock::{Self, HotPotato};
@@ -93,7 +92,7 @@ module typus_dov::typus_dov_single {
 
     // ======== Manager Cap Key ========
     const K_TYPUS_ECOSYSTEM: vector<u8> = b"typus_ecosystem";
-    const K_WITNESSES: vector<u8> = b"witnesses";
+    // const K_WITNESSES: vector<u8> = b"witnesses";
 
     // ======== Flag Key ========
     const K_ENABLE_TGLD: vector<u8> = b"enable_tgld";
@@ -459,7 +458,7 @@ module typus_dov::typus_dov_single {
     public(package) fun suspend_transaction_(
         registry: &mut Registry,
     ) {
-        assert!(!registry.transaction_suspended, transaction_already_suspended(0));
+        assert!(!registry.transaction_suspended, ETransactionAlreadySuspended);
         registry.transaction_suspended = true;
     }
 
@@ -468,7 +467,7 @@ module typus_dov::typus_dov_single {
     public(package) fun resume_transaction_(
         registry: &mut Registry,
     ) {
-        assert!(registry.transaction_suspended, transaction_already_resumed(0));
+        assert!(registry.transaction_suspended, ETransactionAlreadyResumed);
         registry.transaction_suspended = false;
     }
 
@@ -669,8 +668,8 @@ module typus_dov::typus_dov_single {
         if (portfolio_vault.info.status == S_RECOUP) {
             return vector[portfolio_vault.info.round]
         };
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 2, scallop_basic_lending_disabled(index));
+        assert!(portfolio_vault.info.status != S_SETTLE, EInvalidAction);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 2, EScallopBasicLendingDisabled);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
 
@@ -715,7 +714,7 @@ module typus_dov::typus_dov_single {
         };
         let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 2, scallop_basic_lending_disabled(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 2, EScallopBasicLendingDisabled);
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
@@ -795,8 +794,8 @@ module typus_dov::typus_dov_single {
         if (portfolio_vault.info.status == S_RECOUP) {
             return vector[portfolio_vault.info.round]
         };
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
+        assert!(portfolio_vault.info.status != S_SETTLE, EInvalidAction);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
         if (!dynamic_field::exists_(&additional_config.id, K_NAVI_ACCOUNT_CAP)) {
@@ -840,8 +839,8 @@ module typus_dov::typus_dov_single {
         if (portfolio_vault.info.status == S_RECOUP) {
             return vector[portfolio_vault.info.round]
         };
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, navi_disabled(index));
+        assert!(portfolio_vault.info.status != S_SETTLE, EInvalidAction);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, ENaviDisabled);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         if (!dynamic_field::exists_(&registry.id, K_NAVI_ACCOUNT_CAP)) {
             let navi_account_cap = lending_core::lending::create_account(ctx);
@@ -884,8 +883,8 @@ module typus_dov::typus_dov_single {
         if (portfolio_vault.info.status == S_RECOUP) {
             return vector[portfolio_vault.info.round]
         };
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 7, navi_disabled(index));
+        assert!(portfolio_vault.info.status != S_SETTLE, EInvalidAction);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 7, ENaviDisabled);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let (mut balance, mut log) = vault::withdraw_for_lending(deposit_vault);
         if (balance.value() == 0) {
@@ -959,7 +958,7 @@ module typus_dov::typus_dov_single {
         };
         let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
@@ -1030,7 +1029,7 @@ module typus_dov::typus_dov_single {
         let navi_account_cap = dynamic_field::remove(&mut registry.id, K_NAVI_ACCOUNT_CAP);
         let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, navi_disabled(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 6, ENaviDisabled);
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
@@ -1100,7 +1099,7 @@ module typus_dov::typus_dov_single {
         let shared_navi_account_cap = dynamic_field::remove(&mut registry.id, K_NAVI_ACCOUNT_CAP);
         let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 7, ENaviDisabled);
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
         oracle_pro::update_single_price(
             clock,
@@ -1268,7 +1267,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): vector<u64> {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, collateral_index);
-        assert!(portfolio_vault.info.status != S_SETTLE, invalid_action(collateral_index));
+        assert!(portfolio_vault.info.status != S_SETTLE, EInvalidAction);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         if (!dynamic_field::exists_(&additional_config.id, K_NAVI_ACCOUNT_CAP)) {
             let navi_account_cap = lending_core::lending::create_account(ctx);
@@ -1385,7 +1384,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): vector<u64> {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         let receipts = if (dynamic_field::exists_(&additional_config.id, K_TYPUS_DEPOSIT_RECEIPT)) {
             vector[dynamic_field::remove(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT)]
@@ -1502,7 +1501,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): vector<u64> {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         let receipt = dynamic_field::remove(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
@@ -1547,7 +1546,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): vector<u64> {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         let receipt = dynamic_field::remove(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT);
         let navi_account_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_NAVI_ACCOUNT_CAP);
@@ -1662,7 +1661,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): (HotPotato<Balance<I_TOKEN>>, vector<u64>) {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         let receipt = dynamic_field::remove(&mut additional_config.id, K_TYPUS_DEPOSIT_RECEIPT);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, deposit_index);
@@ -1735,7 +1734,7 @@ module typus_dov::typus_dov_single {
         ctx: &mut TxContext,
     ): vector<u64> {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, collateral_index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, navi_disabled(collateral_index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 4, ENaviDisabled);
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, collateral_index);
         let navi_account_cap = dynamic_field::borrow_mut(&mut additional_config.id, K_NAVI_ACCOUNT_CAP);
         oracle_pro::update_single_price(
@@ -1810,7 +1809,7 @@ module typus_dov::typus_dov_single {
     }
 
     /// Returns the dynamic field key for a specific lending protocol's account capability object.
-    fun lending_cap_key(index: u64, lending_index: u64): vector<u8> {
+    fun lending_cap_key(lending_index: u64): vector<u8> {
         if (lending_index == 5) {
             K_ALPHALEND_ACCOUNT_CAP
         } else if (lending_index == 4) {
@@ -1820,7 +1819,7 @@ module typus_dov::typus_dov_single {
         } else if (lending_index == 1) {
             K_SCALLOP_SPOOL_ACCOUNT
         } else {
-            abort invalid_lending_index(index)
+            abort EInvalidLendingIndex
         }
     }
 
@@ -1834,7 +1833,7 @@ module typus_dov::typus_dov_single {
     ): address {
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
         let account_cap_id = object::id_address(&account_cap);
-        dynamic_field::add(&mut additional_config.id, lending_cap_key(index, lending_index), account_cap);
+        dynamic_field::add(&mut additional_config.id, lending_cap_key(lending_index), account_cap);
         account_cap_id
     }
 
@@ -1857,7 +1856,7 @@ module typus_dov::typus_dov_single {
         lending_index: u64,
     ): (CAP, LendingCapHotPotato) {
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        let account_cap = dynamic_field::remove(&mut additional_config.id, lending_cap_key(index, lending_index));
+        let account_cap = dynamic_field::remove(&mut additional_config.id, lending_cap_key(lending_index));
         let account_cap_id = object::id_address(&account_cap);
         let lending_cap_hot_potato = LendingCapHotPotato {
             index,
@@ -1881,7 +1880,7 @@ module typus_dov::typus_dov_single {
         } = lending_cap_hot_potato;
         assert!(account_cap_id == object::id_address(&account_cap));
         let additional_config = get_mut_additional_config(&mut registry.additional_config_registry, index);
-        dynamic_field::add(&mut additional_config.id, lending_cap_key(index, lending_index), account_cap);
+        dynamic_field::add(&mut additional_config.id, lending_cap_key(lending_index), account_cap);
     }
 
     /// A generic function to withdraw the entire balance from a deposit vault for depositing into a lending protocol.
@@ -1893,8 +1892,8 @@ module typus_dov::typus_dov_single {
     ): (Balance<TOKEN>, vector<u64>) {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
         assert!(portfolio_vault.info.status == S_NEW_AUCTION
-         || portfolio_vault.info.status == S_DELIVERY, invalid_action(index));
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == lending_index, navi_disabled(index));
+         || portfolio_vault.info.status == S_DELIVERY, EInvalidAction);
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == lending_index, ENaviDisabled);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let (balance, mut log) = vault::withdraw_for_lending(deposit_vault);
         log.push_back(balance.value());
@@ -1913,7 +1912,7 @@ module typus_dov::typus_dov_single {
     ): vector<u64> {
         let incentive = dynamic_field::borrow_mut(&mut registry.id, type_name::with_defining_ids<TOKEN>());
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == lending_index, navi_disabled(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == lending_index, ENaviDisabled);
         utils::set_u64_padding_value(&mut portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL, 0);
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
         let additional_lending_flag = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_ENABLE_ADDITIONAL_LENDING);
@@ -2236,32 +2235,31 @@ module typus_dov::typus_dov_single {
         // safety check
         let index = registry.num_of_vault;
         let current_ts_ms = clock::timestamp_ms(clock);
-        assert!(activation_ts_ms >= current_ts_ms, invalid_activation_time(index));
-        assert!(expiration_ts_ms > activation_ts_ms, invalid_expiration_time(index));
+        assert!(activation_ts_ms >= current_ts_ms, EInvalidActivationTime);
+        assert!(expiration_ts_ms > activation_ts_ms, EInvalidExpirationTime);
         validate_dutch_auction_settings(
-            index,
             initial_price,
             final_price,
             auction_duration_ts_ms,
         );
         if (period == 0) {
-            assert!(expiration_ts_ms - activation_ts_ms == 86400_000, invalid_expiration_time(index));
+            assert!(expiration_ts_ms - activation_ts_ms == 86400_000, EInvalidExpirationTime);
         } else if (period == 1) {
-            assert!(expiration_ts_ms - activation_ts_ms == 604800_000, invalid_expiration_time(index));
+            assert!(expiration_ts_ms - activation_ts_ms == 604800_000, EInvalidExpirationTime);
         } else if (period == 2) {
             assert!((expiration_ts_ms - activation_ts_ms == 4 * 604800_000) ||
-                    (expiration_ts_ms - activation_ts_ms == 5 * 604800_000), invalid_expiration_time(index));
+                    (expiration_ts_ms - activation_ts_ms == 5 * 604800_000), EInvalidExpirationTime);
         } else if (period == 3) {
-            assert!(expiration_ts_ms - activation_ts_ms == 3600_000, invalid_expiration_time(index));
+            assert!(expiration_ts_ms - activation_ts_ms == 3600_000, EInvalidExpirationTime);
         } else if (period == 4) {
-            assert!(expiration_ts_ms - activation_ts_ms == 600_000, invalid_expiration_time(index));
+            assert!(expiration_ts_ms - activation_ts_ms == 600_000, EInvalidExpirationTime);
         } else {
-            abort invalid_period(index)
+            abort EInvalidPeriod
         };
-        assert!(deposit_lot_size > 0, invalid_deposit_lot_size(index));
-        assert!(min_deposit_size >= deposit_lot_size, invalid_min_deposit_size(index));
-        assert!(bid_lot_size > 0, invalid_bid_lot_size(index));
-        assert!(min_bid_size >= bid_lot_size, invalid_min_bid_size(index));
+        assert!(deposit_lot_size > 0, EInvalidDepositLotSize);
+        assert!(min_deposit_size >= deposit_lot_size, EInvalidMinDepositSize);
+        assert!(bid_lot_size > 0, EInvalidBidLotSize);
+        assert!(min_bid_size >= bid_lot_size, EInvalidMinBidSize);
 
         // main logic
         let (oracle_price, oracle_price_decimal) = oracle::get_price(oracle, clock);
@@ -2534,7 +2532,7 @@ module typus_dov::typus_dov_single {
         };
         // TODO: update_fee_share
         if (option::is_some(&deposit_fee_share_bp)) {
-            abort invalid_fee_share_setting(index)
+            abort EInvalidFeeShareSetting
         };
         if (option::is_some(&oracle_id)) {
             portfolio_vault.config.oracle_id = option::destroy_some(oracle_id);
@@ -2625,9 +2623,9 @@ module typus_dov::typus_dov_single {
         final_price: u64,
     ): (VaultConfig, VaultConfig) {
         let portfolio_vault = get_mut_portfolio_vault(&mut registry.portfolio_vault_registry, index);
-        validate_dutch_auction_settings(index, initial_price, final_price, portfolio_vault.config.auction_duration_ts_ms);
+        validate_dutch_auction_settings(initial_price, final_price, portfolio_vault.config.auction_duration_ts_ms);
         let previous = portfolio_vault.config.warmup_vault_config;
-        portfolio_vault.config.warmup_vault_config.payoff_configs = create_payoff_configs(index, strike_pct, weight, is_buyer);
+        portfolio_vault.config.warmup_vault_config.payoff_configs = create_payoff_configs(strike_pct, weight, is_buyer);
         portfolio_vault.config.warmup_vault_config.strike_increment = strike_increment;
         portfolio_vault.config.warmup_vault_config.decay_speed = decay_speed;
         portfolio_vault.config.warmup_vault_config.initial_price = initial_price;
@@ -2774,8 +2772,8 @@ module typus_dov::typus_dov_single {
         let deposit_vault = get_mut_deposit_vault(&mut registry.deposit_vault_registry, index);
 
         // safety check
-        assert!(clock::timestamp_ms(clock) >= portfolio_vault.info.activation_ts_ms, not_yet_activated(index));
-        assert!(portfolio_vault.info.status % 5 == 0, invalid_action(index));
+        assert!(clock::timestamp_ms(clock) >= portfolio_vault.info.activation_ts_ms, ENotYetActivated);
+        assert!(portfolio_vault.info.status % 5 == 0, EInvalidAction);
 
         // main logic
         let next_lending_protocol = utils::get_u64_padding_value(&portfolio_vault.config.u64_padding, I_CONFIG_NEXT_LENDING_PROTOCOL);
@@ -2818,7 +2816,7 @@ module typus_dov::typus_dov_single {
             // oracle: USDC/USD price
             let (_, _, base_token_type, _) = oracle::get_token(d_token_price_oracle);
             // deposit_token: USDC, base_token_type: USDC
-            assert!(portfolio_vault.info.deposit_token == base_token_type, invalid_deposit_token(index));
+            assert!(portfolio_vault.info.deposit_token == base_token_type, EInvalidDepositToken);
             // USDC -> USD
             total_balance_= ((total_balance_ as u128) * (d_token_price as u128) / (utils::multiplier(d_token_price_decimal) as u128)) as u64;
         };
@@ -2829,7 +2827,6 @@ module typus_dov::typus_dov_single {
             portfolio_vault.config.leverage,
             total_balance_,
             calculate_max_loss_per_unit(
-                index,
                 portfolio_vault.info.option_type,
                 oracle_price,
                 oracle_price_decimal,
@@ -2959,12 +2956,12 @@ module typus_dov::typus_dov_single {
         };
 
         // safety check
-        assert!(!auction_exists(&registry.auction_registry, index), auction_already_started(index));
-        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, invalid_action(index));
+        assert!(!auction_exists(&registry.auction_registry, index), EAuctionAlreadyStarted);
+        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, EInvalidAction);
 
         // main logic
         let start_ts_ms = portfolio_vault.info.activation_ts_ms + option::get_with_default(&auction_delay_ts_ms, portfolio_vault.config.auction_delay_ts_ms);
-        assert!(start_ts_ms < portfolio_vault.info.expiration_ts_ms, invalid_auction_delay_ts_ms(index));
+        assert!(start_ts_ms < portfolio_vault.info.expiration_ts_ms, EInvalidAuctionDelayTsMs);
         let end_ts_ms = start_ts_ms + option::get_with_default(&auction_duration_ts_ms, portfolio_vault.config.auction_duration_ts_ms);
         let size = portfolio_vault.info.delivery_infos.max_size - portfolio_vault.info.delivery_infos.total_delivery_size;
         let decay_speed = portfolio_vault.config.active_vault_config.decay_speed;
@@ -3019,7 +3016,7 @@ module typus_dov::typus_dov_single {
         let auction = take_auction(&mut registry.auction_registry, index);
 
         // safety check
-        assert!(portfolio_vault.info.status == S_NEW_AUCTION, invalid_action(index));
+        assert!(portfolio_vault.info.status == S_NEW_AUCTION, EInvalidAction);
 
         // main logic
         let (
@@ -3314,14 +3311,14 @@ module typus_dov::typus_dov_single {
         let bid_vault = get_mut_bid_vault(&mut registry.bid_vault_registry, index);
 
         // safety check
-        assert!(!auction_exists(&registry.auction_registry, index), auction_already_started(index));
-        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, invalid_action(index));
-        assert!(round.is_none() || option::some(portfolio_vault.info.round) == round , invalid_round(index));
+        assert!(!auction_exists(&registry.auction_registry, index), EAuctionAlreadyStarted);
+        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, EInvalidAction);
+        assert!(round.is_none() || option::some(portfolio_vault.info.round) == round , EInvalidRound);
         assert!(((delivery_price as u128) * (delivery_size as u128)
             / (utils::multiplier(portfolio_vault.info.o_token_decimal) as u128) as u64)
-                <= balance::value(&bidder_balance) + balance::value(&incentive_balance), insufficient_balance(index));
+                <= balance::value(&bidder_balance) + balance::value(&incentive_balance), EInsufficientBalance);
         assert!(portfolio_vault.info.delivery_infos.total_delivery_size + delivery_size
-            <= portfolio_vault.info.delivery_infos.max_size, max_size_violation(index));
+            <= portfolio_vault.info.delivery_infos.max_size, EMaxSizeViolation);
 
         // main logic
         let bidder_fee = balance::value(&bidder_fee_balance);
@@ -3402,8 +3399,8 @@ module typus_dov::typus_dov_single {
         let bid_vault = get_mut_bid_vault(&mut registry.bid_vault_registry, index);
 
         // safety check
-        assert!(!auction_exists(&registry.auction_registry, index), auction_already_started(index));
-        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY || portfolio_vault.info.status == S_RECOUP, invalid_action(index));
+        assert!(!auction_exists(&registry.auction_registry, index), EAuctionAlreadyStarted);
+        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY || portfolio_vault.info.status == S_RECOUP, EInvalidAction);
         if (portfolio_vault.info.status == S_RECOUP) {
             balance.destroy_zero();
             return (option::none(), vector[0, 0, 0, 0])
@@ -3493,9 +3490,9 @@ module typus_dov::typus_dov_single {
         let bid_vault = get_mut_bid_vault(&mut registry.bid_vault_registry, index);
 
         // safety check
-        assert!(!auction_exists(&registry.auction_registry, index), auction_already_started(index));
-        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, invalid_action(index));
-        assert!(users.length() == sizes.length(), invalid_input(index));
+        assert!(!auction_exists(&registry.auction_registry, index), EAuctionAlreadyStarted);
+        assert!(portfolio_vault.info.status == S_ACTIVATE || portfolio_vault.info.status == S_DELIVERY, EInvalidAction);
+        assert!(users.length() == sizes.length(), EInvalidInput);
 
         // main logic
         let mut delivery_size = 0;
@@ -3534,7 +3531,7 @@ module typus_dov::typus_dov_single {
                 u64_padding: vector::empty(),
             }
         );
-        assert!(portfolio_vault.info.delivery_infos.total_delivery_size <= portfolio_vault.info.delivery_infos.max_size, max_size_violation(index));
+        assert!(portfolio_vault.info.delivery_infos.total_delivery_size <= portfolio_vault.info.delivery_infos.max_size, EMaxSizeViolation);
         vault::delivery<D_TOKEN, B_TOKEN>(
             deposit_vault,
             bid_vault,
@@ -3642,10 +3639,10 @@ module typus_dov::typus_dov_single {
 
         // safety check
         assert!(clock::timestamp_ms(clock) >=
-            portfolio_vault.info.activation_ts_ms + portfolio_vault.config.recoup_delay_ts_ms, recoup_not_yet_started(index));
-        assert!(portfolio_vault.info.status == S_DELIVERY, invalid_action(index));
+            portfolio_vault.info.activation_ts_ms + portfolio_vault.config.recoup_delay_ts_ms, ERecoupNotYetStarted);
+        assert!(portfolio_vault.info.status == S_DELIVERY, EInvalidAction);
         portfolio_vault.info.status = S_RECOUP;
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 0, lending_protocol_not_yet_withdrawn(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 0, ELendingProtocolNotYetWithdrawn);
 
         // main logic
         let refund_amount = ((((vault::active_share_supply(deposit_vault)
@@ -3678,10 +3675,10 @@ module typus_dov::typus_dov_single {
         let current_ts_ms = clock::timestamp_ms(clock);
 
         // safety check
-        assert!(current_ts_ms >= portfolio_vault.info.expiration_ts_ms, not_yet_expired(index));
-        assert!(portfolio_vault.info.status == S_RECOUP, invalid_action(index));
+        assert!(current_ts_ms >= portfolio_vault.info.expiration_ts_ms, ENotYetExpired);
+        assert!(portfolio_vault.info.status == S_RECOUP, EInvalidAction);
         portfolio_vault.info.status = S_SETTLE;
-        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 0, lending_protocol_not_yet_withdrawn(index));
+        assert!(utils::get_u64_padding_value(&portfolio_vault.info.u64_padding, I_INFO_CURRENT_LENDING_PROTOCOL) == 0, ELendingProtocolNotYetWithdrawn);
 
         // main logic
         let (oracle_price, oracle_price_decimal) = oracle::get_price(oracle, clock);
@@ -3690,7 +3687,6 @@ module typus_dov::typus_dov_single {
         // portfolio_payoff should be <= 0; if negative => depositor should pay
         // leverage has been considered in delivery_size => use 1x leverage to calculate portfolio payoff
         let mut portfolio_payoff = calculate_portfolio_payoff_by_price(
-            index,
             portfolio_vault.info.option_type,
             oracle_price,
             oracle_price_decimal,
@@ -3705,7 +3701,7 @@ module typus_dov::typus_dov_single {
         if (object::id(oracle) != object::id(d_token_price_oracle)) {
             // check d_token_price_oracle
             let (_, _, base_token_type, _) = oracle::get_token(d_token_price_oracle);
-            assert!(portfolio_vault.info.deposit_token == base_token_type, invalid_deposit_token(index));
+            assert!(portfolio_vault.info.deposit_token == base_token_type, EInvalidDepositToken);
             let (d_token_price, d_token_price_decimal) = oracle::get_price(d_token_price_oracle, clock);
             portfolio_payoff = i64_mul_div(portfolio_payoff, utils::multiplier(d_token_price_decimal), d_token_price);
         };
@@ -3819,8 +3815,8 @@ module typus_dov::typus_dov_single {
         let current_ts_ms = clock::timestamp_ms(clock);
 
         // safety check
-        assert!(current_ts_ms >= portfolio_vault.info.expiration_ts_ms, not_yet_expired(index));
-        assert!(portfolio_vault.info.status == S_DELIVERY || portfolio_vault.info.status == S_RECOUP, invalid_action(index));
+        assert!(current_ts_ms >= portfolio_vault.info.expiration_ts_ms, ENotYetExpired);
+        assert!(portfolio_vault.info.status == S_DELIVERY || portfolio_vault.info.status == S_RECOUP, EInvalidAction);
         portfolio_vault.info.status = S_SETTLE;
 
         // main logic
@@ -4218,7 +4214,7 @@ module typus_dov::typus_dov_single {
         id: &UID,
         index: u64,
     ): &Auction {
-        assert!(auction_exists(id, index), auction_not_yet_started(index));
+        assert!(auction_exists(id, index), EAuctionNotYetStarted);
         dynamic_object_field::borrow<u64, Auction>(id, index)
     }
 
@@ -4227,7 +4223,7 @@ module typus_dov::typus_dov_single {
         id: &mut UID,
         index: u64,
     ): &mut Auction {
-        assert!(auction_exists(id, index), auction_not_yet_started(index));
+        assert!(auction_exists(id, index), EAuctionNotYetStarted);
         dynamic_object_field::borrow_mut<u64, Auction>(id, index)
     }
 
@@ -4236,31 +4232,8 @@ module typus_dov::typus_dov_single {
         id: &mut UID,
         index: u64,
     ): Auction {
-        assert!(auction_exists(id, index), auction_not_yet_started(index));
+        assert!(auction_exists(id, index), EAuctionNotYetStarted);
         dynamic_object_field::remove<u64, Auction>(id, index)
-    }
-
-    /// Performs a health check on all vaults, identifying those that are expired but have not yet been settled.
-    public(package) fun health_check(
-        registry: &Registry,
-        clock: &Clock,
-    ): vector<vector<u8>> {
-
-        let mut result = vector::empty();
-        let mut index = 0;
-        let current_ts_ms = clock::timestamp_ms(clock);
-        vector::push_back(&mut result, bcs::to_bytes(&current_ts_ms));
-        while (index < registry.num_of_vault) {
-            if (portfolio_vault_exists(&registry.portfolio_vault_registry, index)) {
-                let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-                if (portfolio_vault.info.expiration_ts_ms < current_ts_ms && portfolio_vault.config.has_next) {
-                    vector::push_back(&mut result, bcs::to_bytes(&portfolio_vault.info));
-                };
-            };
-            index = index + 1;
-        };
-
-        result
     }
 
     /// Returns the bid fee in basis points for a specific vault.
@@ -4336,7 +4309,6 @@ module typus_dov::typus_dov_single {
 
     /// Calculates the maximum potential loss per option contract for the vault's strategy in terms of the deposit token.
     public(package) fun calculate_max_loss_per_unit(
-        index: u64,
         option_type: u64,
         price: u64,
         price_decimal: u64,
@@ -4356,7 +4328,7 @@ module typus_dov::typus_dov_single {
         let mut i = 0;
         while (i < component_length) {
             let payoff_config = vector::borrow(&payoff_configs, i);
-            assert!(option::is_some(&payoff_config.strike), strike_required(index));
+            assert!(option::is_some(&payoff_config.strike), EStrikeRequired);
             let strike = option::borrow(&payoff_config.strike);
             if (!vector::contains(&pivot_prices, strike)) {
                 vector::push_back(&mut pivot_prices, *strike);
@@ -4369,7 +4341,6 @@ module typus_dov::typus_dov_single {
         while (!vector::is_empty(&pivot_prices)) {
             let pivot_price = vector::pop_back(&mut pivot_prices);
             let payoff = calculate_portfolio_payoff_by_price(
-                index,
                 option_type,
                 pivot_price,
                 price_decimal,
@@ -4384,16 +4355,15 @@ module typus_dov::typus_dov_single {
                 max_loss = payoff;
             };
         };
-        assert!(i64::is_neg(&max_loss), invalid_max_loss(index));
+        assert!(i64::is_neg(&max_loss), EInvalidMaxLoss);
         let max_loss = i64::as_u64(&i64::neg(&max_loss));
-        assert!(max_loss > 0, invalid_max_loss(index));
+        assert!(max_loss > 0, EInvalidMaxLoss);
         max_loss
     }
 
     /// Calculates the total payoff for the entire portfolio (i.e., the depositors' side) based on a given settlement price.
     /// The result is an `I64` because it can be a loss (negative) for the depositors.
     public(package) fun calculate_portfolio_payoff_by_price(
-        index: u64,
         option_type: u64,
         price: u64,
         price_decimal: u64,
@@ -4407,11 +4377,11 @@ module typus_dov::typus_dov_single {
 
         while (!vector::is_empty(&payoff_configs)) {
             let payoff_config = vector::pop_back(&mut payoff_configs);
-            assert!(option::is_some(&payoff_config.strike), strike_required(index));
+            assert!(option::is_some(&payoff_config.strike), EStrikeRequired);
             let strike = *option::borrow<u64>(&payoff_config.strike);
 
             // option payoff in price_decimal => d_token_decimal
-            let mut option_settle_value = calculate_option_payoff(index, option_type, price, price_decimal, strike);
+            let mut option_settle_value = calculate_option_payoff(option_type, price, price_decimal, strike);
 
             let price_multiplier = utils::multiplier(price_decimal);
             let d_token_multiplier = utils::multiplier(d_token_decimal);
@@ -4462,7 +4432,6 @@ module typus_dov::typus_dov_single {
 
     /// Calculates the payoff for a single long option (call or put) at a given price.
     public(package) fun calculate_option_payoff(
-        index: u64,
         option_type: u64,
         price: u64,
         price_decimal: u64,
@@ -4490,7 +4459,7 @@ module typus_dov::typus_dov_single {
                 0
             }
         } else {
-            abort invalid_option_type(index)
+            abort EInvalidOptionType
         };
 
         long_option_payoff
@@ -4507,7 +4476,7 @@ module typus_dov::typus_dov_single {
         } else if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.bid_token) {
             portfolio_vault.info.b_token_decimal
         } else {
-            abort invalid_token(portfolio_vault.info.index)
+            abort EInvalidToken
         };
         let benchmark_price = portfolio_vault.info.oracle_info.price;
         let price_decimal = portfolio_vault.info.oracle_info.decimal;
@@ -4546,7 +4515,7 @@ module typus_dov::typus_dov_single {
         } else if (type_name::with_defining_ids<TOKEN>() == portfolio_vault.info.bid_token) {
             portfolio_vault.info.b_token_decimal
         } else {
-            abort invalid_token(portfolio_vault.info.index)
+            abort EInvalidToken
         };
 
         if (
@@ -4567,14 +4536,13 @@ module typus_dov::typus_dov_single {
 
     /// Creates a vector of `PayoffConfig` structs from raw parameters.
     public(package) fun create_payoff_configs(
-        index: u64,
         mut strike_bp: vector<u64>,
         mut weight: vector<u64>,
         mut is_buyer: vector<bool>,
     ): vector<PayoffConfig> {
-        assert!(vector::length(&strike_bp) > 0, invalid_payoff_config(index));
-        assert!(vector::length(&strike_bp) == vector::length(&weight), invalid_payoff_config(index));
-        assert!(vector::length(&weight) == vector::length(&is_buyer), invalid_payoff_config(index));
+        assert!(vector::length(&strike_bp) > 0, EInvalidPayoffConfig);
+        assert!(vector::length(&strike_bp) == vector::length(&weight), EInvalidPayoffConfig);
+        assert!(vector::length(&weight) == vector::length(&is_buyer), EInvalidPayoffConfig);
         let mut payoff_configs = vector::empty();
         while (!vector::is_empty(&strike_bp)) {
             let strike_bp_ = vector::pop_back(&mut strike_bp);
@@ -4777,7 +4745,6 @@ module typus_dov::typus_dov_single {
         let (oracle_price, oracle_price_decimal) = oracle::get_price(oracle, clock);
 
         let depositor_payoff = calculate_portfolio_payoff_by_price(
-            index,
             portfolio_vault.info.option_type,
             oracle_price,
             oracle_price_decimal,
@@ -4797,7 +4764,7 @@ module typus_dov::typus_dov_single {
             } else {
                 // check d_token_price_oracle
                 let (_, _, base_token_type, _) = oracle::get_token(d_token_price_oracle);
-                assert!(portfolio_vault.info.deposit_token == base_token_type, invalid_deposit_token(index));
+                assert!(portfolio_vault.info.deposit_token == base_token_type, EInvalidDepositToken);
                 let (d_token_price, d_token_price_decimal) = oracle::get_price(d_token_price_oracle, clock);
                 // USD -> USDC
                 (x as u128  * (utils::multiplier(d_token_price_decimal) as u128) / (d_token_price as u128)) as u64
@@ -4949,12 +4916,12 @@ module typus_dov::typus_dov_single {
 
     /// Checks if the module version is compatible with the registry version.
     public(package) fun version_check(registry: &Registry) {
-        assert!(C_VERSION >= registry.version, invalid_version(0));
+        assert!(C_VERSION >= registry.version, EInvalidVersion);
     }
 
     /// Checks if transactions are currently suspended in the registry.
     public(package) fun operation_check(registry: &Registry) {
-        assert!(!registry.transaction_suspended, transaction_suspended(0));
+        assert!(!registry.transaction_suspended, ETransactionSuspended);
     }
 
     /// Checks if the provided oracle matches the one configured in the vault.
@@ -4964,7 +4931,7 @@ module typus_dov::typus_dov_single {
         oracle: &Oracle,
     ) {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        assert!(portfolio_vault.config.oracle_id == object::id_address(oracle), invalid_oracle(index));
+        assert!(portfolio_vault.config.oracle_id == object::id_address(oracle), EInvalidOracle);
     }
 
     /// Checks if the provided generic token types match the deposit and bid tokens configured in the vault.
@@ -4973,13 +4940,13 @@ module typus_dov::typus_dov_single {
         index: u64,
     ) {
         let portfolio_vault = get_portfolio_vault(&registry.portfolio_vault_registry, index);
-        assert!(type_name::with_defining_ids<D_TOKEN>() == portfolio_vault.info.deposit_token, invalid_deposit_token(index));
-        assert!(type_name::with_defining_ids<B_TOKEN>() == portfolio_vault.info.bid_token, invalid_bid_token(index));
+        assert!(type_name::with_defining_ids<D_TOKEN>() == portfolio_vault.info.deposit_token, EInvalidDepositToken);
+        assert!(type_name::with_defining_ids<B_TOKEN>() == portfolio_vault.info.bid_token, EInvalidBidToken);
     }
 
     /// Validates that the caller has the authority and the version of package.
     public(package) fun validate_registry_upgradability(registry: &Registry, ctx: &TxContext) {
-        assert!(C_VERSION > registry.version, invalid_version(0));
+        assert!(C_VERSION > registry.version, EInvalidVersion);
         authority::verify(&registry.authority, ctx);
     }
 
@@ -4994,52 +4961,38 @@ module typus_dov::typus_dov_single {
         authority::double_verify(&registry.authority, &portfolio_vault.authority, ctx);
     }
 
-    /// Validates that a provided witness is registered as a valid witness in the registry.
-    public(package) fun validate_witness<W: drop>(registry: &Registry, _witness: W, index: u64) {
-        let witnesses = dynamic_field::borrow(&registry.id, K_WITNESSES.to_string());
-        assert!(linked_set::contains(witnesses, type_name::with_defining_ids<W>()), invalid_witness(index));
-    }
-
-    /// Validates that a deposit amount conforms to the vault's lot size and minimum size rules.
-    public(package) fun validate_deposit_amount(portfolio_vault: &PortfolioVault, amount: u64) {
-        assert!(amount >= portfolio_vault.config.deposit_lot_size
-            && amount % portfolio_vault.config.deposit_lot_size == 0, lot_size_violation(portfolio_vault.info.index));
-        assert!(amount >= portfolio_vault.config.min_deposit_size, min_size_violation(portfolio_vault.info.index));
-    }
-
     /// Validates that a deposit amount is at least the minimum required size.
     public(package) fun validate_min_deposit_size(portfolio_vault: &PortfolioVault, amount: u64) {
-        assert!(amount >= portfolio_vault.config.min_deposit_size, min_size_violation(portfolio_vault.info.index));
+        assert!(amount >= portfolio_vault.config.min_deposit_size, EMinSizeViolation);
     }
 
     /// Validates a bid amount against the vault's rules and checks if the maximum number of bidders has been reached.
     public(package) fun validate_bid(portfolio_vault: &PortfolioVault, auction: &Auction, amount: u64) {
         validate_bid_amount(portfolio_vault, amount);
         assert!(portfolio_vault.config.max_bid_entry == 0
-            || dutch::bid_index(auction) < portfolio_vault.config.max_bid_entry, max_bid_entry_reached(portfolio_vault.info.index));
+            || dutch::bid_index(auction) < portfolio_vault.config.max_bid_entry, EMaxBidEntryReached);
     }
 
     /// Validates that a bid amount conforms to the vault's lot size and minimum size rules.
     public(package) fun validate_bid_amount(portfolio_vault: &PortfolioVault, amount: u64) {
         assert!(amount >= portfolio_vault.config.bid_lot_size
-            && amount % portfolio_vault.config.bid_lot_size == 0, lot_size_violation(portfolio_vault.info.index));
-        assert!(amount >= portfolio_vault.config.min_bid_size, min_size_violation(portfolio_vault.info.index));
+            && amount % portfolio_vault.config.bid_lot_size == 0, ELotSizeViolation);
+        assert!(amount >= portfolio_vault.config.min_bid_size, EMinSizeViolation);
     }
 
     /// Validates that an amount is greater than zero.
-    public(package) fun validate_amount(index: u64, amount: u64) {
-        assert!(amount > 0, zero_value(index));
+    public(package) fun validate_amount(amount: u64) {
+        assert!(amount > 0, EZeroValue);
     }
 
     /// Validates the price and duration settings for a Dutch auction.
     public(package) fun validate_dutch_auction_settings(
-        index: u64,
         initial_price: u64,
         final_price: u64,
         auction_duration_ts_ms: u64,
     ) {
-        assert!(initial_price >= final_price && final_price > 0, invalid_auction_price(index));
-        assert!(auction_duration_ts_ms >= 60_000, invalid_auction_duration_ts_ms(index));
+        assert!(initial_price >= final_price && final_price > 0, EInvalidAuctionPrice);
+        assert!(auction_duration_ts_ms >= 60_000, EInvalidAuctionDurationTsMs);
     }
 
     /// Validates that the current total deposits do not exceed the vault's capacity and entry limits.
@@ -5053,13 +5006,13 @@ module typus_dov::typus_dov_single {
             vault::active_share_supply(deposit_vault)
                 + vault::warmup_share_supply(deposit_vault)
                     <= portfolio_vault.config.capacity,
-            max_vault_capacity_reached(index)
+            EMaxVaultCapacityReached
         );
         let deposit_shares = vault::get_deposit_shares(deposit_vault);
         assert!(
             portfolio_vault.config.max_deposit_entry == 0 ||
                 big_vector::length(deposit_shares) <= portfolio_vault.config.max_deposit_entry,
-            max_deposit_entry_reached(index)
+            EMaxDepositEntryReached
         );
     }
 
@@ -6006,49 +5959,90 @@ module typus_dov::typus_dov_single {
 
     // ======== Errors ========
 
-    fun auction_already_started(index: u64): u64 { abort index }
-    fun auction_not_yet_started(index: u64): u64 { abort index }
-    fun insufficient_balance(index: u64): u64 { abort index }
-    fun invalid_action(index: u64): u64 { abort index }
-    fun invalid_activation_time(index: u64): u64 { abort index }
-    fun invalid_auction_delay_ts_ms(index: u64): u64 { abort index }
-    fun invalid_auction_duration_ts_ms(index: u64): u64 { abort index }
-    fun invalid_auction_price(index: u64): u64 { abort index }
-    fun invalid_bid_lot_size(index: u64): u64 { abort index }
-    fun invalid_bid_token(index: u64): u64 { abort index }
-    fun invalid_deposit_lot_size(index: u64): u64 { abort index }
-    fun invalid_deposit_token(index: u64): u64 { abort index }
-    fun invalid_expiration_time(index: u64): u64 { abort index }
-    fun invalid_fee_share_setting(index: u64): u64 { abort index }
-    fun invalid_input(index: u64): u64 { abort index }
-    fun invalid_max_loss(index: u64): u64 { abort index }
-    fun invalid_min_bid_size(index: u64): u64 { abort index }
-    fun invalid_min_deposit_size(index: u64): u64 { abort index }
-    fun invalid_option_type(index: u64): u64 { abort index }
-    fun invalid_oracle(index: u64): u64 { abort index }
-    fun invalid_payoff_config(index: u64): u64 { abort index }
-    fun invalid_period(index: u64): u64 { abort index }
-    fun invalid_round(index: u64): u64 { abort index }
-    fun invalid_token(index: u64): u64 { abort index }
-    fun invalid_version(index: u64): u64 { abort index }
-    fun invalid_lending_index(index: u64): u64 { abort index }
-    public(package) fun invalid_witness(index: u64): u64 { abort index }
-    fun lending_protocol_not_yet_withdrawn(index: u64): u64 { abort index }
-    fun lot_size_violation(index: u64): u64 { abort index }
-    fun max_bid_entry_reached(index: u64): u64 { abort index }
-    fun max_deposit_entry_reached(index: u64): u64 { abort index }
-    fun max_size_violation(index: u64): u64 { abort index }
-    fun max_vault_capacity_reached(index: u64): u64 { abort index }
-    fun min_size_violation(index: u64): u64 { abort index }
-    fun navi_disabled(index: u64): u64 { abort index }
-    fun not_yet_activated(index: u64): u64 { abort index }
-    fun not_yet_expired(index: u64): u64 { abort index }
-    fun recoup_not_yet_started(index: u64): u64 { abort index }
-    fun scallop_basic_lending_disabled(index: u64): u64 { abort index }
-    fun strike_required(index: u64): u64 { abort index }
-    fun transaction_already_resumed(index: u64): u64 { abort index }
-    fun transaction_already_suspended(index: u64): u64 { abort index }
-    fun transaction_suspended(index: u64): u64 { abort index }
-    fun zero_value(index: u64): u64 { abort index }
-    public(package) fun deprecated(index: u64) { abort index }
+    #[error]
+    const EAuctionAlreadyStarted: vector<u8> = b"auction_already_started";
+    #[error]
+    const EAuctionNotYetStarted: vector<u8> = b"auction_not_yet_started";
+    #[error]
+    const EInsufficientBalance: vector<u8> = b"insufficient_balance";
+    #[error]
+    const EInvalidAction: vector<u8> = b"invalid_action";
+    #[error]
+    const EInvalidActivationTime: vector<u8> = b"invalid_activation_time";
+    #[error]
+    const EInvalidAuctionDelayTsMs: vector<u8> = b"invalid_auction_delay_ts_ms";
+    #[error]
+    const EInvalidAuctionDurationTsMs: vector<u8> = b"invalid_auction_duration_ts_ms";
+    #[error]
+    const EInvalidAuctionPrice: vector<u8> = b"invalid_auction_price";
+    #[error]
+    const EInvalidBidLotSize: vector<u8> = b"invalid_bid_lot_size";
+    #[error]
+    const EInvalidBidToken: vector<u8> = b"invalid_bid_token";
+    #[error]
+    const EInvalidDepositLotSize: vector<u8> = b"invalid_deposit_lot_size";
+    #[error]
+    const EInvalidDepositToken: vector<u8> = b"invalid_deposit_token";
+    #[error]
+    const EInvalidExpirationTime: vector<u8> = b"invalid_expiration_time";
+    #[error]
+    const EInvalidFeeShareSetting: vector<u8> = b"invalid_fee_share_setting";
+    #[error]
+    const EInvalidInput: vector<u8> = b"invalid_input";
+    #[error]
+    const EInvalidMaxLoss: vector<u8> = b"invalid_max_loss";
+    #[error]
+    const EInvalidMinBidSize: vector<u8> = b"invalid_min_bid_size";
+    #[error]
+    const EInvalidMinDepositSize: vector<u8> = b"invalid_min_deposit_size";
+    #[error]
+    const EInvalidOptionType: vector<u8> = b"invalid_option_type";
+    #[error]
+    const EInvalidOracle: vector<u8> = b"invalid_oracle";
+    #[error]
+    const EInvalidPayoffConfig: vector<u8> = b"invalid_payoff_config";
+    #[error]
+    const EInvalidPeriod: vector<u8> = b"invalid_period";
+    #[error]
+    const EInvalidRound: vector<u8> = b"invalid_round";
+    #[error]
+    const EInvalidToken: vector<u8> = b"invalid_token";
+    #[error]
+    const EInvalidVersion: vector<u8> = b"invalid_version";
+    #[error]
+    const EInvalidLendingIndex: vector<u8> = b"invalid_lending_index";
+    #[error]
+    const ELendingProtocolNotYetWithdrawn: vector<u8> = b"lending_protocol_not_yet_withdrawn";
+    #[error]
+    const ELotSizeViolation: vector<u8> = b"lot_size_violation";
+    #[error]
+    const EMaxBidEntryReached: vector<u8> = b"max_bid_entry_reached";
+    #[error]
+    const EMaxDepositEntryReached: vector<u8> = b"max_deposit_entry_reached";
+    #[error]
+    const EMaxSizeViolation: vector<u8> = b"max_size_violation";
+    #[error]
+    const EMaxVaultCapacityReached: vector<u8> = b"max_vault_capacity_reached";
+    #[error]
+    const EMinSizeViolation: vector<u8> = b"min_size_violation";
+    #[error]
+    const ENaviDisabled: vector<u8> = b"navi_disabled";
+    #[error]
+    const ENotYetActivated: vector<u8> = b"not_yet_activated";
+    #[error]
+    const ENotYetExpired: vector<u8> = b"not_yet_expired";
+    #[error]
+    const ERecoupNotYetStarted: vector<u8> = b"recoup_not_yet_started";
+    #[error]
+    const EScallopBasicLendingDisabled: vector<u8> = b"scallop_basic_lending_disabled";
+    #[error]
+    const EStrikeRequired: vector<u8> = b"strike_required";
+    #[error]
+    const ETransactionAlreadyResumed: vector<u8> = b"transaction_already_resumed";
+    #[error]
+    const ETransactionAlreadySuspended: vector<u8> = b"transaction_already_suspended";
+    #[error]
+    const ETransactionSuspended: vector<u8> = b"transaction_suspended";
+    #[error]
+    const EZeroValue: vector<u8> = b"zero_value";
 }

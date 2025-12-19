@@ -74,7 +74,7 @@ module typus_dov::tds_user_entry {
         let fee_share_amount = *vector::borrow(&log, 3);
         let inactive_value = *vector::borrow(&log, 4);
         let snapshot = typus_dov_single::calculate_in_usd<D_TOKEN>(portfolio_vault, *vector::borrow(&log, 5), false);
-        typus_dov_single::validate_amount(index, balance_value + premium_value + inactive_value);
+        typus_dov_single::validate_amount(balance_value + premium_value + inactive_value);
         typus_dov_single::validate_capacity(registry, index);
         typus_dov_single::emit_raise_fund_event(
             portfolio_vault,
@@ -407,7 +407,7 @@ module typus_dov::tds_user_entry {
             share,
             ctx,
         );
-        typus_dov_single::validate_amount(index, amount);
+        typus_dov_single::validate_amount(amount);
         transfer::public_transfer(option::destroy_some(split_receipt), recipient);
         if (option::is_some(&remain_receipt)) {
             transfer::public_transfer(option::destroy_some(remain_receipt), tx_context::sender(ctx));
@@ -498,7 +498,7 @@ module typus_dov::tds_user_entry {
             share,
             ctx,
         );
-        typus_dov_single::validate_amount(index, amount);
+        typus_dov_single::validate_amount(amount);
         (split_receipt, remain_receipt, vector[amount])
     }
 
@@ -580,7 +580,7 @@ module typus_dov::tds_user_entry {
             tx_context::sender(ctx),
         );
         let amount = *vector::borrow(&log, 0);
-        typus_dov_single::validate_amount(0, amount);
+        typus_dov_single::validate_amount(amount);
         typus_dov_single::emit_refund_event(
             type_name::with_defining_ids<TOKEN>(),
             amount,

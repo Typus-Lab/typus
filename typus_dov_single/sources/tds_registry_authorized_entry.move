@@ -441,7 +441,7 @@ module typus_dov::tds_registry_authorized_entry {
             leverage,
             risk_level,
             has_next,
-            typus_dov_single::create_payoff_configs(0, strike_bp, weight, is_buyer),
+            typus_dov_single::create_payoff_configs(strike_bp, weight, is_buyer),
             strike_increment,
             decay_speed,
             initial_price,

@@ -28,6 +28,7 @@ module typus_dov::auto_bid {
     // const E_LOW_LEVEL: u64 = 1;
     const E_NO_VALID_RECEIPT: u64 = 2;
     const E_INVALID_AUTH: u64 = 3;
+    const E_INVALID_INDEX: u64 = 4;
     const E_DEPRECATED: u64 = 999;
 
     public struct StrategyPoolV3 has key, store {
@@ -135,6 +136,7 @@ module typus_dov::auto_bid {
         // check authority
         assert!(vector::contains(&strategy_pool.authority, &tx_context::sender(ctx)), E_INVALID_AUTH);
 
+        assert!(!strategy_pool.strategies.contains(&vault_index), E_INVALID_INDEX);
         vec_map::insert(&mut strategy_pool.strategies, vault_index, vec_map::empty());
 
         let event = NewStrategyVaultEvent {
@@ -158,6 +160,7 @@ module typus_dov::auto_bid {
         // check authority
         assert!(vector::contains(&strategy_pool.authority, &tx_context::sender(ctx)), E_INVALID_AUTH);
 
+        assert!(strategy_pool.strategies.contains(&vault_index), E_INVALID_INDEX);
         let (_, mut vault) = vec_map::remove<u64, VecMap<u64, TableVec<StrategyV2>>>(&mut strategy_pool.strategies, &vault_index);
 
         while (!vec_map::is_empty(&vault)) {
@@ -1101,5 +1104,6 @@ module typus_dov::auto_bid {
         abort E_DEPRECATED
     }
 
+    #[allow(unused)]
     public struct AutoBidEvent has copy, drop {}
 }
