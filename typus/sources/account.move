@@ -166,7 +166,7 @@ module typus::account {
         };
 
         // emit event
-        event::emit_event(
+        event::emit_typus_event(
             b"new_account".to_string(),
             vec_map::empty(),
             vec_map::from_keys_values(
@@ -215,7 +215,7 @@ module typus::account {
         account_registry.user_account.push_back(ctx.sender(), account_address);
 
         // emit event
-        event::emit_event(
+        event::emit_typus_event(
             b"create_account".to_string(),
             vec_map::empty(),
             vec_map::from_keys_values(
@@ -253,7 +253,7 @@ module typus::account {
         account_registry.user_account.push_back(recipient, account_address);
 
         // emit event
-        event::emit_event(
+        event::emit_typus_event(
             b"transfer_account".to_string(),
             vec_map::empty(),
             vec_map::from_keys_values(

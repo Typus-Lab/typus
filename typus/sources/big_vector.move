@@ -192,6 +192,7 @@ module typus::big_vector {
     /// Swaps the element at index `i` with the last element and removes it.
     /// This is more efficient than `remove` as it does not require shifting elements.
     public fun swap_remove<Element: store>(bv: &mut BigVector, i: u64): Element {
+        assert!(i < bv.length, EIndexOutOfBounds);
         let result = pop_back(bv);
         if (i == bv.length()) {
             result

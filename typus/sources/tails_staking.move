@@ -65,21 +65,26 @@ module typus::tails_staking {
     // ======== Error Code ========
 
     /// Error when a user has already signed up for the day.
-    const EAlreadySignedUp: u64 = 0;
+    #[error]
+    const EAlreadySignedUp: vector<u8> = b"already_signed_up";
     /// Error for insufficient balance.
-    const EInsufficientBalance: u64 = 1;
-    /// Error for insufficient experience points.
-    const EInsufficientExp: u64 = 2;
+    #[error]
+    const EInsufficientExp: vector<u8> = b"insufficient_exp";
     /// Error for an invalid fee amount.
-    const EInvalidFee: u64 = 3;
+    #[error]
+    const EInvalidFee: vector<u8> = b"invalid_fee";
     /// Error for invalid input.
-    const EInvalidInput: u64 = 4;
+    #[error]
+    const EInvalidInput: vector<u8> = b"invalid_input";
     /// Error for an invalid token type.
-    const EInvalidToken: u64 = 5;
+    #[error]
+    const EInvalidToken: vector<u8> = b"invalid_token";
     /// Error when the maximum stake amount is reached.
-    const EMaxStakeAmountReached: u64 = 6;
+    #[error]
+    const EMaxStakeAmountReached: vector<u8> = b"max_stake_amount_reached";
     /// Error when staking information for a user is not found.
-    const EStakingInfoNotFound: u64 = 7;
+    #[error]
+    const EStakingInfoNotFound: vector<u8> = b"staking_info_not_found";
 
     // ======== Tails Staking ========
 
@@ -387,7 +392,6 @@ module typus::tails_staking {
         let shared_profit = dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut tails_staking_registry.id, profit_asset);
         let spent_profit = profit.value();
         balance::join(shared_profit, coin::into_balance(profit));
-        assert!(shared_profit.value() >= total_profit, EInsufficientBalance);
         assert!(shared_profit.value() == total_profit, EInvalidInput);
 
         emit(SetProfitSharingEvent {
@@ -449,55 +453,14 @@ module typus::tails_staking {
         });
     }
 
-    /// Imports a vector of Tails NFTs and assigns them to users.
-    /// This is an authorized function used for initialization.
+    #[deprecated, allow(unused)]
     public fun import_tails(
         version: &mut Version,
         tails_staking_registry: &mut TailsStakingRegistry,
         mut tailses: vector<Tails>,
         mut users: vector<address>,
         ctx: &TxContext,
-    ) {
-        version.verify(ctx);
-        assert!(tailses.length() == users.length(), EInvalidInput);
-
-        while (!tailses.is_empty()) {
-            let mut tails = tailses.pop_back();
-            let user = users.pop_back();
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"updating_url"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"updating_url"));
-            };
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"attendance_ms"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"attendance_ms"));
-            };
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"snapshot_ms"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"snapshot_ms"));
-            };
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"usd_in_deposit"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"usd_in_deposit"));
-            };
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"dice_profit"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"dice_profit"));
-            };
-            if (typus_nft::contains_u64_padding(&tails_staking_registry.tails_manager_cap, &tails, string::utf8(b"exp_profit"))) {
-                typus_nft::remove_u64_padding(&tails_staking_registry.tails_manager_cap, &mut tails, string::utf8(b"exp_profit"));
-            };
-            let tails_ids: &mut vector<address> = &mut tails_staking_registry.tails_metadata[KTailsIds];
-            *&mut tails_ids[typus_nft::tails_number(&tails) - 1] = object::id_address(&tails);
-            let tails_levels: &mut vector<u64> = &mut tails_staking_registry.tails_metadata[KTailsLevels];
-            *&mut tails_levels[typus_nft::tails_number(&tails) - 1] = typus_nft::tails_level(&tails);
-            tails_staking_registry.staking_infos.push_back(
-                StakingInfo {
-                    user,
-                    tails: vector[typus_nft::tails_number(&tails)],
-                    profits: vector[],
-                    u64_padding: vector[0],
-                }
-            );
-            tails_staking_registry.tails.add(object::id_address(&tails), tails);
-        };
-        tailses.destroy_empty();
-    }
+    ) { abort 0 }
 
     /// Event emitted when a user claims their profit sharing.
     public struct ClaimProfitSharingEvent has copy, drop {
