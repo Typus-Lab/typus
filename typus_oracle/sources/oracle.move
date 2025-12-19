@@ -38,6 +38,8 @@ module typus_oracle::oracle {
     const EInvalidSignature: vector<u8> = b"Invalid Signature";
     #[error]
     const ETokenTypeMismatched: vector<u8> = b"Token Type Mismatched";
+    #[error]
+    const ETimestampMsTooOld: vector<u8> = b"Timestamp Ms Too Old";
 
 
     // ======== Structs =========
@@ -359,24 +361,6 @@ module typus_oracle::oracle {
         })
     }
 
-    entry fun update_pyth_oracle_usd_reciprocal(
-        oracle: &mut Oracle,
-        _manager_cap: &ManagerCap,
-        quote_price_info_object: &PriceInfoObject,
-    ) {
-        version_check(oracle);
-        // only quote token is USD
-        assert!(oracle.quote_token == ascii::string(b"USD"), ENotPyth);
-        let id = object::id(quote_price_info_object);
-        oracle.pyth = option::none();
-        dynamic_field::add(&mut oracle.id, string::utf8(b"reciprocal_pyth"), id);
-        emit(UpdatePythOracleEvent {
-            oracle_id: object::id(oracle),
-            base_price_info_object: option::none(),
-            quote_price_info_object: option::some(object::id(quote_price_info_object)),
-        })
-    }
-
     // ======== Permissionless Functions =========
 
     public fun update_with_pyth(
@@ -411,16 +395,7 @@ module typus_oracle::oracle {
             / (10u64.pow(base_decimal as u8) as u256)
             / (quote_price as u256)) as u64);
 
-        oracle.price = price;
-        oracle.twap_price = twap_price;
-        oracle.ts_ms = clock.timestamp_ms();
-        oracle.epoch = tx_context::epoch(ctx);
-
-        emit(PriceEvent {
-            id: object::id(oracle),
-            price,
-            ts_ms: clock.timestamp_ms(),
-        });
+        update_(oracle, price, twap_price, clock, ctx);
     }
 
     public fun update_with_pyth_usd(
@@ -431,42 +406,27 @@ module typus_oracle::oracle {
         ctx: & TxContext
     ) {
         version_check(oracle);
-        // only quote token is USD
-        assert!(oracle.quote_token == ascii::string(b"USD") || oracle.base_token == ascii::string(b"USD"), ENotPyth);
+        // quote token is USD or special case USD/JPY
+        assert!(oracle.quote_token == ascii::string(b"USD") ||
+            (oracle.base_token == ascii::string(b"USD") && oracle.quote_token == ascii::string(b"JPY")), ENotPyth);
+        // double check for USD quote
+        assert!(!dynamic_field::exists_(&oracle.id, string::utf8(b"quote_price_info_object")), EInvalidPyth);
 
-        let mut reciprocal = false;
-        if (dynamic_field::exists_(&oracle.id, string::utf8(b"reciprocal_pyth"))) {
-            reciprocal = true;
-            assert!(dynamic_field::borrow(&oracle.id, string::utf8(b"reciprocal_pyth")) == object::id(base_price_info_object), EInvalidPyth);
-        } else {
-            assert!(oracle.pyth == option::some(object::id(base_price_info_object)), EInvalidPyth);
-        };
+        assert!(oracle.pyth == option::some(object::id(base_price_info_object)), EInvalidPyth);
 
         let (base_price, base_decimal, _) = pyth_parser::get_price(state, base_price_info_object, clock);
         assert!(base_price > 0, EInvalidPrice);
-        let mut price = (((base_price as u256)
+        let price = (((base_price as u256)
             * (10u64.pow(oracle.decimal as u8) as u256)
             / (10u64.pow(base_decimal as u8) as u256)) as u64);
+
         let (base_price, base_decimal, _) = pyth_parser::get_ema_price(base_price_info_object);
         assert!(base_price > 0, EInvalidPrice);
-        let mut twap_price = (((base_price as u256)
+        let twap_price = (((base_price as u256)
             * (10u64.pow(oracle.decimal as u8) as u256)
             / (10u64.pow(base_decimal as u8) as u256)) as u64);
-        if (reciprocal) {
-            price = 10u64.pow((oracle.decimal * 2) as u8) / price;
-            twap_price = 10u64.pow((oracle.decimal * 2) as u8) / twap_price;
-        };
 
-        oracle.price = price;
-        oracle.twap_price = twap_price;
-        oracle.ts_ms = clock.timestamp_ms();
-        oracle.epoch = tx_context::epoch(ctx);
-
-        emit(PriceEvent {
-            id: object::id(oracle),
-            price,
-            ts_ms: clock.timestamp_ms(),
-        });
+        update_(oracle, price, twap_price, clock, ctx);
     }
 
     public fun update_with_signature(
@@ -495,17 +455,9 @@ module typus_oracle::oracle {
         assert!(bls12381_min_pk_verify(&signature, public_key, &message), EInvalidSignature);
         assert!(oracle.base_token_type.as_string() == ascii::string(token_type), ETokenTypeMismatched);
         assert!(clock_ms.diff(timestamp_ms) < oracle.time_interval, EOracleExpired);
+        assert!(oracle.ts_ms < timestamp_ms, ETimestampMsTooOld);
 
-        oracle.price = price;
-        oracle.twap_price = twap_price;
-        oracle.ts_ms = clock_ms;
-        oracle.epoch = tx_context::epoch(ctx);
-
-        emit(PriceEvent {
-            id: object::id(oracle),
-            price,
-            ts_ms: clock_ms,
-        });
+        update_(oracle, price, twap_price, clock, ctx);
     }
 
     // ======== Utility =========
