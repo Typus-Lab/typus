@@ -285,17 +285,16 @@ module typus_perp::position {
         let balance = dynamic_field::borrow_mut<String, Balance<C_TOKEN>>(&mut position.id, string::utf8(K_COLLATERAL));
         balance.join(collateral);
         position.collateral_amount = balance.value();
-
-        let reserve_usd
-            = amount_to_usd(position.size, position.size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-        let mut reserve_amount
-            = usd_to_amount(reserve_usd, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-        reserve_amount = if (position.collateral_amount >= reserve_amount) {
-            0
-        } else {
-            reserve_amount - position.collateral_amount
-        };
-        position.reserve_amount = reserve_amount;
+        position.reserve_amount = calculate_reserve_amount(
+            position.size,
+            position.size_decimal,
+            position.collateral_amount,
+            position.collateral_token_decimal,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+        );
     }
 
     /// Releases collateral from a position.
@@ -311,17 +310,16 @@ module typus_perp::position {
         let balance = dynamic_field::borrow_mut<String, Balance<C_TOKEN>>(&mut position.id, string::utf8(K_COLLATERAL));
         let released_balance = balance.split(release_amount);
         position.collateral_amount = balance.value();
-
-        let reserve_usd
-            = amount_to_usd(position.size, position.size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-        let mut reserve_amount
-            = usd_to_amount(reserve_usd, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-        reserve_amount = if (position.collateral_amount >= reserve_amount) {
-            0
-        } else {
-            reserve_amount - position.collateral_amount
-        };
-        position.reserve_amount = reserve_amount;
+        position.reserve_amount = calculate_reserve_amount(
+            position.size,
+            position.size_decimal,
+            position.collateral_amount,
+            position.collateral_token_decimal,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+        );
         released_balance
     }
 
@@ -537,15 +535,17 @@ module typus_perp::position {
             );
             let collateral_amount = dynamic_field::borrow<String, Balance<C_TOKEN>>(&position.id, string::utf8(K_COLLATERAL));
             let new_collateral_amount = collateral_amount.value() + new_added_collateral_amount;
-            let notional_size_usd
-                = amount_to_usd(new_size, position.size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-            let mut reserve_amount
-                = usd_to_amount(notional_size_usd, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-            reserve_amount = if (new_collateral_amount >= reserve_amount) {
-                0
-            } else {
-                reserve_amount - new_collateral_amount
-            };
+            let reserve_amount = calculate_reserve_amount(
+                new_size,
+                position.size_decimal,
+                new_collateral_amount,
+                position.collateral_token_decimal,
+                collateral_oracle_price,
+                collateral_oracle_price_decimal,
+                trading_pair_oracle_price,
+                trading_pair_oracle_price_decimal,
+            );
+
             position.is_long = new_side;
             position.size = new_size;
             position.average_price = average_price;
@@ -553,15 +553,16 @@ module typus_perp::position {
             position.unrealized_trading_fee = position.unrealized_trading_fee + fee_in_c_token;
             (position, is_realized, is_profit, realized_usd, filled_size)
         } else {
-            let notional_size_usd
-                = amount_to_usd(size, size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-            let mut reserve_amount
-                = usd_to_amount(notional_size_usd, collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-            reserve_amount = if (new_added_collateral_amount >= reserve_amount) {
-                0
-            } else {
-                reserve_amount - new_added_collateral_amount
-            };
+            let reserve_amount = calculate_reserve_amount(
+                size,
+                size_decimal,
+                new_added_collateral_amount,
+                collateral_token_decimal,
+                collateral_oracle_price,
+                collateral_oracle_price_decimal,
+                trading_pair_oracle_price,
+                trading_pair_oracle_price_decimal,
+            );
             let mut position = Position {
                 id: object::new(ctx),
                 create_ts_ms: clock::timestamp_ms(clock),
@@ -919,13 +920,16 @@ module typus_perp::position {
     ): (u64, u64) {
         let reserve_usd
             = amount_to_usd(position.size, position.size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-        let mut reserve_amount
-            = usd_to_amount(reserve_usd, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-        reserve_amount = if (position.collateral_amount >= reserve_amount) {
-            0
-        } else {
-            reserve_amount - position.collateral_amount
-        };
+        let reserve_amount = calculate_reserve_amount(
+            position.size,
+            position.size_decimal,
+            position.collateral_amount,
+            position.collateral_token_decimal,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+        );
         let period_borrow_cost = ((reserve_amount as u128)
             * ((cumulative_borrow_rate - position.entry_borrow_index) as u128)
                 / (math::multiplier(lp_pool::get_borrow_rate_decimal()) as u128) as u64);
@@ -1518,15 +1522,16 @@ module typus_perp::position {
                 cumulative_funding_rate_index_sign,
                 cumulative_funding_rate_index,
             );
-            let reserve_usd
-                = amount_to_usd(new_size, position.size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-            let mut reserve_amount
-                = usd_to_amount(reserve_usd, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-            reserve_amount = if (new_collateral_amount >= reserve_amount) {
-                0
-            } else {
-                reserve_amount - new_collateral_amount
-            };
+            let reserve_amount = calculate_reserve_amount(
+                position.size,
+                position.size_decimal,
+                new_collateral_amount,
+                position.collateral_token_decimal,
+                collateral_oracle_price,
+                collateral_oracle_price_decimal,
+                trading_pair_oracle_price,
+                trading_pair_oracle_price_decimal,
+            );
             position.is_long = new_side;
             position.size = new_size;
             position.average_price = average_price;
@@ -1536,15 +1541,16 @@ module typus_perp::position {
             // position.unrealized_rebate = position.unrealized_rebate + rebate;
             (position, is_realized, is_profit, realized_usd, filled_size)
         } else {
-            let reserve_usd
-                = amount_to_usd(size, size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-            let mut reserve_amount
-                = usd_to_amount(reserve_usd, collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-            reserve_amount = if (collateral_amount >= reserve_amount) {
-                0
-            } else {
-                reserve_amount - collateral_amount
-            };
+            let reserve_amount = calculate_reserve_amount(
+                size,
+                size_decimal,
+                collateral_amount,
+                collateral_token_decimal,
+                collateral_oracle_price,
+                collateral_oracle_price_decimal,
+                trading_pair_oracle_price,
+                trading_pair_oracle_price_decimal,
+            );
             let mut bid_receipts_bcs = vector::empty<vector<u8>>();
             let receipts = bid_receipts.borrow();
             receipts.do_ref!(|receipt|{
@@ -2002,25 +2008,6 @@ module typus_perp::position {
         collateral_amount
     }
 
-    fun calculate_trading_fee(
-        size: u64,
-        size_decimal: u64,
-        collateral_oracle_price: u64,
-        collateral_oracle_price_decimal: u64,
-        trading_pair_oracle_price: u64,
-        trading_pair_oracle_price_decimal: u64,
-        trading_fee_mbp: u64,
-        collateral_token_decimal: u64,
-    ): (u64, u64) {
-        let filled_usd
-                = amount_to_usd(size, size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-        let trading_fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
-
-        let fee_in_c_token
-            = usd_to_amount(trading_fee_usd, collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-        (fee_in_c_token, trading_fee_usd)
-    }
-
     fun collateral_with_pnl(
         position: &Position,
         collateral_oracle_price: u64,
@@ -2154,6 +2141,36 @@ module typus_perp::position {
         (unrealized_funding_sign, unrealized_funding_fee)
     }
 
+    fun calculate_reserve_amount(
+        new_size: u64,
+        size_decimal: u64,
+        collateral_amount: u64,
+        collateral_token_decimal: u64,
+        collateral_oracle_price: u64,
+        collateral_oracle_price_decimal: u64,
+        trading_pair_oracle_price: u64,
+        trading_pair_oracle_price_decimal: u64,
+    ): u64 {
+        let notional_size_usd = amount_to_usd(
+            new_size,
+            size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal
+        );
+        let reserve_amount = usd_to_amount(
+            notional_size_usd,
+            collateral_token_decimal,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal
+        );
+
+        if (collateral_amount >= reserve_amount) {
+            0
+        } else {
+            reserve_amount - collateral_amount
+        }
+    }
+
     // ======= Helper Functions =======
     public(package) fun is_option_collateral_order(
         order: &TradingOrder
@@ -2272,27 +2289,24 @@ module typus_perp::position {
         }
     }
 
-    // fee in collateral token
-    public(package) fun get_order_filled_fee(
-        order: &TradingOrder,
+    // fee in collateral token, fee in usd
+    public(package) fun calculate_trading_fee(
+        size: u64,
+        size_decimal: u64,
         collateral_oracle_price: u64,
         collateral_oracle_price_decimal: u64,
         trading_pair_oracle_price: u64,
         trading_pair_oracle_price_decimal: u64,
         trading_fee_mbp: u64,
-    ): u64 {
-        let filled_usd = amount_to_usd(
-            order.size,
-            order.size_decimal,
-            trading_pair_oracle_price,
-            trading_pair_oracle_price_decimal
-        );
-        let fee_usd = ((filled_usd as u128)
-                        * (trading_fee_mbp as u128)
-                            / 10000000 as u64);
-        let fee_in_collateral_token
-            = usd_to_amount(fee_usd, order.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
-        fee_in_collateral_token
+        collateral_token_decimal: u64,
+    ): (u64, u64) {
+        let filled_usd
+                = amount_to_usd(size, size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
+        let trading_fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
+
+        let fee_in_c_token
+            = usd_to_amount(trading_fee_usd, collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
+        (fee_in_c_token, trading_fee_usd)
     }
 
     public(package) fun split_bid_receipt(

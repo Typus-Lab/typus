@@ -20,7 +20,7 @@ module typus_perp::trading {
     use typus_perp::position::{Self, TradingOrder, Position};
     use typus_perp::profit_vault::ProfitVault;
     use typus_perp::symbol;
-    use typus_perp::user_account::{Self, UserAccount, UserAccountCap};
+    // use typus_perp::user_account::{Self, UserAccount, UserAccountCap};
 
     use typus_framework::vault::{Self, TypusBidReceipt};
     use typus_dov::typus_dov_single::{Self, Registry as DovRegistry};
@@ -65,7 +65,7 @@ module typus_perp::trading {
     const K_STOP_BUY_ORDERS: vector<u8> = b"stop_buy_orders";
     const K_STOP_SELL_ORDERS: vector<u8> = b"stop_sell_orders";
     // const K_REFERRAL: vector<u8> = b"referral";
-    const K_USER_ACCOUNTS: vector<u8> = b"user_accounts";
+    // const K_USER_ACCOUNTS: vector<u8> = b"user_accounts";
 
     // ======== Structs ========
 
@@ -300,18 +300,8 @@ module typus_perp::trading {
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
         assert!(!vector::contains(&market.symbols, &base_token), error::trading_symbol_existed());
 
-        assert!(
-            trading_fee_config[I_MAX_TRADING_FEE_MBP] >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
-            && trading_fee_config.length() == 5
-            && trading_fee_config[I_SCALE] > 0,
-            error::invalid_trading_fee_config()
-        );
-        assert!(
-            option_trading_fee_config[I_MAX_TRADING_FEE_MBP] >= option_trading_fee_config[I_BASE_TRADING_FEE_MBP]
-            && option_trading_fee_config.length() == 5
-            && option_trading_fee_config[I_SCALE] > 0,
-            error::invalid_trading_fee_config()
-        );
+        validate_trading_fee_config(&trading_fee_config);
+        validate_trading_fee_config(&option_trading_fee_config);
 
         // add into market.symbols
         vector::push_back(&mut market.symbols, base_token);
@@ -476,13 +466,7 @@ module typus_perp::trading {
         };
         if (option::is_some(&trading_fee_config)) {
             symbol_market.market_config.trading_fee_config = option::extract(&mut trading_fee_config);
-            assert!(
-                symbol_market.market_config.trading_fee_config[I_MAX_TRADING_FEE_MBP]
-                    >= symbol_market.market_config.trading_fee_config[I_BASE_TRADING_FEE_MBP]
-                        && symbol_market.market_config.trading_fee_config.length() == 5
-                            && symbol_market.market_config.trading_fee_config[I_SCALE] > 0,
-                error::invalid_trading_fee_config()
-            );
+            validate_trading_fee_config(&symbol_market.market_config.trading_fee_config);
         };
         if (option::is_some(&basic_funding_rate)) {
             symbol_market.market_config.basic_funding_rate = option::extract(&mut basic_funding_rate);
@@ -507,13 +491,7 @@ module typus_perp::trading {
         };
         if (option::is_some(&option_collateral_trading_fee_config)) {
             let trading_fee_config = option::extract(&mut option_collateral_trading_fee_config);
-            assert!(
-                trading_fee_config[I_MAX_TRADING_FEE_MBP]
-                    >= trading_fee_config[I_BASE_TRADING_FEE_MBP]
-                        && trading_fee_config.length() == 5
-                            && trading_fee_config[I_SCALE] > 0,
-                error::invalid_trading_fee_config()
-            );
+            validate_trading_fee_config(&trading_fee_config);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_BASE_TRADING_FEE_MBP, trading_fee_config[I_BASE_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAX_TRADING_FEE_MBP, trading_fee_config[I_MAX_TRADING_FEE_MBP]);
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_ALLOCATED_LP_EXPOSURE_MBP, trading_fee_config[I_ALLOCATED_LP_EXPOSURE_MBP]);
@@ -702,49 +680,6 @@ module typus_perp::trading {
         market.symbols.remove(symbol_index);
     }
 
-    // public struct SetReferralEvent has copy, drop {
-    //     user: address,
-    //     invited_from: address,
-    //     fee_rebate_bp: u64,         // to the user who sends invitation
-    //     fee_reduction_bp: u64,      // to the user who was invited
-    //     u64_padding: vector<u64>
-    // }
-    // entry fun set_referral(
-    //     // for share objects
-    //     version: &Version,
-    //     registry: &mut MarketRegistry,
-    //     // referral parameters
-    //     invited_from: address,
-    //     fee_rebate_bp: u64,         // to the user who sends invitation
-    //     fee_reduction_bp: u64,      // to the user who was invited
-    //     ctx: &TxContext,
-    // ) {
-    //     // user function
-    //     let user = tx_context::sender(ctx);
-    //     // safety check
-    //     admin::version_check(version);
-
-    //     let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-
-    //     // only update for the user who has not been referred
-    //     if (!referrals.referrals.contains(invited_from)) {
-    //         let referral_info = ReferralInfo {
-    //             invited_from,
-    //             fee_rebate_bp,
-    //             fee_reduction_bp,
-    //             u64_padding: vector::empty()
-    //         };
-    //         referrals.referrals.add(user, referral_info);
-    //         emit(SetReferralEvent {
-    //             user,
-    //             invited_from,
-    //             fee_rebate_bp,
-    //             fee_reduction_bp,
-    //             u64_padding: vector::empty()
-    //         });
-    //     };
-    // }
-
     public struct CreateTradingOrderEvent has copy, drop {
         user: address,
         market_index: u64,
@@ -789,21 +724,25 @@ module typus_perp::trading {
         // user function
         let user = tx_context::sender(ctx);
         // safety check
-        admin::version_check(version);
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            linked_position_id,
+            ctx
+        );
 
-        // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-
-        let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
         // allow reduce_only when token pool inactive
         if (!reduce_only) { lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true); };
         if (reduce_only) { assert!(linked_position_id.is_some(), error::position_id_needed_with_reduce_only_order()); };
-
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let market = registry.markets.borrow_mut(market_index);
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         assert!(
             symbol_market.market_info.is_active
                 || (!symbol_market.market_info.is_active && reduce_only),
@@ -859,8 +798,6 @@ module typus_perp::trading {
         );
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let mut reserve_amount
             = usd_to_amount(order_size_usd, liquidity_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
         let linked_position_collateral_amount = if (linked_position_id.is_some()) {
@@ -1018,6 +955,16 @@ module typus_perp::trading {
         };
     }
 
+    public struct ManagerCancelOrdersEvent has copy, drop {
+        reason: String,
+        collateral_token: TypeName,
+        base_token: TypeName,
+        order_type_tag: u8,
+        order_id: u64,
+        order_size: u64,
+        order_price: u64,
+        u64_padding: vector<u64>
+    }
     public struct CancelTradingOrderEvent has copy, drop {
         user: address,
         market_index: u64,
@@ -1041,15 +988,11 @@ module typus_perp::trading {
         ctx: &mut TxContext,
     ): Coin<C_TOKEN> {
         // safety check
-        if (order_user.is_some()) {
-            admin::verify(version, ctx);
-        } else {
-            admin::version_check(version);
-        };
-        // user function
         let order_user = if (order_user.is_some()) {
+            admin::verify(version, ctx);
             order_user.extract()
         } else {
+            admin::version_check(version);
             tx_context::sender(ctx)
         };
 
@@ -1068,8 +1011,10 @@ module typus_perp::trading {
         );
         assert!(option::is_some(&order_option), error::order_not_found());
         let order = option::destroy_some(order_option);
-        let order_size = position::get_order_size(&order);
-        adjust_market_info_user_order_size(symbol_market, position::get_order_side(&order), true, order_size);
+        let is_long = order.get_order_side();
+        let order_type_tag = order.get_order_type_tag();
+        let order_size = order.get_order_size();
+        adjust_market_info_user_order_size(symbol_market, is_long, true, order_size);
 
         // edit position.linked_order_ids
         let mut linked_position_id = position::get_order_linked_position_id(&order);
@@ -1092,13 +1037,26 @@ module typus_perp::trading {
             u64_padding: vector::empty()
         });
 
-        if (user_account::has_user_account(&market.id, order_user)) {
-            let user_account = user_account::get_mut_user_account(&mut market.id, order_user);
-            user_account.deposit(collateral);
-            coin::zero<C_TOKEN>(ctx)
-        } else {
-            coin::from_balance(collateral, ctx)
-        }
+        if (order_user != tx_context::sender(ctx)) {
+            emit(ManagerCancelOrdersEvent {
+                reason: string::utf8(b"manager"),
+                collateral_token: type_name::with_defining_ids<C_TOKEN>(),
+                base_token,
+                order_type_tag,
+                order_id,
+                order_size,
+                order_price: trigger_price,
+                u64_padding: vector::empty()
+            });
+        };
+
+        // if (user_account::has_user_account(&market.id, order_user)) {
+        //     let user_account = user_account::get_mut_user_account(&mut market.id, order_user);
+        //     user_account.deposit(collateral);
+        //     coin::zero<C_TOKEN>(ctx)
+        // } else {
+        coin::from_balance(collateral, ctx)
+        // }
     }
 
     public struct ReleaseCollateralEvent has copy, drop {
@@ -1132,59 +1090,56 @@ module typus_perp::trading {
         // user function
         let user = tx_context::sender(ctx);
 
+        // 1. safety checks:
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::some(position_id),
+            ctx
+        );
+
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
-        // 1. safety checks:
-        {
-            // 1.a version check
-            admin::version_check(version);
-            let market = registry.markets.borrow_mut(market_index);
-            assert!(market.is_active, error::markets_inactive());
-            let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-            let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-            assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-            let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-            assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
-            let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
-            check_position_user_matched(mut_position, user);
-            assert!(collateral_token == position::get_position_collateral_token_type(mut_position), error::collateral_token_type_mismatched());
-            // 1.b check if exceed leverage:
-            // update pool borrow info first, then update position position unrealized borrow fee and funding fee
-            lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
-            let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-            liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-            let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
-            position::update_position_borrow_rate_and_funding_rate(
-                mut_position,
-                collateral_oracle_price,
-                collateral_oracle_price_decimal,
-                trading_pair_oracle_price,
-                trading_pair_oracle_price_decimal,
-                cumulative_borrow_rate,
-                symbol_market.market_info.cumulative_funding_rate_index_sign,
-                symbol_market.market_info.cumulative_funding_rate_index
-            );
-            let max_releasing_collateral_amount = get_max_releasing_collateral_amount<C_TOKEN, BASE_TOKEN>(
-                version,
-                registry,
-                pool_registry,
-                typus_oracle_c_token,
-                typus_oracle_trading_symbol,
-                clock,
-                market_index,
-                pool_index,
-                position_id,
-            );
-            assert!(max_releasing_collateral_amount >= release_amount, error::exceed_max_leverage());
-        };
-
-        // 2. execute releasing collateral
-        let market = registry.markets.borrow_mut(market_index);
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+
+        let market = registry.markets.borrow_mut(market_index);
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
+        // update pool borrow info first, then update position position unrealized borrow fee and funding fee
+        lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
+        let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
+        position::update_position_borrow_rate_and_funding_rate(
+            mut_position,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            cumulative_borrow_rate,
+            symbol_market.market_info.cumulative_funding_rate_index_sign,
+            symbol_market.market_info.cumulative_funding_rate_index
+        );
+        let max_releasing_collateral_amount = get_max_releasing_collateral_amount_(
+            liquidity_pool,
+            mut_position,
+            &symbol_market.market_info,
+            &symbol_market.market_config,
+            collateral_token,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            cumulative_borrow_rate,
+        );
+        assert!(max_releasing_collateral_amount >= release_amount, error::exceed_max_leverage());
+
+        // 2. execute releasing collateral
         let position_collateral_amount = position::get_position_collateral_amount<C_TOKEN>(mut_position);
         assert!(position_collateral_amount >= release_amount, error::remaining_collateral_not_enough());
 
@@ -1243,13 +1198,13 @@ module typus_perp::trading {
             remaining_collateral_amount: position_collateral_amount - release_amount,
             u64_padding: vector::empty(),
         });
-        if (user_account::has_user_account(&market.id, user)) {
-            let user_account = user_account::get_mut_user_account(&mut market.id, user);
-            user_account.deposit(released_collateral);
-            coin::zero<C_TOKEN>(ctx)
-        } else {
-            coin::from_balance(released_collateral, ctx)
-        }
+        // if (user_account::has_user_account(&market.id, user)) {
+        //     let user_account = user_account::get_mut_user_account(&mut market.id, user);
+        //     user_account.deposit(released_collateral);
+        //     coin::zero<C_TOKEN>(ctx)
+        // } else {
+        coin::from_balance(released_collateral, ctx)
+        // }
     }
 
     public struct IncreaseCollateralEvent has copy, drop {
@@ -1283,30 +1238,29 @@ module typus_perp::trading {
         // user function
         let user = tx_context::sender(ctx);
         // safety check
-        admin::version_check(version);
-
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::some(position_id),
+            ctx
+        );
         let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
-
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         assert!(symbol_market.market_info.is_active, error::trading_symbol_inactive());
 
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
-        // not allowed when token pool inactive
-        lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true);
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
-        check_position_user_matched(mut_position, user);
-        assert!(collateral_token == position::get_position_collateral_token_type(mut_position), error::collateral_token_type_mismatched());
-
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
 
@@ -1397,32 +1351,31 @@ module typus_perp::trading {
         position_id: u64,
         ctx: &mut TxContext,
     ) {
-        // user function
-        let user = tx_context::sender(ctx);
         // safety check
-        admin::version_check(version);
-
-        let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::some(position_id),
+            ctx
+        );
 
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+        let market = registry.markets.borrow_mut(market_index);
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         assert!(symbol_market.market_info.is_active, error::trading_symbol_inactive());
 
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
-        // not allowed when token pool inactive
-        lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true);
 
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
-        check_position_user_matched(mut_position, user);
-        assert!(collateral_token == position::get_position_collateral_token_type(mut_position), error::collateral_token_type_mismatched());
 
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
@@ -1516,21 +1469,23 @@ module typus_perp::trading {
         ctx: &mut TxContext,
     ) {
         // safety check
-        admin::version_check(version);
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::none(),
+            ctx
+        );
         let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         assert!(symbol_market.market_info.is_active, error::trading_symbol_inactive());
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, collateral_token);
-        {
-            let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-            liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        };
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         // not allowed when token pool inactive
         lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true);
@@ -1765,25 +1720,28 @@ module typus_perp::trading {
         mut order_size: Option<u64>, // in contract size decimal. if none => close position
         ctx: &mut TxContext,
     ) {
+        // safety check
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::none(), // can't check position user matched here due to manager reduce position also using this function
+            ctx
+        );
         // user function
         let user = tx_context::sender(ctx);
-        // safety check
         let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         if (order_size.is_some()) {
             assert!(*order_size.borrow() % symbol_market.market_config.lot_size == 0, error::invalid_order_size());
         };
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let liquidity_token_decimal = lp_pool::get_liquidity_token_decimal(pool_registry, pool_index, type_name::with_defining_ids<C_TOKEN>());
-        {
-            let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-            liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        };
 
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
@@ -1801,12 +1759,6 @@ module typus_perp::trading {
         if (order_size.is_some()) {
             assert!(*order_size.borrow() <= position_size, error::invalid_order_size());
         };
-
-        // let (fee_rebate_bp, fee_reduction_bp) = if (referrals.referrals.contains(user)) {
-        //     let referral_info = referrals.referrals.borrow(user);
-        //     (referral_info.fee_rebate_bp, referral_info.fee_reduction_bp)
-        // } else { (0, 0) };
-        // let (_fee_rebate_bp, fee_reduction_bp) = (0, 0);
 
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
@@ -1993,25 +1945,29 @@ module typus_perp::trading {
         ctx: &mut TxContext
     ) {
         // safety check
-        admin::verify(version, ctx);
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::none(), // can't check position user matched here due to manager reduce position also using this function
+            ctx
+        );
+        admin::verify(version, ctx); // manager only function
 
         let mut operation_count = 0;
         let mut matched_order_ids = vector::empty();
         // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
 
         let market = registry.markets.borrow_mut(market_index);
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        {
-            let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-            liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        };
+        // let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
-
+        assert!(symbol_market.market_info.is_active, error::trading_symbol_inactive());
         let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
         let (collateral_oracle_price, collateral_oracle_price_decimal) = typus_oracle_c_token.get_price_with_interval_ms(clock, 0);
         let (trading_pair_oracle_price, trading_pair_oracle_price_decimal) = typus_oracle_trading_symbol.get_price_with_interval_ms(clock, 0);
@@ -2038,7 +1994,7 @@ module typus_perp::trading {
                         order,
                         order_user
                     );
-                    return_to_user(&mut market.id, collateral, order_user, ctx);
+                    return_to_user(collateral, order_user, ctx);
                     continue
                 };
             };
@@ -2103,7 +2059,7 @@ module typus_perp::trading {
                     clock,
                     ctx,
                 );
-                return_to_user(&mut market.id, collateral_balance, order_user, ctx);
+                return_to_user(collateral_balance, order_user, ctx);
                 matched_order_ids.push_back(order_id);
                 operation_count = operation_count + 1;
             } else {
@@ -2127,120 +2083,6 @@ module typus_perp::trading {
                 collateral_token: type_name::with_defining_ids<C_TOKEN>(),
                 base_token,
                 matched_order_ids,
-                u64_padding: vector::empty()
-            });
-        };
-    }
-
-    public struct ManagerCancelOrdersEvent has copy, drop {
-        reason: String,
-        collateral_token: TypeName,
-        base_token: TypeName,
-        order_type_tag: u8,
-        order_ids: vector<u64>,
-        order_sizes: vector<u64>,
-        order_prices: vector<u64>,
-        u64_padding: vector<u64>
-    }
-    /// [Authorized Function] Cancels orders by the manager due to open interest limit.
-    public fun manager_cancel_order_by_open_interest_limit<C_TOKEN, BASE_TOKEN>(
-        // for share objects
-        version: &mut Version,
-        registry: &mut MarketRegistry,
-        pool_registry: &mut PoolRegistry,
-        clock: &Clock,
-        market_index: u64,
-        pool_index: u64,
-        // other parameters
-        order_type_tag: u8,
-        trigger_price: u64,
-        max_operation_count: u64,
-        ctx: &mut TxContext
-    ) {
-        // safety check
-        admin::verify(version, ctx);
-
-        let mut operation_count = 0;
-        // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-
-        let market = registry.markets.borrow_mut(market_index);
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
-        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
-        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        lp_pool::update_borrow_info(version, pool_registry, pool_index, clock);
-        let symbol_market = object_table::borrow<TypeName, SymbolMarket>(&market.symbol_markets, base_token);
-
-        let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
-        liquidity_pool.check_active();
-
-        let active_orders = get_orders(symbol_market, true, order_type_tag).get(&trigger_price);
-        let mut order_ids = vector::empty();
-        let mut order_sizes = vector::empty();
-        let mut order_prices = vector::empty();
-        let mut order_users = vector::empty();
-        let mut i = 0;
-        let length = active_orders.length();
-        while (i < length && operation_count < max_operation_count) {
-            let order = &active_orders[i];
-            let is_long = order.get_order_side();
-            let size = order.get_order_size();
-            let order_id = order.get_order_id();
-            let order_user = order.get_order_user();
-            let order_collateral_token = order.get_order_collateral_token();
-
-            // check open interest enough for this new position order
-            let exceed_max_open_interest = if (is_long) {
-                let max_buy_open_interest = math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_MAX_BUY_OPEN_INTEREST);
-                symbol_market.market_info.user_long_position_size + size > max_buy_open_interest
-            } else {
-                let max_sell_open_interest = math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_MAX_SELL_OPEN_INTEREST);
-                symbol_market.market_info.user_short_position_size + size > max_sell_open_interest
-            };
-
-            if (exceed_max_open_interest && order_collateral_token == collateral_token) {
-                order_ids.push_back(order_id);
-                order_sizes.push_back(size);
-                order_prices.push_back(trigger_price);
-                order_users.push_back(order_user);
-                operation_count = operation_count + 1;
-            };
-            i = i + 1;
-        };
-
-        let mut j = 0;
-        let length = order_ids.length();
-        while (j < length) {
-            let order_id = order_ids[j];
-            let trigger_price = order_prices[j];
-            let order_user = order_users[j];
-            let margin = cancel_trading_order<C_TOKEN, BASE_TOKEN>(
-                version,
-                registry,
-                market_index,
-                order_id,
-                trigger_price,
-                option::some(order_user),
-                ctx,
-            );
-            if (margin.value() > 0) {
-                let market = registry.markets.borrow_mut(market_index);
-                return_to_user(&mut market.id, margin.into_balance(), order_user, ctx);
-            } else {
-                margin.destroy_zero();
-            };
-            j = j + 1;
-        };
-
-        if (operation_count > 0) {
-            emit(ManagerCancelOrdersEvent {
-                reason: string::utf8(b"exceed_max_open_interest"),
-                collateral_token: type_name::with_defining_ids<C_TOKEN>(),
-                base_token,
-                order_type_tag,
-                order_ids,
-                order_sizes,
-                order_prices,
                 u64_padding: vector::empty()
             });
         };
@@ -2270,7 +2112,7 @@ module typus_perp::trading {
         collateral_balance.join(collaterals);
         // transfer remaining balance back to user
         if (collateral_balance.value() > 0) {
-            return_to_user(&mut market.id, collateral_balance, user, ctx);
+            return_to_user(collateral_balance, user, ctx);
         } else {
             balance::destroy_zero(collateral_balance);
         };
@@ -2402,7 +2244,7 @@ module typus_perp::trading {
             clock,
             ctx,
         );
-        return_to_user(&mut market.id, collateral_balance, user, ctx);
+        return_to_user(collateral_balance, user, ctx);
 
         if (linked_order_ids.length() > 0) {
             cancel_linked_orders<C_TOKEN, BASE_TOKEN>(
@@ -2485,7 +2327,7 @@ module typus_perp::trading {
 
             balance.join(trading_fee_balance);
 
-            return_to_user(&mut market.id, balance, user, ctx);
+            return_to_user(balance, user, ctx);
             emit(ManagerClearPositionEvent {
                 user,
                 collateral_token,
@@ -2546,23 +2388,23 @@ module typus_perp::trading {
         ctx: &mut TxContext
     ) {
         // safety check
+        normal_safety_check<C_TOKEN, BASE_TOKEN>(
+            version,
+            registry,
+            pool_registry,
+            typus_oracle_c_token,
+            typus_oracle_trading_symbol,
+            market_index,
+            pool_index,
+            option::none(), // can't check position user matched here due to manager reduce position also using this function
+            ctx
+        );
         admin::verify(version, ctx);
 
-        // let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-
         let market = registry.markets.borrow_mut(market_index);
-        assert!(market.is_active, error::markets_inactive());
-        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
         let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
-        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
-
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        {
-            let liquidity_pool = lp_pool::get_liquidity_pool(pool_registry, pool_index);
-            liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
-        };
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
         assert!(mut_position.is_option_collateral_position(), error::not_option_collateral_position());
         assert!(position::option_position_bid_receipts_expired(dov_registry, mut_position), error::bid_receipt_not_expired());
@@ -2980,7 +2822,7 @@ module typus_perp::trading {
                     linked_order_prices,
                     user
                 );
-                return_to_user(&mut market.id, collaterals, user, ctx);
+                return_to_user(collaterals, user, ctx);
 
                 let charged_value = std::u64::min(balance.value(), unrealized_liquidator_fee);
                 let liquidator_fee_balance = balance.split(charged_value);
@@ -3327,173 +3169,151 @@ module typus_perp::trading {
 
     /// [Authorized Function] Initializes the user account table.
     /// TODO: can be removed, only use once.
-    entry fun init_user_account_table(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        ctx: &mut TxContext,
-    ) {
-        // safety check
-        admin::verify(version, ctx);
-        let market_id = registry.get_mut_market_id(market_index);
-        dynamic_field::add(market_id, string::utf8(K_USER_ACCOUNTS), object_table::new<address, UserAccount>(ctx));
-    }
-
-    /// [User Function] Creates a new user account.
-    public fun create_user_account(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        ctx: &mut TxContext,
-    ): UserAccountCap {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-
-        let user_accounts: &mut ObjectTable<address, UserAccount> = dynamic_field::borrow_mut(market_id, string::utf8(K_USER_ACCOUNTS));
-        // check already exist
-        assert!(!user_accounts.contains(ctx.sender()), error::invalid_user_account());
-
-        let (user_account, user_account_cap) = user_account::new_user_account(ctx);
-        object_table::add(user_accounts, ctx.sender(), user_account);
-
-        user_account_cap
-    }
-
-    /// [User Function] Adds a delegate user to a user account.
-    /// Safe with `check_owner`
-    entry fun add_delegate_user(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        user: address,
-        ctx: &TxContext,
-    ) {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-        let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
-        // check only owner can deposit
-        user_account.check_owner(ctx); // abort inside
-
-        user_account.add_delegate_user(user);
-    }
-
-    /// [User Function] Remove a delegate user to a user account.
-    /// Safe with `check_owner`
-    entry fun remove_delegate_user(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        user: address,
-        ctx: &TxContext,
-    ) {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-        let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
-        // check only owner can deposit
-        user_account.check_owner(ctx); // abort inside
-
-        user_account.remove_delegate_user(user);
-    }
-
-    /// [User Function] Removes a user account.
-    /// Safe with `UserAccountCap`
-    entry fun remove_user_account(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        user_account_cap: UserAccountCap,
-    ) {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-        // use the owner of user_account_cap to withdraw
-        let owner = user_account_cap.get_user_account_owner();
-        user_account::remove_user_account(market_id, owner, user_account_cap);
-    }
-
-    /// Deposits collateral into a user account.
-    /// Safe with `check_owner`
-    entry fun deposit_user_account<C_TOKEN>(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        collateral: Coin<C_TOKEN>,
-        ctx: &TxContext,
-    ) {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-        let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
-        // check only owner can deposit
-        user_account.check_owner(ctx); // abort inside
-
-        user_account.deposit(collateral.into_balance());
-    }
-
-    /// Withdraws collateral from a user account.
-    /// Safe with `UserAccountCap`
-    public fun withdraw_user_account<C_TOKEN>(
-        version: &Version,
-        registry: &mut MarketRegistry,
-        market_index: u64,
-        amount: Option<u64>,
-        user_account_cap: &UserAccountCap,
-        ctx: &mut TxContext,
-    ): Coin<C_TOKEN> {
-        // safety check
-        admin::version_check(version);
-
-        let market_id = registry.get_mut_market_id(market_index);
-        // use the owner of user_account_cap to withdraw
-        let owner = user_account_cap.get_user_account_owner();
-        let user_account = user_account::get_mut_user_account(market_id, owner);
-
-        // check authority with user_account_cap
-        let balance = user_account.withdraw(amount, user_account_cap);
-        coin::from_balance(balance, ctx)
-    }
-
-    // public struct WithdrawReferralRebateEvent has copy, drop {
-    //     rebate_token: TypeName,
-    //     amount: u64,
-    //     u64_padding: vector<u64>
-    // }
-    // public fun withdraw_referral_rebate<TOKEN>(
+    // entry fun init_user_account_table(
     //     version: &Version,
     //     registry: &mut MarketRegistry,
-    //     ctx: &mut TxContext
-    // ): Coin<TOKEN> {
-    //     // user function
-    //     let user = tx_context::sender(ctx);
+    //     market_index: u64,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     // safety check
+    //     admin::verify(version, ctx);
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     dynamic_field::add(market_id, string::utf8(K_USER_ACCOUNTS), object_table::new<address, UserAccount>(ctx));
+    // }
+
+    /// [User Function] Creates a new user account.
+    // public fun create_user_account(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     ctx: &mut TxContext,
+    // ): UserAccountCap {
     //     // safety check
     //     admin::version_check(version);
 
-    //     let referrals = dynamic_object_field::borrow_mut<String, Referrals>(&mut registry.referral_registry, string::utf8(K_REFERRAL));
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     let token_rebates = referrals.rebates.borrow_mut(token_type);
+    //     let market_id = registry.get_mut_market_id(market_index);
 
-    //     let rebate_balance = dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(
-    //         &mut referrals.id,
-    //         token_type
-    //     ).split(
-    //         *token_rebates.borrow(user)
-    //     );
-    //     *token_rebates.borrow_mut(user) = 0;
-    //     emit(WithdrawReferralRebateEvent {
-    //         rebate_token: token_type,
-    //         amount: rebate_balance.value(),
-    //         u64_padding: vector::empty()
-    //     });
-    //     coin::from_balanc(rebate_balance, ctx)
+    //     let user_accounts: &mut ObjectTable<address, UserAccount> = dynamic_field::borrow_mut(market_id, string::utf8(K_USER_ACCOUNTS));
+    //     // check already exist
+    //     assert!(!user_accounts.contains(ctx.sender()), error::invalid_user_account());
+
+    //     let (user_account, user_account_cap) = user_account::new_user_account(ctx);
+    //     object_table::add(user_accounts, ctx.sender(), user_account);
+
+    //     user_account_cap
     // }
+
+    /// [User Function] Adds a delegate user to a user account.
+    /// Safe with `check_owner`
+    // entry fun add_delegate_user(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     user: address,
+    //     ctx: &TxContext,
+    // ) {
+    //     // safety check
+    //     admin::version_check(version);
+
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
+    //     // check only owner can deposit
+    //     user_account.check_owner(ctx); // abort inside
+
+    //     user_account.add_delegate_user(user);
+    // }
+
+    /// [User Function] Remove a delegate user to a user account.
+    /// Safe with `check_owner`
+    // entry fun remove_delegate_user(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     user: address,
+    //     ctx: &TxContext,
+    // ) {
+    //     // safety check
+    //     admin::version_check(version);
+
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
+    //     // check only owner can deposit
+    //     user_account.check_owner(ctx); // abort inside
+
+    //     user_account.remove_delegate_user(user);
+    // }
+
+    /// [User Function] Removes a user account.
+    /// Safe with `UserAccountCap`
+    // entry fun remove_user_account(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     user_account_cap: UserAccountCap,
+    // ) {
+    //     // safety check
+    //     admin::version_check(version);
+
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     // use the owner of user_account_cap to withdraw
+    //     let owner = user_account_cap.get_user_account_owner();
+    //     user_account::remove_user_account(market_id, owner, user_account_cap);
+    // }
+
+    /// Deposits collateral into a user account.
+    /// Safe with `check_owner`
+    // entry fun deposit_user_account<C_TOKEN>(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     collateral: Coin<C_TOKEN>,
+    //     ctx: &TxContext,
+    // ) {
+    //     // safety check
+    //     admin::version_check(version);
+
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     let user_account = user_account::get_mut_user_account(market_id, ctx.sender());
+    //     // check only owner can deposit
+    //     user_account.check_owner(ctx); // abort inside
+
+    //     user_account.deposit(collateral.into_balance());
+    // }
+
+    /// Withdraws collateral from a user account.
+    /// Safe with `UserAccountCap`
+    // public fun withdraw_user_account<C_TOKEN>(
+    //     version: &Version,
+    //     registry: &mut MarketRegistry,
+    //     market_index: u64,
+    //     amount: Option<u64>,
+    //     user_account_cap: &UserAccountCap,
+    //     ctx: &mut TxContext,
+    // ): Coin<C_TOKEN> {
+    //     // safety check
+    //     admin::version_check(version);
+
+    //     let market_id = registry.get_mut_market_id(market_index);
+    //     // use the owner of user_account_cap to withdraw
+    //     let owner = user_account_cap.get_user_account_owner();
+    //     let user_account = user_account::get_mut_user_account(market_id, owner);
+
+    //     // check authority with user_account_cap
+    //     let balance = user_account.withdraw(amount, user_account_cap);
+    //     coin::from_balance(balance, ctx)
+    // }
+
+    fun prepare_order_execution<C_TOKEN>(
+        symbol_market: &mut SymbolMarket,
+        liquidity_pool: &LiquidityPool,
+        order: &TradingOrder,
+    ): (address, Option<Position>, u64, u64) {
+        let user = order.get_order_user();
+        let linked_position_id = order.get_order_linked_position_id();
+        let (original_position, original_reserve) = get_linked_position(symbol_market, linked_position_id, user);
+        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
+        (user, original_position, original_reserve, cumulative_borrow_rate)
+    }
 
     fun execute_order_<C_TOKEN>(
         version: &mut Version,
@@ -3517,19 +3337,19 @@ module typus_perp::trading {
         clock: &Clock,
         ctx: &mut TxContext
     ): (Balance<C_TOKEN>, vector<u64>, vector<u64>) {
-        let user = order.get_order_user();
+        let (
+            user,
+            original_position,
+            original_reserve,
+            cumulative_borrow_rate
+        ) = prepare_order_execution<C_TOKEN>(symbol_market, liquidity_pool, &order);
         let order_id = order.get_order_id();
-        let linked_position_id = order.get_order_linked_position_id();
         let is_long = position::get_order_side(&order);
-        let (original_position, original_reserve) = get_linked_position(symbol_market, linked_position_id, user);
         let (original_position_size, original_position_side) = if (original_position.is_some()) {
             (option::some(original_position.borrow().get_position_size()), option::some(original_position.borrow().get_position_side()))
         } else {
             (option::none(), option::none())
         };
-
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
-
 
         let order_size = order.get_order_size();
         let actual_order_size = if (option::is_some(&original_position)) {
@@ -3550,16 +3370,6 @@ module typus_perp::trading {
             actual_order_size,
             symbol_market.market_config.trading_fee_config,
         );
-
-        // let (fee_rebate_bp, fee_reduction_bp) = if (referrals.referrals.contains(user)) {
-        //     let referral_info = referrals.referrals.borrow(user);
-        //     (referral_info.fee_rebate_bp, referral_info.fee_reduction_bp)
-        // } else { (0, 0) };
-        // let (_fee_rebate_bp, fee_reduction_bp) = (0, 0);
-
-        // let trading_fee_rate = ((symbol_market.market_config.trading_fee_rate as u128)
-        //                             * ((10000 - fee_reduction_bp) as u128)
-        //                                 / 10000 as u64);
 
         let (
             mut position,
@@ -3617,18 +3427,6 @@ module typus_perp::trading {
                 clock
             );
         };
-
-        // put referral rebate
-        // let fee_balance_value = fee_balance.value();
-        // let rebate_balance_value = ((fee_balance_value as u128)
-        //     * (fee_rebate_bp as u128)
-        //         / 10000 as u64);
-        // if (rebate_balance_value > 0 ) {
-        //     let referral_info = referrals.referrals.borrow(user);
-        //     put_referral_rebate(referrals, fee_balance.split(rebate_balance_value), referral_info.invited_from, ctx);
-        // };
-
-
 
         // add tails exp
         admin::add_tails_exp_and_leaderboard(
@@ -3725,24 +3523,15 @@ module typus_perp::trading {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let user = position::get_order_user(&order);
-        let linked_position_id = position::get_order_linked_position_id(&order);
+        let (
+            user,
+            original_position,
+            original_reserve,
+            cumulative_borrow_rate
+        ) = prepare_order_execution<C_TOKEN>(symbol_market, liquidity_pool, &order);
         let size = position::get_order_size(&order);
         let is_long = position::get_order_side(&order);
         let reduce_only = position::get_order_reduce_only(&order);
-        let (original_position, original_reserve) = get_linked_position(symbol_market, linked_position_id, user);
-
-        let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
-
-        // let (fee_rebate_bp, fee_reduction_bp) = if (referrals.referrals.contains(user)) {
-        //     let referral_info = referrals.referrals.borrow(user);
-        //     (referral_info.fee_rebate_bp, referral_info.fee_reduction_bp)
-        // } else { (0, 0) };
-        // let (fee_rebate_bp, fee_reduction_bp) = (0, 0);
-
-        // let trading_fee_rate = ((symbol_market.market_config.trading_fee_rate as u128)
-        //                             * ((10000 - fee_reduction_bp) as u128)
-        //                                 / 10000 as u64);
 
         // let fee_usd;
         let (
@@ -3777,13 +3566,6 @@ module typus_perp::trading {
             ctx
         );
         realized_rebate_balance.destroy_zero();
-
-        // option collateral position does not realized funding here due to no field for storing C_TOKEN collateral
-        // and no Balance<C_TOKEN> to pay for funding
-
-        // put referral rebate
-        // let referral_info = referrals.referrals.borrow(user);
-        // put_referral_rebate(referrals, realized_rebate_balance, referral_info.invited_from, ctx);
 
         let realized_fee_value = realized_fee_balance.value();
         let shared_balance = realized_fee_balance.split(
@@ -3965,15 +3747,6 @@ module typus_perp::trading {
                     u64_padding: vector::empty()
                 });
 
-                // split rebate
-                // let invited_from = referrals.referrals.borrow(user).invited_from;
-                // let rebate_balance = exercise_balance.split(
-                //     if (exercise_balance.value() >= unrealized_rebate) {
-                //         unrealized_rebate
-                //     } else {exercise_balance.value()}
-                // );
-                // put_referral_rebate(referrals, rebate_balance, invited_from, ctx);
-
                 // transfer remaining balance back to user
                 if (user_remaining_balance.value() > 0) {
                     // user_account not support for option collateral order
@@ -4051,54 +3824,30 @@ module typus_perp::trading {
 
     fun get_mut_orders(symbol_market: &mut SymbolMarket, is_token_collateral: bool, order_type_tag: u8): &mut VecMap<u64, vector<TradingOrder>> {
         // order_type_tag: limit buy = 0, limit sell = 1, stop buy = 2, stop sell = 3
-        if (is_token_collateral) {
-            if (order_type_tag == 0) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.token_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS))
-            } else if (order_type_tag == 1) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.token_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS))
-            } else if (order_type_tag == 2) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.token_collateral_orders, string::utf8(K_STOP_BUY_ORDERS))
-            } else if (order_type_tag == 3) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.token_collateral_orders, string::utf8(K_STOP_SELL_ORDERS))
-            };
+        let order_key = get_order_key(order_type_tag);
+        return if (is_token_collateral) {
+            dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.token_collateral_orders, order_key)
         } else {
-            if (order_type_tag == 0) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.option_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS))
-            } else if (order_type_tag == 1) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.option_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS))
-            } else if (order_type_tag == 2) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.option_collateral_orders, string::utf8(K_STOP_BUY_ORDERS))
-            } else if (order_type_tag == 3) {
-                return dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.option_collateral_orders, string::utf8(K_STOP_SELL_ORDERS))
-            };
-        };
-        abort error::unsupported_order_type_tag()
+            dynamic_field::borrow_mut<String, VecMap<u64, vector<TradingOrder>>>(&mut symbol_market.option_collateral_orders, order_key)
+        }
     }
 
     fun get_orders(symbol_market: &SymbolMarket, is_token_collateral: bool, order_type_tag: u8): &VecMap<u64, vector<TradingOrder>> {
         // order_type_tag: limit buy = 0, limit sell = 1, stop buy = 2, stop sell = 3
-        if (is_token_collateral) {
-            if (order_type_tag == 0) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.token_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS))
-            } else if (order_type_tag == 1) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.token_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS))
-            } else if (order_type_tag == 2) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.token_collateral_orders, string::utf8(K_STOP_BUY_ORDERS))
-            } else if (order_type_tag == 3) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.token_collateral_orders, string::utf8(K_STOP_SELL_ORDERS))
-            };
+        let order_key = get_order_key(order_type_tag);
+        return if (is_token_collateral) {
+            dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.token_collateral_orders, order_key)
         } else {
-            if (order_type_tag == 0) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.option_collateral_orders, string::utf8(K_LIMIT_BUY_ORDERS))
-            } else if (order_type_tag == 1) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.option_collateral_orders, string::utf8(K_LIMIT_SELL_ORDERS))
-            } else if (order_type_tag == 2) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.option_collateral_orders, string::utf8(K_STOP_BUY_ORDERS))
-            } else if (order_type_tag == 3) {
-                return dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.option_collateral_orders, string::utf8(K_STOP_SELL_ORDERS))
-            };
-        };
-        abort error::unsupported_order_type_tag()
+            dynamic_field::borrow<String, VecMap<u64, vector<TradingOrder>>>(&symbol_market.option_collateral_orders, order_key)
+        }
+    }
+
+    fun get_order_key(order_type_tag: u8): String {
+        if (order_type_tag == 0) { string::utf8(K_LIMIT_BUY_ORDERS) }
+        else if (order_type_tag == 1) { string::utf8(K_LIMIT_SELL_ORDERS) }
+        else if (order_type_tag == 2) { string::utf8(K_STOP_BUY_ORDERS) }
+        else if (order_type_tag == 3) { string::utf8(K_STOP_SELL_ORDERS) }
+        else { abort error::unsupported_order_type_tag() }
     }
 
     fun take_order_by_order_id_and_price(
@@ -4175,13 +3924,15 @@ module typus_perp::trading {
             collateral_amount
         } else { 0 };
 
-        let order_filled_fee = position::get_order_filled_fee(
-            order,
+        let (order_filled_fee, _) = position::calculate_trading_fee(
+            order.get_order_size(),
+            symbol_market.market_info.size_decimal,
             collateral_oracle_price,
             collateral_oracle_price_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
             trading_fee_mbp,
+            order.get_order_collateral_token_decimal(),
         );
         order_collateral_amount + position_collateral_amount > order_filled_fee
     }
@@ -4210,13 +3961,15 @@ module typus_perp::trading {
             trading_pair_oracle_price_decimal,
             trading_fee_mbp,
         );
-        let actual_trading_fee = position::get_order_filled_fee(
-            order,
+        let (actual_trading_fee, _) = position::calculate_trading_fee(
+            order.get_order_size(),
+            symbol_market.market_info.size_decimal,
             collateral_oracle_price,
             collateral_oracle_price_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
             trading_fee_mbp,
+            order.get_order_collateral_token_decimal(),
         );
         if (unrealized_pnl_sign) {
             let unrealized_profit_usd = unrealized_pnl_w_fee_usd + fee_usd;
@@ -4288,14 +4041,15 @@ module typus_perp::trading {
             );
             collateral_amount
         } else { 0 };
-
-        let order_filled_fee = position::get_order_filled_fee(
-            order,
+        let (order_filled_fee, _) = position::calculate_trading_fee(
+            order.get_order_size(),
+            symbol_market.market_info.size_decimal,
             collateral_oracle_price,
             collateral_oracle_price_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
             trading_fee_mbp,
+            order.get_order_collateral_token_decimal(),
         );
         order_collateral_amount + position_collateral_amount > order_filled_fee
     }
@@ -4353,6 +4107,84 @@ module typus_perp::trading {
                 liquidity_amount >= reserved_amount + (reserve_amount_after_filled - reserve_amount_before_filled)
             } else { true }
         }
+    }
+
+    fun get_max_releasing_collateral_amount_(
+        liquidity_pool: &LiquidityPool,
+        position: &Position,
+        market_info: &MarketInfo,
+        market_config: &MarketConfig,
+        collateral_token: TypeName,
+        collateral_oracle_price: u64,
+        collateral_oracle_price_decimal: u64,
+        trading_pair_oracle_price: u64,
+        trading_pair_oracle_price_decimal: u64,
+        cumulative_borrow_rate: u64,
+    ): u64 {
+        let trading_fee_mbp = calculate_trading_fee_rate_mbp(
+            math::get_u64_vector_value(&market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
+            // infos
+            market_info.user_long_position_size,
+            market_info.user_short_position_size,
+            lp_pool::get_token_pool_state(liquidity_pool, collateral_token)[1],
+            market_info.size_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            // condition & config
+            !position.get_position_side(),
+            position.get_position_size(),
+            market_config.trading_fee_config,
+        );
+        position::max_releasing_collateral_amount(
+            position,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            trading_fee_mbp,
+            cumulative_borrow_rate,
+            market_config.max_leverage_mbp,
+        )
+    }
+
+    fun normal_safety_check<C_TOKEN, BASE_TOKEN>(
+        version: &Version,
+        registry: &mut MarketRegistry,
+        pool_registry: &mut PoolRegistry,
+        typus_oracle_c_token: &Oracle,
+        typus_oracle_trading_symbol: &Oracle,
+        market_index: u64,
+        pool_index: u64,
+        position_id: Option<u64>,
+        ctx: &TxContext,
+    ) {
+        admin::version_check(version);
+        let market = registry.markets.borrow_mut(market_index);
+        assert!(market.is_active, error::markets_inactive());
+        assert!(market.lp_token_type == lp_pool::get_lp_token_type(pool_registry, pool_index), error::lp_token_type_mismatched());
+        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+        assert!(vector::contains(&market.symbols, &base_token), error::trading_symbol_not_existed());
+        let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
+        assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
+        if (position_id.is_some()) {
+            let position: &Position = &symbol_market.user_positions[position_id];
+            let user = tx_context::sender(ctx);
+            check_position_user_matched(position, user);
+            assert!(collateral_token == position::get_position_collateral_token_type(position), error::collateral_token_type_mismatched());
+            lp_pool::check_token_pool_status<C_TOKEN>(pool_registry, pool_index, true); // not allowed when token pool inactive
+        };
+        let liquidity_pool = lp_pool::get_mut_liquidity_pool(pool_registry, pool_index);
+        liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
+    }
+
+    fun validate_trading_fee_config(config: &vector<u64>) {
+        assert!(
+            config[I_MAX_TRADING_FEE_MBP] >= config[I_BASE_TRADING_FEE_MBP]
+            && config.length() == 5
+            && config[I_SCALE] > 0,
+            error::invalid_trading_fee_config()
+        );
     }
 
     fun adjust_market_info_user_order_size(
@@ -4420,13 +4252,14 @@ module typus_perp::trading {
         (exercise_balance, returned_receipts)
     }
 
-    fun return_to_user<TOKEN>(market_id: &mut UID, balance: Balance<TOKEN>, user: address, ctx: &mut TxContext) {
-        if (user_account::has_user_account(market_id, user)) {
-            let user_account = user_account::get_mut_user_account(market_id, user);
-            user_account.deposit(balance);
-        } else {
-            transfer::public_transfer(coin::from_balance(balance, ctx), user);
-        };
+    fun return_to_user<TOKEN>(balance: Balance<TOKEN>, user: address, ctx: &mut TxContext) {
+    // fun return_to_user<TOKEN>(market_id: &mut UID, balance: Balance<TOKEN>, user: address, ctx: &mut TxContext) {
+        // if (user_account::has_user_account(market_id, user)) {
+        //     let user_account = user_account::get_mut_user_account(market_id, user);
+        //     user_account.deposit(balance);
+        // } else {
+        transfer::public_transfer(coin::from_balance(balance, ctx), user);
+        // };
     }
 
     fun check_position_user_matched(position: &Position, user: address) {
@@ -4593,39 +4426,39 @@ module typus_perp::trading {
         active_orders
     }
 
-    /// [View Function] Gets active orders by order type tag and collateral token.
-    public(package) fun get_active_orders_by_order_tag_and_ctoken<C_TOKEN, BASE_TOKEN>(
-        version: &Version,
-        registry: &MarketRegistry,
-        market_index: u64,
-        order_type_tag: u8,
-    ): vector<vector<u8>> {
-        admin::version_check(version);
-        let collateral_token = type_name::with_defining_ids<C_TOKEN>();
-        let mut active_orders = vector::empty<vector<u8>>();
+    // /// [View Function] Gets active orders by order type tag and collateral token.
+    // public(package) fun get_active_orders_by_order_tag_and_ctoken<C_TOKEN, BASE_TOKEN>(
+    //     version: &Version,
+    //     registry: &MarketRegistry,
+    //     market_index: u64,
+    //     order_type_tag: u8,
+    // ): vector<vector<u8>> {
+    //     admin::version_check(version);
+    //     let collateral_token = type_name::with_defining_ids<C_TOKEN>();
+    //     let mut active_orders = vector::empty<vector<u8>>();
 
-        let market = registry.markets.borrow(market_index);
-        let base_token = type_name::with_defining_ids<BASE_TOKEN>();
-        let symbol_market = market.symbol_markets.borrow(base_token);
+    //     let market = registry.markets.borrow(market_index);
+    //     let base_token = type_name::with_defining_ids<BASE_TOKEN>();
+    //     let symbol_market = market.symbol_markets.borrow(base_token);
 
-        let active_orders_vec_map = get_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
-        let mut keys = active_orders_vec_map.keys();
-        // iter by order prices
-        while (keys.length() > 0) {
-            let trigger_price = keys.pop_back();
-            let active_orders_per_price = active_orders_vec_map.get(&trigger_price);
-            let mut k = 0;
-            let length = active_orders_per_price.length();
-            while (k < length) {
-                let order = &active_orders_per_price[k];
-                if (position::get_order_collateral_token(order) == collateral_token) {
-                    active_orders.push_back(bcs::to_bytes(order));
-                };
-                k = k + 1;
-            };
-        };
-        active_orders
-    }
+    //     let active_orders_vec_map = get_orders(symbol_market, true, order_type_tag); // &mut VecMap<u64, vector<TradingOrder>>
+    //     let mut keys = active_orders_vec_map.keys();
+    //     // iter by order prices
+    //     while (keys.length() > 0) {
+    //         let trigger_price = keys.pop_back();
+    //         let active_orders_per_price = active_orders_vec_map.get(&trigger_price);
+    //         let mut k = 0;
+    //         let length = active_orders_per_price.length();
+    //         while (k < length) {
+    //             let order = &active_orders_per_price[k];
+    //             if (position::get_order_collateral_token(order) == collateral_token) {
+    //                 active_orders.push_back(bcs::to_bytes(order));
+    //             };
+    //             k = k + 1;
+    //         };
+    //     };
+    //     active_orders
+    // }
 
     /// [View Function] Gets the maximum amount of collateral that can be released from a position.
     public(package) fun get_max_releasing_collateral_amount<C_TOKEN, BASE_TOKEN>(
@@ -4653,29 +4486,17 @@ module typus_perp::trading {
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         liquidity_pool.safety_check(collateral_token, object::id_address(typus_oracle_c_token));
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, collateral_token);
-        let trading_fee_mbp = calculate_trading_fee_rate_mbp(
-            math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_TRADING_FEE_FORMULA_VERSION),
-            // infos
-            symbol_market.market_info.user_long_position_size,
-            symbol_market.market_info.user_short_position_size,
-            lp_pool::get_token_pool_state(liquidity_pool, collateral_token)[1],
-            symbol_market.market_info.size_decimal,
-            trading_pair_oracle_price,
-            trading_pair_oracle_price_decimal,
-            // condition & config
-            !position.get_position_side(),
-            position.get_position_size(),
-            symbol_market.market_config.trading_fee_config,
-        );
-        position::max_releasing_collateral_amount(
+        get_max_releasing_collateral_amount_(
+            liquidity_pool,
             position,
+            &symbol_market.market_info,
+            &symbol_market.market_config,
+            collateral_token,
             collateral_oracle_price,
             collateral_oracle_price_decimal,
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal,
-            trading_fee_mbp,
             cumulative_borrow_rate,
-            symbol_market.market_config.max_leverage_mbp,
         )
     }
 
@@ -4884,104 +4705,6 @@ module typus_perp::trading {
             }
         }
     }
-
-    // fun put_referral_rebate<TOKEN>(
-    //     referrals: &mut Referrals,
-    //     balance: Balance<TOKEN>,
-    //     to_user: address,
-    //     ctx: &mut TxContext
-    // ) {
-    //     let token_type = type_name::with_defining_ids<TOKEN>();
-    //     if (!referrals.rebates.contains(token_type)) {
-    //         referrals.rebates.add(token_type, table::new(ctx));
-    //     };
-    //     let token_rebates = referrals.rebates.borrow_mut(token_type);
-    //     if (!token_rebates.contains(to_user)) {
-    //         token_rebates.add(to_user, balance.value());
-    //     } else {
-    //         let user_rebates = token_rebates.borrow_mut(to_user);
-    //         *user_rebates = *user_rebates + balance.value();
-    //     };
-
-    //     let rebate_pool_balance = dynamic_field::borrow_mut<TypeName, Balance<TOKEN>>(&mut referrals.id, token_type);
-    //     rebate_pool_balance.join(balance);
-    // }
-
-    // fun map_order_price_to_fill(
-    //     orders_vec_map: &VecMap<u64, vector<TradingOrder>>,
-    //     max_leaf_price: u64,
-    //     min_leaf_price: u64,
-    //     order_type_tag: u8,
-    //     trigger_price: u64,
-    //     trading_pair_oracle_price: u64
-    // ): (u64, u64) {
-    //     let mut keys = orders_vec_map.keys();
-    //     if (order_type_tag == 0) {
-    //         // limit buy
-    //         if (trigger_price >= trading_pair_oracle_price) {
-    //             // trigger price = 100, trading_pair_oracle_price = 99 => filled at 99
-    //             let (_, index) = critbit::find_leaf<vector<TradingOrder>>(orders_critbit, trigger_price);
-    //             (trigger_price, index)
-    //         } else {
-    //             // trigger price = 98, trading_pair_oracle_price = 99 => not filled => find next (larger key)
-    //             if (trigger_price < max_leaf_price) {
-    //                 critbit::next_leaf<vector<TradingOrder>>(orders_critbit, trigger_price)
-    //             } else {
-    //                 // no orders to be filled
-    //                 (0, C_U64_MAX)
-    //             }
-    //         }
-    //     } else if (order_type_tag == 1) {
-    //         // limit sell
-    //         if (trigger_price <= trading_pair_oracle_price) {
-    //             // trigger price = 99, trading_pair_oracle_price = 100 => filled at 100
-    //             let (_, index) = critbit::find_leaf<vector<TradingOrder>>(orders_critbit, trigger_price);
-    //             (trigger_price, index)
-    //         } else {
-    //             // trigger price = 100, trading_pair_oracle_price = 99 => not filled => find previous (smaller key)
-    //             if (trigger_price > min_leaf_price) {
-    //                 // trigger price = 98, trading_pair_oracle_price = 99 => filled at 99
-    //                 critbit::previous_leaf<vector<TradingOrder>>(orders_critbit, trigger_price)
-    //             } else {
-    //                 // no orders to be filled
-    //                 (0, C_U64_MAX)
-    //             }
-    //         }
-    //     } else if (order_type_tag == 2) {
-    //         // stop buy
-    //         if (trigger_price <= trading_pair_oracle_price) {
-    //             // trigger price = 99, trading_pair_oracle_price = 100 => filled at 100
-    //             let (_, index) = critbit::find_leaf<vector<TradingOrder>>(orders_critbit, trigger_price);
-    //             (trigger_price, index)
-    //         } else {
-    //             // trigger price = 100, trading_pair_oracle_price = 99 => not filled => find previous (smaller key)
-    //             if (trigger_price > min_leaf_price) {
-    //                 critbit::previous_leaf<vector<TradingOrder>>(orders_critbit, trigger_price)
-    //             } else {
-    //                 // no orders to be filled
-    //                 (0, C_U64_MAX)
-    //             }
-    //         }
-    //     } else if (order_type_tag == 3) {
-    //         // stop sell
-    //         if (trigger_price >= trading_pair_oracle_price) {
-    //             // trigger price = 100, trading_pair_oracle_price = 99 => filled at 99
-    //             let (_, index) = critbit::find_leaf<vector<TradingOrder>>(orders_critbit, trigger_price);
-    //             (trigger_price, index)
-    //         } else {
-    //             // trigger price = 99, trading_pair_oracle_price = 100 => not filled => find next (larger key)
-    //             if (trigger_price > max_leaf_price) {
-    //                 // trigger price = 101, trading_pair_oracle_price = 100 => filled at 100
-    //                 critbit::next_leaf<vector<TradingOrder>>(orders_critbit, trigger_price)
-    //             } else {
-    //                 // no orders to be filled
-    //                 (0, C_U64_MAX)
-    //             }
-    //         }
-    //     } else {
-    //         abort error::unsupported_order_type_tag()
-    //     }
-    // }
 
     /// [View Function] Gets the BCS-serialized markets.
     public(package) fun get_markets_bcs(

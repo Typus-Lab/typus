@@ -839,36 +839,22 @@ module typus_perp::lp_pool {
         ctx: &mut TxContext
     ): Coin<LP_TOKEN> {
         let token_type = type_name::with_defining_ids<TOKEN>();
-        let (price, price_decimal) = oracle.get_price_with_interval_ms(clock, 0);
 
         // coin to balance
         let mut balance = coin.into_balance();
         let deposit_amount = balance.value();
 
-        // checks
-        {
-            // safety check
-            admin::version_check(version);
-
-            // check token type correct
-            let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
-            // check pool active
-            assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-            // check token pool tvl all updated
-            assert!(check_tvl_updated(liquidity_pool, clock), error::tvl_not_yet_updated());
+        normal_safety_check<TOKEN, LP_TOKEN>(version, registry, index, oracle, clock);
 
             // check min deposit
+        {
+            let liquidity_pool = get_liquidity_pool(registry, index);
             let token_pool = get_token_pool(liquidity_pool, &token_type);
             assert!(deposit_amount >= token_pool.config.spot_config.min_deposit, error::deposit_amount_insufficient());
             assert!(token_pool.state.liquidity_amount + deposit_amount <= token_pool.config.spot_config.max_capacity, error::reach_max_capacity());
-
-            // check collateral token active
-            assert!(token_pool.state.is_active, error::token_pool_inactive());
-
-            // check oracle correct
-            assert!(object::id_address(oracle) == token_pool.config.oracle_id, error::oracle_mismatched());
         };
+
+        let (price, price_decimal) = oracle.get_price_with_interval_ms(clock, 0);
 
         update_borrow_info(version, registry, index, clock);
 
@@ -1234,26 +1220,8 @@ module typus_perp::lp_pool {
         clock: &Clock,
         ctx: &mut TxContext
     ): Coin<C_TOKEN> {
-        // checks
-        {
-            // safety check
-            admin::version_check(version);
-
-            // check token type correct
-            let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
-            // check pool active
-            assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
-            // check token pool tvl all updated
-            assert!(check_tvl_updated(liquidity_pool, clock), error::tvl_not_yet_updated());
-
-            let collateral_token_type = type_name::with_defining_ids<C_TOKEN>();
-            let token_pool = get_token_pool(liquidity_pool, &collateral_token_type);
-            // check collateral token active
-            assert!(token_pool.state.is_active, error::token_pool_inactive());
-            // check oracle correct
-            assert!(object::id_address(oracle) == token_pool.config.oracle_id, error::oracle_mismatched());
-        };
+        // safety check
+        normal_safety_check<C_TOKEN, LP_TOKEN>(version, registry, index, oracle, clock);
 
         update_borrow_info(version, registry, index, clock);
 
@@ -2559,6 +2527,32 @@ module typus_perp::lp_pool {
                 / 10000 as u64);
 
         (fee, fee_usd)
+    }
+
+    fun normal_safety_check<TOKEN, LP_TOKEN>(
+        version: &Version,
+        registry: &Registry,
+        index: u64,
+        oracle: &Oracle,
+        clock: &Clock,
+    ) {
+        // safety check
+        admin::version_check(version);
+
+        // check token type correct
+        let liquidity_pool = get_liquidity_pool(registry, index);
+        assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
+        // check pool active
+        assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
+        // check token pool tvl all updated
+        assert!(check_tvl_updated(liquidity_pool, clock), error::tvl_not_yet_updated());
+
+        let collateral_token_type = type_name::with_defining_ids<TOKEN>();
+        let token_pool = get_token_pool(liquidity_pool, &collateral_token_type);
+        // check collateral token active
+        assert!(token_pool.state.is_active, error::token_pool_inactive());
+        // check oracle correct
+        assert!(object::id_address(oracle) == token_pool.config.oracle_id, error::oracle_mismatched());
     }
 
     fun calculate_swap_fee(
