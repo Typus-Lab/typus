@@ -19,6 +19,11 @@ module typus::leaderboard {
     use typus::linked_object_table::{Self, LinkedObjectTable};
     use typus::linked_set::{Self, LinkedSet};
 
+    // ======== Error Code ========
+
+    #[error]
+    const EInvalidTimePeriod: vector<u8> = b"invalid_time_period";
+
     // ======== Typus Leaderboard ========
 
     /// A registry for all leaderboards, separating them into active and inactive categories.
@@ -72,6 +77,7 @@ module typus::leaderboard {
     ) {
         version.verify(ctx);
 
+        assert!(end_ts_ms > start_ts_ms, EInvalidTimePeriod);
         if (!dynamic_field::exists_(&registry.active_leaderboard_registry, key)) {
             dynamic_field::add(
                 &mut registry.active_leaderboard_registry,
@@ -121,6 +127,7 @@ module typus::leaderboard {
 
         let leaderboards: &mut LinkedObjectTable<address, Leaderboard> =
             dynamic_field::borrow_mut(&mut registry.active_leaderboard_registry, key);
+        assert!(end_ts_ms > leaderboards[id].start_ts_ms, EInvalidTimePeriod);
         *&mut leaderboards[id].end_ts_ms = end_ts_ms;
         emit(ExtendLeaderboardEvent {
             key,
