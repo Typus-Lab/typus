@@ -11,9 +11,9 @@ rev = "mainnet"
 override = true
 
 [dependencies.Pyth]
-git = "https://github.com/pyth-network/pyth-crosschain.git"
+git = "https://github.com/Typus-Lab/pyth-crosschain.git"
 subdir = "target_chains/sui/contracts"
-rev = "sui-contract-mainnet"
+rev = "main"
 override = true
 
 [dependencies.SupraOracle]
