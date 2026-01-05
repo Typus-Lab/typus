@@ -1,7 +1,7 @@
 [package]
 name = "typus_framework"
-version = "3.0.1"
-published-at = "0xdc0794d74ea9fa1b0439e3ae1f72b061431830649874843e26a15d5b9862f54e"
+version = "3.1.0"
+published-at = "0xa00e1424c9eef6786dca30b2e2dcbbf75af10fef2ae2639e064af39abff59fa6"
 edition = "2024.alpha"
 
 [dependencies.Pyth]

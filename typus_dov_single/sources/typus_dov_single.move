@@ -52,7 +52,7 @@ module typus_dov::typus_dov_single {
 
     // ======== Constants ========
 
-    const C_VERSION: u64 = 30;
+    const C_VERSION: u64 = 31;
     const C_LEVERAGE_DECIMAL: u64 = 2;
     const C_SHARE_PRICE_DECIMAL: u64 = 8;
     const C_U64_MAX: u64 = 18446744073709551615;

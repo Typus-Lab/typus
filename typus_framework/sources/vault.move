@@ -1778,7 +1778,7 @@ module typus_framework::vault {
         bid_vault: &BidVault,
     ): (TypeName, TypeName) {
         (
-            bid_vault.bid_token,
+            bid_vault.deposit_token,
             bid_vault.bid_token,
         )
     }

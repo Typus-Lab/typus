@@ -128,6 +128,7 @@ module typus_dov::test_manager_entry {
         risk_level: Option<u64>,
         deposit_incentive_bp_divisor_decimal: Option<u64>,
         incentive_fee_bp: Option<u64>,
+        shared_navi_amount: Option<u64>,
     ) {
         let mut registry = test_environment::dov_registry(scenario);
 
@@ -155,6 +156,7 @@ module typus_dov::test_manager_entry {
             risk_level,
             deposit_incentive_bp_divisor_decimal,
             incentive_fee_bp,
+            shared_navi_amount,
             ctx(scenario)
         );
 

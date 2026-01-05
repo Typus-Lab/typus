@@ -247,6 +247,7 @@ module typus_dov::test_manager_cases {
             option::none(),
             option::none(),
             option::none(),
+            option::none(),
         );
 
         test_manager_entry::test_new_auction_<BABE, BABE>(&mut scenario, index);
@@ -448,11 +449,13 @@ module typus_dov::test_manager_cases {
             option::some(2),
             option::some(0),
             option::some(0),
+            option::some(1),
         );
 
         test_manager_entry::test_update_config_(
             &mut scenario,
             0,
+            option::none(),
             option::none(),
             option::none(),
             option::none(),

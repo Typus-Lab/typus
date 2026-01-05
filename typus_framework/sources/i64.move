@@ -27,6 +27,9 @@ module typus_framework::i64 {
     /// @dev Error code for when an arithmetic operation results in an overflow.
     const E_ARITHMETIC_OVERFLOW: u64 = 2;
 
+    /// @dev Error code for when an arithmetic operation results in an overflow.
+    const E_ARITHMETIC_ERROR: u64 = 3;
+
     /// @notice Struct representing a signed 64-bit integer.
     /// @dev The most significant bit is used to represent the sign (1 for negative, 0 for positive).
     public struct I64 has copy, drop, store {
@@ -161,6 +164,7 @@ module typus_framework::i64 {
 
     /// @notice Multiply `a * b`.
     public fun mul(a: &I64, b: &I64): I64 {
+        if (a.bits == 0 || b.bits == 0) return zero();
         if (a.bits >> 63 == 0) {
             // A is positive
             if (b.bits >> 63 == 0) {
@@ -188,6 +192,8 @@ module typus_framework::i64 {
 
     /// @notice Divide `a / b`.
     public fun div(a: &I64, b: &I64): I64 {
+        if (a.bits == 0) return zero();
+        if (b.bits == 0) abort E_ARITHMETIC_ERROR;
         if (a.bits >> 63 == 0) {
             // A is positive
             if (b.bits >> 63 == 0) {
@@ -208,5 +214,4 @@ module typus_framework::i64 {
             }
         }
     }
-
 }
