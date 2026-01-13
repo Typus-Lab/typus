@@ -443,6 +443,8 @@ module typus_oracle::oracle {
         version_check(oracle);
 
         let mut message_bytes = vector[];
+
+        message_bytes.append(object::id_to_bytes(&oracle.id.uid_to_inner()));
         message_bytes.append(token_type);
         message_bytes.append( bcs::to_bytes(&price));
         message_bytes.append( bcs::to_bytes(&twap_price));
