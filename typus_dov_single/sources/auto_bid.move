@@ -104,6 +104,16 @@ module typus_dov::auto_bid {
         transfer::public_share_object(strategy_pool);
     }
 
+    #[test_only]
+    public fun new_strategy_pool(scenario: &mut sui::test_scenario::Scenario) {
+        let strategy_pool = StrategyPoolV3 {
+            id: object::new(scenario.ctx()),
+            strategies: vec_map::empty(),
+            authority: vector[scenario.sender()],
+        };
+        transfer::public_share_object(strategy_pool);
+    }
+
     /// Event emitted when a new strategy pool is created.
     public struct NewStrategyPoolEvent has copy, drop {
         id: ID,

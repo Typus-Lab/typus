@@ -6,7 +6,7 @@ module typus_dov::test_environment {
     use sui::sui::SUI;
     use sui::test_scenario::{Scenario, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
     use typus_dov::typus_dov_single::{Self, Registry as DovRegistry};
-    use typus_dov::auto_bid::{Self, StrategyPoolV2};
+    use typus_dov::auto_bid::{Self, StrategyPoolV3};
     use typus_dov::babe::{Self, BABE};
     use typus_dov::babe2::{Self, BABE2};
     use typus_dov::scallop_tests;
@@ -119,9 +119,7 @@ module typus_dov::test_environment {
     }
 
     public(package) fun new_strategy_pool(scenario: &mut Scenario) {
-        let registry = dov_registry(scenario);
-        // auto_bid::new_strategy_pool(&registry, ctx(scenario));
-        return_shared(registry);
+        auto_bid::new_strategy_pool(scenario);
         next_tx(scenario, ADMIN);
     }
 
@@ -133,8 +131,12 @@ module typus_dov::test_environment {
         take_shared<DovRegistry>(scenario)
     }
 
-    public(package) fun strategy_pool_v2(scenario: &Scenario): StrategyPoolV2 {
-        take_shared<StrategyPoolV2>(scenario)
+    // public(package) fun strategy_pool_v2(scenario: &Scenario): StrategyPoolV2 {
+    //     take_shared<StrategyPoolV2>(scenario)
+    // }
+
+    public(package) fun strategy_pool_v3(scenario: &Scenario): StrategyPoolV3 {
+        take_shared<StrategyPoolV3>(scenario)
     }
 
     public(package) fun typus_user_registry(scenario: &Scenario): TypusUserRegistry {
@@ -534,13 +536,13 @@ module typus_dov::scallop_tests {
         let mut market = take_shared<Market>(scenario);
 
         // set-up incentive rewards
-        app::set_incentive_reward_factor<BABE>(
-            &adminCap,
-            &mut market,
-            1000,
-            1,
-            ctx(scenario)
-        );
+        // app::set_incentive_reward_factor<BABE>(
+        //     &adminCap,
+        //     &mut market,
+        //     1000,
+        //     1,
+        //     ctx(scenario)
+        // );
 
         app::update_borrow_fee<BABE>(
             &adminCap,

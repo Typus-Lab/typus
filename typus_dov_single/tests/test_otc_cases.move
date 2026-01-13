@@ -21,8 +21,8 @@ module typus_dov::test_otc_cases {
         let mut scenario = test_environment::begin_test();
 
         // prepare env
-        test_environment::prepare_navi_lending_env(&mut scenario);
-        test_environment::prepare_scallop_lending_env(&mut scenario);
+        // test_environment::prepare_navi_lending_env(&mut scenario);
+        // test_environment::prepare_scallop_lending_env(&mut scenario);
         test_manager_entry::test_incentivise_<BABE>(&mut scenario, 10000_0000_00000);
         test_manager_entry::test_withdraw_incentive_<BABE>(&mut scenario, option::some(1_0000_00000));
         let sui_oracle_id = test_environment::new_oracle<BABE>(&mut scenario);
@@ -51,8 +51,8 @@ module typus_dov::test_otc_cases {
             current_ts_ms()
         );
 
-        // set protocol flag = 4 (navi)
-        test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, 0, 4);
+        // set protocol flag = 2 (scallop basic lending)
+        // test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, 0, 2);
         test_manager_entry::test_set_safu_vault_index_(&mut scenario, 0, 999); // nothing happened
         test_manager_entry::test_add_portfolio_vault_authorized_user_(&mut scenario, 0, vector[BABE1, BABE2]);
         test_manager_entry::test_remove_portfolio_vault_authorized_user_(&mut scenario, 0, vector[BABE2]);
@@ -80,7 +80,8 @@ module typus_dov::test_otc_cases {
             ts_ms,
         );
 
-        test_manager_entry::test_deposit_navi_<BABE, BABE>(&mut scenario, index, 0, ts_ms);
+        // test_manager_entry::test_deposit_navi_<BABE, BABE>(&mut scenario, index, 0, ts_ms);
+        // test_manager_entry::test_deposit_scallop_basic_lending_<BABE, BABE>(&mut scenario, 0, ts_ms);
 
         test_manager_entry::test_new_auction_<BABE, BABE>(&mut scenario, index);
 

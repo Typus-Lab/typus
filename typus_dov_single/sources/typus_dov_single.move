@@ -5607,7 +5607,7 @@ module typus_dov::typus_dov_single {
         });
     }
 
-    /// Event emitted when a user deposits into a vault.
+    #[deprecated]
     public struct DepositEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5617,24 +5617,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits a `DepositEvent`.
-    public(package) fun emit_deposit_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(DepositEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.deposit_token,
-            amount,
-            decimal: portfolio_vault.info.d_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector::empty(),
-        });
-    }
-
-    /// Event emitted when a user withdraws from a vault's warm-up period.
+    #[deprecated]
     public struct WithdrawEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5644,24 +5627,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits a `WithdrawEvent`.
-    public(package) fun emit_withdraw_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(WithdrawEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.deposit_token,
-            amount,
-            decimal: portfolio_vault.info.d_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector::empty(),
-        });
-    }
-
-    /// Event emitted when a user unsubscribes from a vault's active period.
+    #[deprecated]
     public struct UnsubscribeEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5671,24 +5637,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits an `UnsubscribeEvent`.
-    public(package) fun emit_unsubscribe_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(UnsubscribeEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.deposit_token,
-            amount,
-            decimal: portfolio_vault.info.d_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector::empty(),
-        });
-    }
-
-    /// Event emitted when a user claims their settled funds.
+    #[deprecated]
     public struct ClaimEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5698,24 +5647,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits a `ClaimEvent`.
-    public(package) fun emit_claim_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(ClaimEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.deposit_token,
-            amount,
-            decimal: portfolio_vault.info.d_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector::empty(),
-        });
-    }
-
-    /// Event emitted when a user harvests earned premiums.
+    #[deprecated]
     public struct HarvestEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5726,27 +5658,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits a `HarvestEvent`.
-    public(package) fun emit_harvest_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        fee_amount: u64,
-        fee_share_amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(HarvestEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.bid_token,
-            amount,
-            fee_amount,
-            decimal: portfolio_vault.info.b_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector[fee_share_amount],
-        });
-    }
-
-    /// Event emitted when a user compounds their earned premiums back into the vault.
+    #[deprecated]
     public struct CompoundEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5756,26 +5668,7 @@ module typus_dov::typus_dov_single {
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
     }
-    /// Emits a `CompoundEvent`.
-    public(package) fun emit_compound_event(
-        portfolio_vault: &PortfolioVault,
-        amount: u64,
-        fee_amount: u64,
-        fee_share_amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(CompoundEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token: portfolio_vault.info.bid_token,
-            amount,
-            decimal: portfolio_vault.info.d_token_decimal,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector[fee_amount, fee_share_amount],
-        });
-    }
-
-    /// Event emitted when a user redeems earned incentives.
+    #[deprecated]
     public struct RedeemEvent has copy, drop {
         signer: address,
         index: u64,
@@ -5783,24 +5676,6 @@ module typus_dov::typus_dov_single {
         amount: u64,
         oracle_info: OracleInfo,
         u64_padding: vector<u64>,
-    }
-    /// Emits a `RedeemEvent`.
-    public(package) fun emit_redeem_event(
-        portfolio_vault: &PortfolioVault,
-        token: TypeName,
-        amount: u64,
-        fee_amount: u64,
-        fee_share_amount: u64,
-        ctx: &TxContext,
-    ) {
-        emit(RedeemEvent {
-            signer: tx_context::sender(ctx),
-            index: portfolio_vault.info.index,
-            token,
-            amount,
-            oracle_info: portfolio_vault.info.oracle_info,
-            u64_padding: vector[fee_amount, fee_share_amount],
-        });
     }
 
     /// Event emitted when a new bid is placed in an auction.
