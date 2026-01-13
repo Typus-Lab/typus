@@ -8,7 +8,6 @@ module typus_stake_pool::stake_pool {
     use sui::coin::{Self, Coin};
     use sui::dynamic_field;
     use sui::dynamic_object_field;
-    use sui::vec_map::{Self, VecMap};
     use sui::event::emit;
 
     use typus_stake_pool::admin::{Self, Version};
@@ -40,6 +39,7 @@ module typus_stake_pool::stake_pool {
     const E_STAKE_POOL_ALREADY_ACTIVE: u64 = 13;
     const E_STAKE_POOL_ALREADY_INACTIVE: u64 = 14;
     const E_PENDING_REWARD_EXISTED: u64 = 15;
+    const E_INCENTIVE_PROGRAMS_MISMATCHED: u64 = 16;
 
     /// A registry for all stake pools.
     public struct StakePoolRegistry has key {
@@ -139,8 +139,8 @@ module typus_stake_pool::stake_pool {
         active_shares: u64,
         /// A vector of deactivating shares.
         deactivating_shares: vector<DeactivatingShares>,
-        /// The last incentive price index.
-        last_incentive_price_index: VecMap<TypeName, u64>,
+        /// The last incentive price index (aligned with StakePool.incentives by index).
+        last_incentive_price_index: vector<u64>,
         /// The last snapshot ts for exp.
         snapshot_ts_ms: u64,
         /// old tlp price  for exp with decimal 4
@@ -159,8 +159,8 @@ module typus_stake_pool::stake_pool {
         unsubscribed_ts_ms: u64,
         /// The timestamp when the shares can be unlocked.
         unlocked_ts_ms: u64,
-        /// The unsubscribed incentive price index.
-        unsubscribed_incentive_price_index: VecMap<TypeName, u64>, // the share can only receive incentive until this index
+        /// The unsubscribed incentive price index (aligned with StakePool.incentives by index).
+        unsubscribed_incentive_price_index: vector<u64>, // the share can only receive incentive until this index
         /// Padding for future use.
         u64_padding: vector<u64>,
     }
@@ -270,6 +270,10 @@ module typus_stake_pool::stake_pool {
         let incentive = get_incentive(stake_pool, &incentive_token);
         let current_incentive_index = incentive.info.incentive_price_index;
 
+        // Get incentive index before borrowing user_shares mutably
+        let incentive_idx_opt = get_incentive_idx(stake_pool, &incentive_token);
+        let incentive_idx = incentive_idx_opt.destroy_some();
+
         let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
         let total_users = user_shares.length();
 
@@ -277,8 +281,8 @@ module typus_stake_pool::stake_pool {
         let mut compound_users = 0;
 
         user_shares.do_mut!(|_user: address, lp_user_share: &mut LpUserShare| {
-            let (incentive_value, _) = calculate_incentive(current_incentive_index, &incentive_token, lp_user_share);
-            lp_user_share.update_last_incentive_price_index(incentive_token, current_incentive_index);
+            let (incentive_value, _) = calculate_incentive_by_idx(current_incentive_index, incentive_idx, lp_user_share);
+            update_last_incentive_price_index_by_idx(lp_user_share, incentive_idx, current_incentive_index);
             // accumulate incentive_value
             lp_user_share.log_harvested_amount(incentive_value);
 
@@ -368,6 +372,20 @@ module typus_stake_pool::stake_pool {
             u64_padding: vector::empty()
         });
         dynamic_field::add(&mut stake_pool.id, incentive_token, balance::zero<I_TOKEN>());
+
+        let incentive_idx = stake_pool.incentives.length() - 1;
+        let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
+        user_shares.do_mut!(|_user: address, lp_user_share: &mut LpUserShare| {
+            while (lp_user_share.last_incentive_price_index.length() <= incentive_idx) {
+                lp_user_share.last_incentive_price_index.push_back(0);
+            };
+            // accumulate incentive_value
+            lp_user_share.deactivating_shares.do_mut!(|deactivating_share: &mut DeactivatingShares| {
+                while (deactivating_share.unsubscribed_incentive_price_index.length() <= incentive_idx) {
+                    deactivating_share.unsubscribed_incentive_price_index.push_back(0);
+                };
+            });
+        });
     }
 
     /// An event that is emitted when a stake pool is activated.
@@ -518,6 +536,11 @@ module typus_stake_pool::stake_pool {
         let incentive_tokens = get_incentive_tokens(stake_pool);
         assert!(vector::contains(&incentive_tokens, &incentive_token), E_INCENTIVE_TOKEN_NOT_EXISTED);
 
+        // Get the index of the incentive BEFORE removing it
+        let incentive_idx_opt = get_incentive_idx(stake_pool, &incentive_token);
+        assert!(incentive_idx_opt.is_some(), E_INCENTIVE_TOKEN_NOT_EXISTED);
+        let incentive_idx = incentive_idx_opt.destroy_some();
+
         let incentive = remove_incentive(stake_pool, &incentive_token);
 
         let Incentive {
@@ -527,16 +550,18 @@ module typus_stake_pool::stake_pool {
         } = incentive;
 
         let incentive_balance: Balance<I_TOKEN> = dynamic_field::remove(&mut stake_pool.id, incentive_token);
-        assert!(info.unallocated_amount == incentive_balance.value(), E_PENDING_REWARD_EXISTED);
 
         let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
         user_shares.do_mut!<address, LpUserShare>(|_user_address, user_share| {
-            if (user_share.last_incentive_price_index.contains(&incentive_token)) {
-                user_share.last_incentive_price_index.remove(&incentive_token);
+            // Remove the element at incentive_idx if it exists
+            if (incentive_idx < user_share.last_incentive_price_index.length()) {
+                assert!(user_share.last_incentive_price_index[incentive_idx] == info.incentive_price_index, E_PENDING_REWARD_EXISTED);
+                vector::remove(&mut user_share.last_incentive_price_index, incentive_idx);
             };
+            // Also remove from all deactivating shares
             user_share.deactivating_shares.do_mut!(|deactivating_shares| {
-                if (deactivating_shares.unsubscribed_incentive_price_index.contains(&incentive_token)) {
-                    deactivating_shares.unsubscribed_incentive_price_index.remove(&incentive_token);
+                if (incentive_idx < vector::length(&deactivating_shares.unsubscribed_incentive_price_index)) {
+                    vector::remove(&mut deactivating_shares.unsubscribed_incentive_price_index, incentive_idx);
                 };
             });
         });
@@ -778,7 +803,7 @@ module typus_stake_pool::stake_pool {
         stake_amount: u64,
         user_share_id: u64,
         stake_ts_ms: u64,
-        last_incentive_price_index: VecMap<TypeName, u64>,
+        last_incentive_price_index: vector<u64>,
         u64_padding: vector<u64>
     }
 
@@ -1137,15 +1162,6 @@ module typus_stake_pool::stake_pool {
         u64_padding: vector<u64>
     }
 
-    fun update_last_incentive_price_index(lp_user_share: &mut LpUserShare, incentive_token: TypeName, current_incentive_index: u64) {
-        if (vec_map::contains(&lp_user_share.last_incentive_price_index, &incentive_token)) {
-            let last_incentive_price_index = vec_map::get_mut(&mut lp_user_share.last_incentive_price_index, &incentive_token);
-            *last_incentive_price_index = current_incentive_index;
-        } else {
-            vec_map::insert(&mut lp_user_share.last_incentive_price_index, incentive_token, current_incentive_index);
-        };
-    }
-
     fun log_harvested_amount(user_share: &mut LpUserShare, incentive_value: u64) {
         user_share.harvested_amount = user_share.harvested_amount + incentive_value;
     }
@@ -1172,14 +1188,18 @@ module typus_stake_pool::stake_pool {
         let incentive = get_incentive(stake_pool, &incentive_token);
         let current_incentive_index = incentive.info.incentive_price_index;
 
+        // Get incentive index before borrowing user_shares mutably
+        let incentive_idx_opt = get_incentive_idx(stake_pool, &incentive_token);
+        let incentive_idx = incentive_idx_opt.destroy_some();
+
         let user = tx_context::sender(ctx);
         let user_shares = dynamic_field::borrow_mut<String, KeyedBigVector>(&mut stake_pool.id, string::utf8(K_LP_USER_SHARES));
         let lp_user_share = user_shares.borrow_by_key_mut<address, LpUserShare>(user);
         let user_share_id = lp_user_share.user_share_id;
 
-        let (incentive_value, current_incentive_index) = calculate_incentive(current_incentive_index, &incentive_token, lp_user_share);
+        let (incentive_value, current_incentive_index) = calculate_incentive_by_idx(current_incentive_index, incentive_idx, lp_user_share);
 
-        lp_user_share.update_last_incentive_price_index(incentive_token, current_incentive_index);
+        update_last_incentive_price_index_by_idx(lp_user_share, incentive_idx, current_incentive_index);
 
         // accumulate incentive_value
         lp_user_share.log_harvested_amount(incentive_value);
@@ -1201,20 +1221,13 @@ module typus_stake_pool::stake_pool {
     }
 
     // ======= Inner Functions =======
-    fun calculate_incentive(
+    fun calculate_incentive_by_idx(
         current_incentive_index: u64,
-        incentive_token: &TypeName,
+        incentive_idx: u64,
         lp_user_share: &LpUserShare,
     ): (u64, u64) {
-        let lp_last_incentive_price_index = if (
-            vec_map::contains(&lp_user_share.last_incentive_price_index, incentive_token)
-        ) {
-            *vec_map::get(&lp_user_share.last_incentive_price_index, incentive_token)
-        } else {
-            // not in lp_user_share.last_incentive_price_index
-            // => new incentive token set after staking / harvesting => new index should be always start from 0
-            0
-        };
+        assert!(incentive_idx < lp_user_share.last_incentive_price_index.length(), E_INCENTIVE_PROGRAMS_MISMATCHED);
+        let lp_last_incentive_price_index = *vector::borrow(&lp_user_share.last_incentive_price_index, incentive_idx);
 
         let mut incentive_value = 0;
 
@@ -1232,39 +1245,48 @@ module typus_stake_pool::stake_pool {
             // unsubscribed_incentive_price_index was initially set when unsubscribing
             // incentive_token not existed in unsubscribed_incentive_price_index => pool incentive_token set after unlocking
             // => deactivating_shares has no right to attend to this incentive token
-            if (deactivating_shares.unsubscribed_incentive_price_index.contains(incentive_token)) {
-                let unsubscribed_incentive_price_index
-                    = *deactivating_shares.unsubscribed_incentive_price_index.get(incentive_token);
-                // if lp_last_incentive_price_index >= unsubscribed_incentive_price_index
-                // => no more incentive for this deactivating share
-                let d_incentive_index = if (unsubscribed_incentive_price_index > lp_last_incentive_price_index) {
-                    unsubscribed_incentive_price_index - lp_last_incentive_price_index
-                } else { 0 };
-                incentive_value = incentive_value + ((deactivating_shares.shares as u128)
-                                    * (d_incentive_index as u128)
-                                        / (multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128) as u64);
-            };
+            assert!(incentive_idx < deactivating_shares.unsubscribed_incentive_price_index.length(), E_INCENTIVE_PROGRAMS_MISMATCHED);
+
+            let unsubscribed_incentive_price_index
+                = *vector::borrow(&deactivating_shares.unsubscribed_incentive_price_index, incentive_idx);
+            // if lp_last_incentive_price_index >= unsubscribed_incentive_price_index
+            // => no more incentive for this deactivating share
+            let d_incentive_index = if (unsubscribed_incentive_price_index > lp_last_incentive_price_index) {
+                unsubscribed_incentive_price_index - lp_last_incentive_price_index
+            } else { 0 };
+            incentive_value = incentive_value + ((deactivating_shares.shares as u128)
+                                * (d_incentive_index as u128)
+                                    / (multiplier(C_INCENTIVE_INDEX_DECIMAL) as u128) as u64);
+
             i = i + 1;
         };
 
         (incentive_value, current_incentive_index)
     }
 
+    fun update_last_incentive_price_index_by_idx(lp_user_share: &mut LpUserShare, incentive_idx: u64, current_incentive_index: u64) {
+        *vector::borrow_mut(&mut lp_user_share.last_incentive_price_index, incentive_idx) = current_incentive_index;
+    }
+
     // harvest transactions to all incentive tokens should be appended before unstaking
-    fun harvest_progress_updated(current: VecMap<TypeName, u64>, user: VecMap<TypeName, u64>): bool {
-        let mut updated = true;
-        let (mut incentive_tokens, mut current_incentive_price_indexs) = current.into_keys_values();
-        while (incentive_tokens.length() > 0) {
-            let incentive_token = incentive_tokens.pop_back();
-            let current_incentive_price_index = current_incentive_price_indexs.pop_back();
-            if (vec_map::contains(&user, &incentive_token)) {
-                let last_incentive_price_index = vec_map::get(&user, &incentive_token);
-                if (*last_incentive_price_index != current_incentive_price_index) { updated = false };
-            } else {
+    fun harvest_progress_updated(current: vector<u64>, user: vector<u64>): bool {
+        let current_len = vector::length(&current);
+        let user_len = vector::length(&user);
+
+        // User must have as many indices as current pool incentives (length match)
+        if (user_len != current_len) {
+            return false
+        };
+
+        // Check each incentive index matches
+        let mut i = 0;
+        while (i < current_len) {
+            if (*vector::borrow(&current, i) != *vector::borrow(&user, i)) {
                 return false
             };
+            i = i + 1;
         };
-        updated
+        true
     }
 
     fun multiplier(decimal: u64): u64 {
@@ -1294,12 +1316,16 @@ module typus_stake_pool::stake_pool {
         let user_share: & LpUserShare = all_lp_user_shares.borrow_by_key(user);
         let incentive_tokens = get_incentive_tokens(stake_pool);
 
-        let mut incentive_values = vector::empty();
+        let mut incentive_values = vector::empty<u64>();
         incentive_tokens.do_ref!(|incentive_token| {
             let incentive = get_incentive(stake_pool, incentive_token);
             let current_incentive_index = incentive.info.incentive_price_index;
-            let (incentive_value, _) = calculate_incentive(current_incentive_index, incentive_token, user_share);
-            incentive_values.push_back(incentive_value);
+            let incentive_idx_opt = get_incentive_idx(stake_pool, incentive_token);
+            if (incentive_idx_opt.is_some()) {
+                let incentive_idx = incentive_idx_opt.destroy_some();
+                let (incentive_value, _) = calculate_incentive_by_idx(current_incentive_index, incentive_idx, user_share);
+                incentive_values.push_back(incentive_value);
+            };
         });
         let mut data = bcs::to_bytes(user_share);
         data.append(bcs::to_bytes(&incentive_values));
@@ -1319,12 +1345,16 @@ module typus_stake_pool::stake_pool {
         all_lp_user_shares.do_ref!<address, LpUserShare>(|_user, user_share| {
             if (user_share.user_share_id == user_share_id) {
                 let incentive_tokens = get_incentive_tokens(stake_pool);
-                let mut incentive_values = vector::empty();
+                let mut incentive_values = vector::empty<u64>();
                 incentive_tokens.do_ref!(|incentive_token| {
                     let incentive = get_incentive(stake_pool, incentive_token);
                     let current_incentive_index = incentive.info.incentive_price_index;
-                    let (incentive_value, _) = calculate_incentive(current_incentive_index, incentive_token, user_share);
-                    incentive_values.push_back(incentive_value);
+                    let incentive_idx_opt = get_incentive_idx(stake_pool, incentive_token);
+                    if (incentive_idx_opt.is_some()) {
+                        let incentive_idx = incentive_idx_opt.destroy_some();
+                        let (incentive_value, _) = calculate_incentive_by_idx(current_incentive_index, incentive_idx, user_share);
+                        incentive_values.push_back(incentive_value);
+                    };
                 });
                 let mut data = bcs::to_bytes(user_share);
                 data.append(bcs::to_bytes(&incentive_values));
@@ -1400,12 +1430,27 @@ module typus_stake_pool::stake_pool {
         abort E_INCENTIVE_TOKEN_NOT_EXISTED
     }
 
-    fun get_last_incentive_price_index(stake_pool: &StakePool): VecMap<TypeName, u64> {
-        let mut incentives = stake_pool.incentives;
-        let mut last_incentive_price_index = vec_map::empty();
-        while (vector::length(&incentives) > 0) {
-            let incentive = vector::pop_back(&mut incentives);
-            vec_map::insert(&mut last_incentive_price_index, incentive.token_type, incentive.info.incentive_price_index);
+    /// Get incentive index by token type, returns None if not found
+    fun get_incentive_idx(stake_pool: &StakePool, token_type: &TypeName): Option<u64> {
+        let mut i = 0;
+        let length = vector::length(&stake_pool.incentives);
+        while (i < length) {
+            if (vector::borrow(&stake_pool.incentives, i).token_type == *token_type) {
+                return option::some(i)
+            };
+            i = i + 1;
+        };
+        option::none()
+    }
+
+    fun get_last_incentive_price_index(stake_pool: &StakePool): vector<u64> {
+        let mut i = 0;
+        let length = vector::length(&stake_pool.incentives);
+        let mut last_incentive_price_index = vector::empty();
+        while (i < length) {
+            let incentive = vector::borrow(&stake_pool.incentives, i);
+            vector::push_back(&mut last_incentive_price_index, incentive.info.incentive_price_index);
+            i = i + 1;
         };
         last_incentive_price_index
     }
