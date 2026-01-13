@@ -656,7 +656,7 @@ module typus_perp::position {
             realized_fee_in_usd,
             realized_amount,
             realized_amount_sign: is_profit,
-            u64_padding: vector::empty()
+            u64_padding: vector[if (is_long) { 1 } else { 0 }] // order.is_long
         });
 
         (
@@ -1699,7 +1699,7 @@ module typus_perp::position {
             realized_fee_in_usd,
             realized_amount,
             realized_amount_sign: is_profit,
-            u64_padding: vector::empty()
+            u64_padding: vector[if (is_long) { 1 } else { 0 }] // order.is_long
         });
 
         object::delete(id);

@@ -7,10 +7,8 @@ module typus_perp::competition {
     use typus::ecosystem::Version as TypusEcosystemVersion;
     use typus::leaderboard::TypusLeaderboardRegistry;
     use typus_perp::admin::{Self, Version};
-    #[test_only]
     use typus_perp::error;
 
-    #[allow(unused_field)]
     public struct CompetitionConfig has key {
         id: UID,
         /// The boost in basis points for each staking level.
@@ -24,7 +22,6 @@ module typus_perp::competition {
     }
 
     // Due to the package size, we changed it to a test_only function
-    #[test_only]
     entry fun new_competition_config(
         version: &Version,
         boost_bp: vector<u64>,
@@ -44,18 +41,18 @@ module typus_perp::competition {
         transfer::share_object(competition_config);
     }
 
-    // entry fun set_boost_bp(
-    //     version: &Version,
-    //     competition_config: &mut CompetitionConfig,
-    //     boost_bp: vector<u64>,
-    //     ctx: &TxContext
-    // ) {
-    //     // safety check
-    //     version.verify(ctx);
-    //     assert!(boost_bp.length() == 8, error::invalid_boost_bp_array_length());
-    //     assert!(competition_config.is_active, error::invalid_boost_bp_array_length());
-    //     competition_config.boost_bp = boost_bp;
-    // }
+    entry fun set_boost_bp(
+        version: &Version,
+        competition_config: &mut CompetitionConfig,
+        boost_bp: vector<u64>,
+        ctx: &TxContext
+    ) {
+        // safety check
+        version.verify(ctx);
+        assert!(boost_bp.length() == 8, error::invalid_boost_bp_array_length());
+        assert!(competition_config.is_active, error::invalid_boost_bp_array_length());
+        competition_config.boost_bp = boost_bp;
+    }
 
     /// Adds a score to the competition leaderboard.
     /// WARNING: no authority check inside

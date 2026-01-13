@@ -12,7 +12,6 @@ module typus_perp::treasury_caps {
     }
 
     // Due to the package size, we changed it to a test_only function
-    #[test_only]
     fun init(ctx: &mut TxContext) {
         transfer::share_object(TreasuryCaps {
             id: object::new(ctx)

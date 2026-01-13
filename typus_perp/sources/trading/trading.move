@@ -4155,7 +4155,7 @@ module typus_perp::trading {
         typus_oracle_trading_symbol: &Oracle,
         market_index: u64,
         pool_index: u64,
-        position_id: Option<u64>,
+        mut position_id: Option<u64>,
         ctx: &TxContext,
     ) {
         admin::version_check(version);
@@ -4168,6 +4168,7 @@ module typus_perp::trading {
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
         if (position_id.is_some()) {
+            let position_id = position_id.extract();
             let position: &Position = &symbol_market.user_positions[position_id];
             let user = tx_context::sender(ctx);
             check_position_user_matched(position, user);

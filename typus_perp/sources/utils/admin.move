@@ -33,7 +33,6 @@ module typus_perp::admin {
 
     // ======== Version ========
 
-    #[allow(unused_field)]
     /// A shared object that holds the version of the contract, fee pools, and the authority list.
     public struct Version has key {
         id: UID,
@@ -62,8 +61,6 @@ module typus_perp::admin {
     }
 
     // ======== Init ========
-    // Due to the package size, we changed it to a test_only function
-    #[test_only]
     fun init(ctx: &mut TxContext) {
         transfer::share_object(Version {
             id: object::new(ctx),
@@ -103,39 +100,36 @@ module typus_perp::admin {
     }
 
     // /// [Authorized Function] Adds an authorized user.
-    // entry fun add_authorized_user(
-    //     version: &mut Version,
-    //     user_address: address,
-    //     ctx: &TxContext,
-    // ) {
-    //     verify(version, ctx);
-    //     assert!(!vec_set::contains(&version.authority, &user_address), error::authority_already_existed());
-    //     vec_set::insert(&mut version.authority, user_address);
-    // }
+    entry fun add_authorized_user(
+        version: &mut Version,
+        user_address: address,
+        ctx: &TxContext,
+    ) {
+        verify(version, ctx);
+        assert!(!vec_set::contains(&version.authority, &user_address), error::authority_already_existed());
+        vec_set::insert(&mut version.authority, user_address);
+    }
 
     // /// [Authorized Function] Removes an authorized user.
-    // entry fun remove_authorized_user(
-    //     version: &mut Version,
-    //     user_address: address,
-    //     ctx: &TxContext,
-    // ) {
-    //     verify(version, ctx);
+    entry fun remove_authorized_user(
+        version: &mut Version,
+        user_address: address,
+        ctx: &TxContext,
+    ) {
+        verify(version, ctx);
 
-    //     assert!(vec_set::contains(&version.authority, &user_address), error::authority_doest_not_exist());
-    //     vec_set::remove(&mut version.authority, &user_address);
-    //     assert!(vec_set::length(&version.authority) > 0, error::authority_empty());
-    // }
+        assert!(vec_set::contains(&version.authority, &user_address), error::authority_doest_not_exist());
+        vec_set::remove(&mut version.authority, &user_address);
+        assert!(vec_set::length(&version.authority) > 0, error::authority_empty());
+    }
 
     // ======== Tails Exp & Leaderboard ========
-    #[test_only]
     use typus::ecosystem;
     use typus::ecosystem::{Version as TypusEcosystemVersion};
     use typus::leaderboard::{Self, TypusLeaderboardRegistry};
     use typus::user::{Self, TypusUserRegistry};
 
 
-    #[test_only]
-    /// Due to the package size, we changed it to a test_only function
     /// [Authorized Function] Installs the ecosystem manager cap.
     /// TODO: can be remove after install
     entry fun install_ecosystem_manager_cap_entry(
