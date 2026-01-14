@@ -388,7 +388,7 @@ module typus_perp::position {
             if (unrealized_trading_fee >= collateral_value) {
                 collateral_value
             } else {
-                unrealized_borrow_fee
+                unrealized_trading_fee
             }
         );
         emit(RemovePositionEvent {
@@ -1726,8 +1726,22 @@ module typus_perp::position {
         trading_fee_mbp: u64,
         maintenance_margin_rate_bp: u64,
         cumulative_borrow_rate: u64,
+        cumulative_funding_rate_index_sign: bool,
+        cumulative_funding_rate_index: u64,
         clock: &Clock
     ): bool {
+        let (unrealized_funding_sign, unrealized_funding_fee) = calculate_position_funding_rate(
+            position,
+            collateral_oracle_price,
+            collateral_oracle_price_decimal,
+            trading_pair_oracle_price,
+            trading_pair_oracle_price_decimal,
+            cumulative_funding_rate_index_sign,
+            cumulative_funding_rate_index,
+        );
+        let unrealized_funding_fee_usd
+            = amount_to_usd(unrealized_funding_fee, position.collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
+
         let collateral_amount = {
             let receipts = dynamic_field::borrow<String, vector<TypusBidReceipt>>(&position.id, string::utf8(K_COLLATERAL));
             let collateral_amount = calculate_intrinsic_value<C_TOKEN>(dov_registry, typus_oracle_trading_symbol, typus_oracle_c_token, receipts, clock);
@@ -1766,12 +1780,28 @@ module typus_perp::position {
 
         let maintenance_margin = ((maintenance_margin_rate_bp as u128) * (reserve_usd as u128) / 10000 as u64);
 
-        if (!has_profit) {
-            let remaining_collateral_usd = if (collateral_usd > pnl_usd + unrealized_cost_in_usd) {
-                collateral_usd - pnl_usd - unrealized_cost_in_usd
-            } else { 0 };
-            remaining_collateral_usd <= maintenance_margin
-        } else { false }
+        let remaining_collateral_usd = if (unrealized_funding_sign) {
+            if (has_profit) {
+                if (collateral_usd + pnl_usd > unrealized_cost_in_usd + unrealized_funding_fee_usd) {
+                    collateral_usd + pnl_usd - unrealized_cost_in_usd - unrealized_funding_fee_usd
+                } else { 0 }
+            } else {
+                if (collateral_usd > pnl_usd + unrealized_cost_in_usd + unrealized_funding_fee_usd) {
+                    collateral_usd - pnl_usd - unrealized_cost_in_usd - unrealized_funding_fee_usd
+                } else { 0 }
+            }
+        } else {
+            if (has_profit) {
+                if (collateral_usd + unrealized_funding_fee_usd + pnl_usd > unrealized_cost_in_usd) {
+                    collateral_usd + unrealized_funding_fee_usd + pnl_usd - unrealized_cost_in_usd
+                } else { 0 }
+            } else {
+                if (collateral_usd + unrealized_funding_fee_usd > pnl_usd + unrealized_cost_in_usd) {
+                    collateral_usd + unrealized_funding_fee_usd - pnl_usd - unrealized_cost_in_usd
+                } else { 0 }
+            }
+        };
+        remaining_collateral_usd <= maintenance_margin
     }
 
     /// Adds linked order info to a position.

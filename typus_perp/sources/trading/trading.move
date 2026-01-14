@@ -786,7 +786,7 @@ module typus_perp::trading {
             let leverage_mbp = ((order_size_usd as u128) * 10000000 / (collateral_usd as u128) as u64);
             assert!(symbol_market.market_config.max_leverage_mbp >= leverage_mbp, error::exceed_max_leverage());
             leverage_mbp
-        } else { 100 };
+        } else { 10000000 };
         assert!(
             if (reduce_only && linked_position_id.is_some()) {
                 size % symbol_market.market_config.lot_size == 0
@@ -2562,6 +2562,8 @@ module typus_perp::trading {
                             trading_fee_mbp,
                             math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAINTENANCE_MARGIN_RATE_BP),
                             cumulative_borrow_rate,
+                            symbol_market.market_info.cumulative_funding_rate_index_sign,
+                            symbol_market.market_info.cumulative_funding_rate_index,
                             clock
                         )
                     } else {
@@ -2708,6 +2710,8 @@ module typus_perp::trading {
                 trading_fee_mbp,
                 math::get_u64_vector_value(&symbol_market.market_config.u64_padding, I_OPTION_COLLATERAL_MAINTENANCE_MARGIN_RATE_BP),
                 cumulative_borrow_rate,
+                symbol_market.market_info.cumulative_funding_rate_index_sign,
+                symbol_market.market_info.cumulative_funding_rate_index,
                 clock
             )
         } else {
