@@ -937,7 +937,7 @@ module typus_perp::lp_pool {
                 let utility_bp = if (token_pool.state.liquidity_amount == 0) {
                     0
                 } else {
-                    (10000 * (token_pool.state.reserved_amount as u128)
+                    ((math::get_bp_scale() as u128) * (token_pool.state.reserved_amount as u128)
                         / (token_pool.state.liquidity_amount as u128) as u64)
                 };
                 let borrow_rate = if (utility_bp < config.margin_config.utilization_threshold_bp_0) {
@@ -956,7 +956,7 @@ module typus_perp::lp_pool {
                         + config.margin_config.basic_borrow_rate_1
                         + ((config.margin_config.basic_borrow_rate_2 as u128)
                             * ((utility_bp - config.margin_config.utilization_threshold_bp_1) as u128)
-                            / ((10000 - config.margin_config.utilization_threshold_bp_1) as u128) as u64)
+                            / ((math::get_bp_scale() - config.margin_config.utilization_threshold_bp_1) as u128) as u64)
                 };
                 token_pool.state.previous_last_borrow_rate_ts_ms = previous_borrow_ts_ms;
                 token_pool.state.previous_cumulative_borrow_rate = previous_cumulative_borrow_rate;
@@ -1095,7 +1095,7 @@ module typus_perp::lp_pool {
             let mut from_balance = from_coin.into_balance();
             let protocol_fee_balance = from_balance.split(((fee_amount as u128)
                                         * (swap_fee_protocol_share_bp as u128)
-                                            / 10000 as u64));
+                                            / (math::get_bp_scale() as u128) as u64));
             let from_balance_value_after_fee = from_balance.value();
             admin::charge_fee(version, protocol_fee_balance);
             balance::join(dynamic_field::borrow_mut(&mut liquidity_pool.id, f_token_type), from_balance);
@@ -2088,8 +2088,9 @@ module typus_perp::lp_pool {
             assert!(token_type_b == type_name::with_defining_ids<B_TOKEN>(), error::rebalance_process_field_mismatched());
             assert!(token_decimal_b == liquidity_token_decimal_b, error::rebalance_process_field_mismatched());
             assert!(oracle_price_b == price_token_b_to_usd, error::rebalance_process_field_mismatched());
+            let bp_scale = math::get_bp_scale();
             assert!(
-                ((swapped_back_usd as u128) * ((10000 + rebalance_cost_threshold_bp) as u128) / 10000 as u64) >= reduced_usd,
+                ((swapped_back_usd as u128) * ((bp_scale + rebalance_cost_threshold_bp) as u128) / (bp_scale as u128) as u64) >= reduced_usd,
                 error::exceed_rebalance_cost_threshold()
             );
 
@@ -2462,7 +2463,7 @@ module typus_perp::lp_pool {
         let target_amount_to_usd = if (liquidity_pool.pool_info.tvl_usd > 0) {
             ((liquidity_pool.pool_info.tvl_usd as u128)
                 * (spot_config.target_weight_bp as u128)
-                    / 10000 as u64)
+                    / (math::get_bp_scale() as u128) as u64)
         } else {
             0
         };
@@ -2521,10 +2522,10 @@ module typus_perp::lp_pool {
 
         let fee = ((deposit_amount as u128)
             * (overall_fee_bp as u128)
-                / 10000 as u64);
+                / (math::get_bp_scale() as u128) as u64);
         let fee_usd = ((deposit_amount_usd as u128)
             * (overall_fee_bp as u128)
-                / 10000 as u64);
+                / (math::get_bp_scale() as u128) as u64);
 
         (fee, fee_usd)
     }
@@ -2568,7 +2569,7 @@ module typus_perp::lp_pool {
 
         let target_amount_to_usd = ((liquidity_pool.pool_info.tvl_usd as u128)
             * (spot_config.target_weight_bp as u128)
-            / 10000 as u64);
+            / (math::get_bp_scale() as u128) as u64);
 
         let original_usd_diff = if (target_amount_to_usd > value_in_usd) {
             target_amount_to_usd - value_in_usd
@@ -2619,10 +2620,10 @@ module typus_perp::lp_pool {
 
         let fee = ((amount as u128)
             * (overall_fee_bp as u128)
-                / 10000 as u64);
+                / (math::get_bp_scale() as u128) as u64);
         let fee_usd = ((amount_usd as u128)
             * (overall_fee_bp as u128)
-                / 10000 as u64);
+                / (math::get_bp_scale() as u128) as u64);
 
         (fee, fee_usd)
     }
@@ -2736,7 +2737,7 @@ module typus_perp::lp_pool {
             let current_lending_amount = math::get_u64_vector_value(&token_pool.state.current_lending_amount, I_LENDING_SCALLOP_BASIC);
             let d_lending_amount = ((current_lending_amount as u128) * (withdraw_amount as u128) / (original_value as u128) as u64);
             let profit = if (balance.value() >= d_lending_amount) { balance.value() - d_lending_amount } else { 0 };
-            let protocol_share = ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / 10000 as u64);
+            let protocol_share = ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / (math::get_bp_scale() as u128) as u64);
             (d_lending_amount, profit, protocol_share)
         };
 
@@ -2865,7 +2866,7 @@ module typus_perp::lp_pool {
             let current_lending_amount = math::get_u64_vector_value(&token_pool.state.current_lending_amount, I_LENDING_NAVI);
             let d_lending_amount = current_lending_amount - 0; // withdraw all
             let profit = if (balance.value() >= d_lending_amount) { balance.value() - d_lending_amount } else { 0 };
-            let protocol_share = ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / 10000 as u64);
+            let protocol_share = ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / (math::get_bp_scale() as u128) as u64);
             (d_lending_amount, profit, protocol_share)
         };
         version.charge_fee(balance.split(protocol_share));
@@ -2914,7 +2915,7 @@ module typus_perp::lp_pool {
             let profit = reward_balance.value();
             let protocol_share = {
                 let token_pool = get_token_pool(liquidity_pool, &reward_token_type);
-                ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / 10000 as u64)
+                ((profit as u128) * (token_pool.config.spot_config.lending_protocol_share_bp as u128) / (math::get_bp_scale() as u128) as u64)
             };
             let balance_for_lp_pool = reward_balance.split(profit - protocol_share);
             dynamic_field::borrow_mut<TypeName, Balance<R_TOKEN>>(&mut liquidity_pool.id, reward_token_type).join(balance_for_lp_pool);
@@ -3400,7 +3401,7 @@ module typus_perp::lp_pool {
         let token_pool = get_token_pool(liquidity_pool, &liquidity_token);
         let max_single_order_reserve_amount = ((token_pool.state.liquidity_amount as u128)
             * (token_pool.config.margin_config.max_order_reserve_ratio_bp as u128)
-                / 10000 as u64);
+                / (math::get_bp_scale() as u128) as u64);
         max_single_order_reserve_amount >= reserve_amount
     }
 

@@ -8,6 +8,7 @@ module typus_perp::competition {
     use typus::leaderboard::TypusLeaderboardRegistry;
     use typus_perp::admin::{Self, Version};
     use typus_perp::error;
+    use typus_perp::math;
 
     public struct CompetitionConfig has key {
         id: UID,
@@ -76,7 +77,7 @@ module typus_perp::competition {
             0
         };
 
-        let score = ((volume_usd as u128) * (boost_bp as u128) / 10000 as u64);
+        let score = ((volume_usd as u128) * (boost_bp as u128) / (math::get_bp_scale() as u128) as u64);
         if (score > 0) {
             admin::add_competition_leaderboard(
                 version,

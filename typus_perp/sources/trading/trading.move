@@ -783,10 +783,10 @@ module typus_perp::trading {
             trading_pair_oracle_price_decimal
         );
         let leverage_mbp = if (collateral_usd > 0) {
-            let leverage_mbp = ((order_size_usd as u128) * 10000000 / (collateral_usd as u128) as u64);
+            let leverage_mbp = ((order_size_usd as u128) * (math::get_mbp_scale() as u128) / (collateral_usd as u128) as u64);
             assert!(symbol_market.market_config.max_leverage_mbp >= leverage_mbp, error::exceed_max_leverage());
             leverage_mbp
-        } else { 10000000 };
+        } else { math::get_mbp_scale() };
         assert!(
             if (reduce_only && linked_position_id.is_some()) {
                 size % symbol_market.market_config.lot_size == 0
@@ -1582,11 +1582,11 @@ module typus_perp::trading {
             size,
             get_trading_fee_config(&symbol_market.market_config, true),
         );
-        let trading_fee = ((notional_size_in_c_token as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
+        let trading_fee = ((notional_size_in_c_token as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
         assert!(
             notional_size_in_c_token
                 < ((collateral_amount - trading_fee as u128)
-                    * (symbol_market.market_config.option_collateral_max_leverage_mbp as u128) / 10000000 as u64),
+                    * (symbol_market.market_config.option_collateral_max_leverage_mbp as u128) / (math::get_mbp_scale() as u128) as u64),
             error::exceed_max_leverage()
         );
 
@@ -1603,7 +1603,7 @@ module typus_perp::trading {
             symbol,
             dov_index,
             deposit_token,
-            100,
+            math::get_mbp_scale(),
             false,
             is_long,
             false,
@@ -1851,7 +1851,7 @@ module typus_perp::trading {
             symbol,
             dov_index,
             collateral_token,
-            100,
+            math::get_mbp_scale(),
             true,   // is_reduce_only
             !position_is_long,
             false,
@@ -2195,7 +2195,7 @@ module typus_perp::trading {
         let symbol = symbol::create(base_token, market.quote_token_type);
         let user = position::get_position_user(mut_position);
         let mut order_size = ((position::get_position_size(mut_position) as u128)
-                            * (reduced_ratio_bp as u128) / 10000 as u64);
+                            * (reduced_ratio_bp as u128) / (math::get_bp_scale() as u128) as u64);
         order_size = order_size / symbol_market.market_config.lot_size * symbol_market.market_config.lot_size;
         let order_id = symbol_market.market_info.next_order_id;
         let order = position::manager_create_reduce_only_order<C_TOKEN>(
@@ -2743,7 +2743,7 @@ module typus_perp::trading {
                 trading_pair_oracle_price,
                 trading_pair_oracle_price_decimal
             );
-            let liquidator_fee_usd = ((position_notional_value_usd as u128) * (C_LIQUIDATOR_FEE_BP as u128) / 10000 as u64);
+            let liquidator_fee_usd = ((position_notional_value_usd as u128) * (C_LIQUIDATOR_FEE_BP as u128) / (math::get_bp_scale() as u128) as u64);
             let liquidator_fee = usd_to_amount(
                 liquidator_fee_usd,
                 position::get_position_collateral_token_decimal(&position),
@@ -3575,7 +3575,7 @@ module typus_perp::trading {
         let shared_balance = realized_fee_balance.split(
             ((realized_fee_value as u128)
                 * (protocol_fee_share_bp as u128)
-                    / 10000 as u64)
+                    / (math::get_bp_scale() as u128) as u64)
         );
         admin::charge_fee(version, shared_balance);
         realized_loss_balance.join(realized_fee_balance);
@@ -3721,7 +3721,7 @@ module typus_perp::trading {
                 user_remaining_value = user_remaining_value - fee_value;
 
                 // 3. split protocol share
-                let protocol_fee_value = ((fee_value as u128) * (protocol_fee_share_bp as u128) / 10000 as u64);
+                let protocol_fee_value = ((fee_value as u128) * (protocol_fee_share_bp as u128) / (math::get_bp_scale() as u128) as u64);
                 let protocol_fee_balance = exercise_balance.split(protocol_fee_value);
                 admin::charge_fee(version, protocol_fee_balance);
 
@@ -4657,14 +4657,14 @@ module typus_perp::trading {
                     trading_pair_oracle_price,
                     trading_pair_oracle_price_decimal
                 );
-                let allocated_exposure = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / 10000000 as u64);
+                let allocated_exposure = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
                 if (allocated_exposure > 0) {
                     let exposure_change_rate_mbp = ((exposure_change_usd as u128)
-                                                        * 10000000
+                                                        * (math::get_mbp_scale() as u128)
                                                             / (allocated_exposure as u128) as u64);
                     let fee_mbp = max_fee_mbp.min(
                         base_fee_mbp
-                            + (((max_fee_mbp - base_fee_mbp) as u128) * (exposure_change_rate_mbp as u128) / 10000000 as u64)
+                            + (((max_fee_mbp - base_fee_mbp) as u128) * (exposure_change_rate_mbp as u128) / (math::get_mbp_scale() as u128) as u64)
                     );
                     fee_mbp
                 } else {
@@ -4681,7 +4681,7 @@ module typus_perp::trading {
                 let curvature = trading_fee_config[I_CURVATURE];
                 let scale = trading_fee_config[I_SCALE];
 
-                let allocated_exposure_usd = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / 10000000 as u64);
+                let allocated_exposure_usd = ((tvl_usd as u128) * (allocated_exposure_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
                 let exposure_change = lp_new_size - lp_original_size;
                 let exposure_change_usd = amount_to_usd(
                     exposure_change,
@@ -4690,21 +4690,21 @@ module typus_perp::trading {
                     trading_pair_oracle_price_decimal
                 );
                 let mut exposure_change_rate_mbp = if (allocated_exposure_usd > 0) {
-                    (10000000 * (exposure_change_usd as u128) / (allocated_exposure_usd as u128) as u64)
+                    ((math::get_mbp_scale() as u128) * (exposure_change_usd as u128) / (allocated_exposure_usd as u128) as u64)
                 } else {
                     0
                 };
-                exposure_change_rate_mbp = (exposure_change_rate_mbp / scale).min(10000000);
+                exposure_change_rate_mbp = (exposure_change_rate_mbp / scale).min(math::get_mbp_scale());
                 // exposure_change_rate_mbp is always <= 10000000, so the pow computing will not overflow
                 let mut pow_result = exposure_change_rate_mbp;
                 let mut i = 1;
                 while (i < curvature) {
-                    pow_result = ((pow_result as u128) * (exposure_change_rate_mbp as u128) / 10000000 as u64);
+                    pow_result = ((pow_result as u128) * (exposure_change_rate_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
                     i = i + 1;
                 };
                 let fee_mbp = max_fee_mbp.min(
                         base_fee_mbp
-                            + (((max_fee_mbp - base_fee_mbp) as u128) * (pow_result as u128) / 10000000 as u64)
+                            + (((max_fee_mbp - base_fee_mbp) as u128) * (pow_result as u128) / (math::get_mbp_scale() as u128) as u64)
                 );
                 fee_mbp
             }

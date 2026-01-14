@@ -6,6 +6,8 @@ module typus_perp::math {
     const C_USD_DECIMAL: u64 = 9;
     /// The number of decimals for the funding rate.
     const C_FUNDING_RATE_DECIMAL: u64 = 9;
+    const C_MBP_SCALE: u64 = 1_000_0000;
+    const C_BP_SCALE: u64 = 1_0000;
 
     /// Sets a value in a `vector<u64>` at a specific index.
     /// It will extend the vector with zeros if the index is out of bounds.
@@ -62,6 +64,8 @@ module typus_perp::math {
     public(package) fun get_usd_decimal(): u64 { C_USD_DECIMAL }
     /// Returns the number of decimals for the funding rate.
     public(package) fun get_funding_rate_decimal(): u64 { C_FUNDING_RATE_DECIMAL }
+    public(package) fun get_mbp_scale(): u64 { C_MBP_SCALE }
+    public(package) fun get_bp_scale(): u64 { C_BP_SCALE }
 
     #[test]
     public(package) fun test_usd_to_amount() {

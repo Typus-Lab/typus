@@ -258,7 +258,7 @@ module typus_perp::position {
             collateral_token: type_name::with_defining_ids<C_TOKEN>(),
             collateral_token_decimal,
             symbol,
-            leverage_mbp: 10000000,
+            leverage_mbp: math::get_mbp_scale(), // 1x leverage
             reduce_only: true,
             is_long,
             is_stop_order: false,
@@ -704,7 +704,7 @@ module typus_perp::position {
         // share fee
         let shared_balance = fee.split(
             ((fee_value_to_realize as u128)
-                * (protocol_fee_share_bp as u128) / 10000 as u64)
+                * (protocol_fee_share_bp as u128) / (math::get_bp_scale() as u128) as u64)
         );
         admin::charge_fee(version, shared_balance);
 
@@ -985,7 +985,7 @@ module typus_perp::position {
             collateral_oracle_price,
             collateral_oracle_price_decimal
         );
-        let maintenance_margin = ((maintenance_margin_rate_bp as u128) * (reserve_usd as u128) / 10000 as u64);
+        let maintenance_margin = ((maintenance_margin_rate_bp as u128) * (reserve_usd as u128) / (math::get_bp_scale() as u128) as u64);
 
         // consider unrealized borrow fee
         let remaining_collateral_usd = if (collateral_usd_w_pnl > unrealized_borrow_fee_in_usd) {
@@ -1024,7 +1024,7 @@ module typus_perp::position {
             trading_pair_oracle_price,
             trading_pair_oracle_price_decimal
         );
-        let fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
+        let fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
 
         let d_price = std::u64::diff(trading_pair_oracle_price, position.average_price);
         let mut pnl_usd = ((position.size as u128) * (d_price as u128)
@@ -1085,7 +1085,7 @@ module typus_perp::position {
             collateral_oracle_price,
             collateral_oracle_price_decimal
         );
-        let min_remaining_collateral_usd = (100 * (reserve_usd as u128) / (max_entry_leverage_mbp as u128) as u64);
+        let min_remaining_collateral_usd = ((math::get_mbp_scale() as u128) * (reserve_usd as u128) / (max_entry_leverage_mbp as u128) as u64);
 
         if (collateral_usd_w_pnl >= unrealized_borrow_fee_in_usd) {
             let adjusted_collateral_usd = collateral_usd_w_pnl - unrealized_borrow_fee_in_usd;
@@ -1130,8 +1130,8 @@ module typus_perp::position {
                                                             / (math::multiplier(position.size_decimal) as u128);
                 // denominator_minus in collateral_token_decimal
                 let mut denominator_minus = (position.unrealized_borrow_fee as u128)
-                    + ((position.size as u128) * (trading_fee_mbp as u128) / 10000000
-                        + (position.size as u128) * (maintenance_margin_rate_bp as u128) / 10000)
+                    + ((position.size as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128)
+                        + (position.size as u128) * (maintenance_margin_rate_bp as u128) / (math::get_bp_scale() as u128))
                             * (math::multiplier(position.collateral_token_decimal) as u128)
                                 / (math::multiplier(position.size_decimal) as u128);
 
@@ -1156,8 +1156,8 @@ module typus_perp::position {
                 // denominator_plus in collateral_token_decimal
                 let mut denominator_plus = (position.unrealized_borrow_fee as u128)
                     + ((position.size as u128)
-                        + (position.size as u128) * (trading_fee_mbp as u128) / 10000000
-                            + (position.size as u128) * (maintenance_margin_rate_bp as u128) / 10000)
+                        + (position.size as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128)
+                            + (position.size as u128) * (maintenance_margin_rate_bp as u128) / (math::get_bp_scale() as u128))
                                 * (math::multiplier(position.collateral_token_decimal) as u128)
                                     / (math::multiplier(position.size_decimal) as u128);
                 // denominator_minus in collateral_token_decimal
@@ -1211,8 +1211,8 @@ module typus_perp::position {
                 // denominator_plus in size_decimal
                 let denominator_plus = (position.size as u128);
                 // denominator_minus in size_decimal
-                let denominator_minus = (position.size as u128) * (trading_fee_mbp as u128) / 10000000
-                    + (position.size as u128) * (maintenance_margin_rate_bp as u128) / 10000;
+                let denominator_minus = (position.size as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128)
+                    + (position.size as u128) * (maintenance_margin_rate_bp as u128) / (math::get_bp_scale() as u128);
 
                 if (numerator_plus > numerator_minus && denominator_plus > denominator_minus) {
                     // denominator in usd_decimal
@@ -1240,8 +1240,8 @@ module typus_perp::position {
                 };
                 // denominator in usd_decimal
                 let mut denominator = (position.size as u128)
-                    + (position.size as u128) * (trading_fee_mbp as u128) / 10000000
-                    + (position.size as u128) * (maintenance_margin_rate_bp as u128) / 10000;
+                    + (position.size as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128)
+                    + (position.size as u128) * (maintenance_margin_rate_bp as u128) / (math::get_bp_scale() as u128);
                 denominator = ((denominator as u256)
                                 * (math::multiplier(math::get_usd_decimal()) as u256)
                                     / (math::multiplier(position.size_decimal) as u256) as u128);
@@ -1778,7 +1778,7 @@ module typus_perp::position {
             collateral_oracle_price_decimal
         );
 
-        let maintenance_margin = ((maintenance_margin_rate_bp as u128) * (reserve_usd as u128) / 10000 as u64);
+        let maintenance_margin = ((maintenance_margin_rate_bp as u128) * (reserve_usd as u128) / (math::get_bp_scale() as u128) as u64);
 
         let remaining_collateral_usd = if (unrealized_funding_sign) {
             if (has_profit) {
@@ -2332,7 +2332,7 @@ module typus_perp::position {
     ): (u64, u64) {
         let filled_usd
                 = amount_to_usd(size, size_decimal, trading_pair_oracle_price, trading_pair_oracle_price_decimal);
-        let trading_fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / 10000000 as u64);
+        let trading_fee_usd = ((filled_usd as u128) * (trading_fee_mbp as u128) / (math::get_mbp_scale() as u128) as u64);
 
         let fee_in_c_token
             = usd_to_amount(trading_fee_usd, collateral_token_decimal, collateral_oracle_price, collateral_oracle_price_decimal);
