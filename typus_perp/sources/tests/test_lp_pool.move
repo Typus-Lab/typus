@@ -1616,15 +1616,6 @@ module typus_perp::scallop_tests {
         let adminCap = take_from_sender<AdminCap>(scenario);
         let mut market = take_shared<Market>(scenario);
 
-        // set-up incentive rewards
-        app::set_incentive_reward_factor<BABE>(
-            &adminCap,
-            &mut market,
-            1000,
-            1,
-            ctx(scenario)
-        );
-
         app::update_borrow_fee<BABE>(
             &adminCap,
             &mut market,
@@ -1638,20 +1629,32 @@ module typus_perp::scallop_tests {
             1_000_000 * sui::math::pow(10, 9),
         );
 
-
         app::update_borrow_limit<BABE>(
             &adminCap,
             &mut market,
             1_000_000 * sui::math::pow(10, 9),
         );
 
-        app::update_borrow_fee_recipient(
-            &adminCap,
-            &mut market,
-            sender
+        app::update_min_collateral_amount<BABE>(
+        &adminCap,
+        &mut market,
+        std::u64::pow(10, 9), // 1 BABE
         );
 
-        whitelist::allow_all(app::ext(&adminCap, &mut market));
+        app::init_market_coin_price_table(
+            &adminCap,
+            &mut market,
+            test_scenario::ctx(scenario)
+        );
+
+        app::set_apm_threshold<BABE>(
+            &adminCap,
+            &mut market,
+            200,
+            test_scenario::ctx(scenario)
+        );
+
+        app::whitelist_allow_all(&adminCap, &mut market, test_scenario::ctx(scenario));
 
         (market, adminCap)
     }

@@ -1468,7 +1468,7 @@ module typus_stake_pool::stake_pool {
     }
 
     #[test_only]
-    public(package) fun test_get_last_incentive_price_index(stake_pool: &StakePool): VecMap<TypeName, u64> {
+    public(package) fun test_get_last_incentive_price_index(stake_pool: &StakePool): vector<u64> {
         get_last_incentive_price_index(stake_pool)
     }
 
@@ -1487,6 +1487,8 @@ module typus_stake_pool::stake_pool {
     ): (u64, u64, u64, u64, u64) {
         let stake_pool = get_stake_pool(&registry.id, index);
         let incentive_token_type = type_name::with_defining_ids<I_TOKEN>();
+        let incentive_idx_opt = get_incentive_idx(stake_pool, &incentive_token_type);
+        let incentive_idx = incentive_idx_opt.destroy_some();
         let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
         let user_shares = all_lp_user_shares.borrow_by_key<address, LpUserShare>(tx_context::sender(ctx));
         return (
@@ -1494,7 +1496,12 @@ module typus_stake_pool::stake_pool {
             user_shares.stake_ts_ms,
             user_shares.total_shares,
             user_shares.active_shares,
-            *user_shares.last_incentive_price_index.get(&incentive_token_type)
+            user_shares.last_incentive_price_index[incentive_idx]
         )
+    }
+
+    #[test_only]
+    public(package) fun test_get_incentive_idx(stake_pool: &StakePool, token_type: &TypeName): Option<u64> {
+        get_incentive_idx(stake_pool, token_type)
     }
 }

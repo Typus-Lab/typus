@@ -695,6 +695,7 @@ module typus_perp::trading {
         is_stop_order: bool,
         size: u64,
         trigger_price: u64,
+        trading_pair_oracle_price: u64,
         filled: bool,
         filled_price: Option<u64>,
         u64_padding: vector<u64>
@@ -934,6 +935,7 @@ module typus_perp::trading {
             is_stop_order,
             size,
             trigger_price,
+            trading_pair_oracle_price,
             filled: false,
             filled_price: option::none(),
             u64_padding: vector::empty()

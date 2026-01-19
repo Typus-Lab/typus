@@ -328,16 +328,18 @@ module typus_stake_pool::test_stake_pool {
         let (_user_share_id, _, _, _, last_incentive_price_index)
             = stake_pool::test_get_single_lp_user_share_info<I_TOKEN>(&registry, index, ctx(scenario));
         let incentive_token = type_name::with_defining_ids<I_TOKEN>();
+        let incentive_idx_opt = stake_pool::test_get_incentive_idx(stake_pool::test_get_stake_pool(&registry, index), &incentive_token);
+        let incentive_idx = incentive_idx_opt.destroy_some();
         let incentive_price_indices
             = stake_pool::test_get_last_incentive_price_index(stake_pool::test_get_stake_pool(&registry, index));
-        let incentive_price_index = incentive_price_indices.get(&incentive_token);
-        assert!(last_incentive_price_index == *incentive_price_index, 0);
+        let incentive_price_index = incentive_price_indices[incentive_idx];
+        assert!(last_incentive_price_index == incentive_price_index, 0);
         transfer::public_transfer(harvest_coin, sender(scenario));
         return_shared(registry);
         return_shared(version);
         clock::destroy_for_testing(clock);
         next_tx(scenario, ADMIN);
-        (harvest_coin_value, *incentive_price_index)
+        (harvest_coin_value, incentive_price_index)
     }
 
     fun update_pool_info_u64_padding(

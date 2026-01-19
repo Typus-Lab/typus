@@ -15,7 +15,6 @@ module typus_perp::test_trading {
     use typus_perp::treasury_caps::{Self, TreasuryCaps};
     use typus_perp::test_lp_pool;
     use typus_perp::competition::{Self, CompetitionConfig};
-    use typus_perp::user_account::UserAccountCap;
     use typus_perp::babe::BABE;
 
     use typus_nft::typus_nft::{Self, Tails, ManagerCap as TailsManagerCap};
@@ -226,17 +225,6 @@ module typus_perp::test_trading {
         admin::install_ecosystem_manager_cap_entry(&mut version, &ecosystem_version, ctx(scenario));
         return_shared(version);
         return_shared(ecosystem_version);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun init_user_account_table(
-        scenario: &mut Scenario
-    ) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-        trading::init_user_account_table(&version, &mut registry, 0, ctx(scenario));
-        return_shared(version);
-        return_shared(registry);
         next_tx(scenario, ADMIN);
     }
 
@@ -780,35 +768,6 @@ module typus_perp::test_trading {
         next_tx(scenario, ADMIN);
     }
 
-    fun test_manager_cancel_order_by_open_interest_limit_<C_TOKEN, BASE_TOKEN>(
-        scenario: &mut Scenario,
-        order_type_tag: u8,
-        trigger_price: u64,
-        max_operation_count: u64,
-    ) {
-        let mut version = version(scenario);
-        let mut registry = registry(scenario);
-        let mut pool_registry = lp_pool_registry(scenario);
-        let clock = new_clock(scenario);
-        trading::manager_cancel_order_by_open_interest_limit<C_TOKEN, BASE_TOKEN>(
-            &mut version,
-            &mut registry,
-            &mut pool_registry,
-            &clock,
-            MARKET_INDEX,
-            0,
-            order_type_tag,
-            trigger_price,
-            max_operation_count,
-            ctx(scenario)
-        );
-        return_shared(registry);
-        return_shared(pool_registry);
-        return_shared(version);
-        clock::destroy_for_testing(clock);
-        next_tx(scenario, ADMIN);
-    }
-
     fun test_manager_reduce_position_<C_TOKEN, BASE_TOKEN>(
         scenario: &mut Scenario,
         c_oracle_id: ID,
@@ -1209,83 +1168,6 @@ module typus_perp::test_trading {
         return_shared(leaderboard_registry);
         return_shared(competition_config);
         return_shared(tails_staking_registry);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_create_user_account_(scenario: &mut Scenario) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-
-        let user_account_cap = trading::create_user_account(&version, &mut registry, MARKET_INDEX, ctx(scenario));
-        transfer::public_transfer(user_account_cap, sender(scenario));
-
-        return_shared(version);
-        return_shared(registry);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_add_delegate_user_(
-        scenario: &mut Scenario,
-        user: address
-    ) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-        trading::add_delegate_user(&version, &mut registry, MARKET_INDEX, user, ctx(scenario));
-        return_shared(version);
-        return_shared(registry);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_remove_user_account_(
-        scenario: &mut Scenario,
-    ) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-        let user_account_cap = take_from_sender<UserAccountCap>(scenario);
-        trading::remove_user_account(&version, &mut registry, MARKET_INDEX, user_account_cap);
-        return_shared(version);
-        return_shared(registry);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_deposit_user_account_<C_TOKEN>(
-        scenario: &mut Scenario,
-        amount: u64,
-    ) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-        let coin = mint_test_coin<C_TOKEN>(scenario, amount);
-        trading::deposit_user_account<C_TOKEN>(
-            &version,
-            &mut registry,
-            MARKET_INDEX,
-            coin,
-            ctx(scenario)
-        );
-        return_shared(version);
-        return_shared(registry);
-        next_tx(scenario, ADMIN);
-    }
-
-    fun test_withdraw_user_account_<C_TOKEN>(
-        scenario: &mut Scenario,
-        amount: Option<u64>,
-    ) {
-        let version = version(scenario);
-        let mut registry = registry(scenario);
-        let user_account_cap = take_from_sender<UserAccountCap>(scenario);
-        let coin = trading::withdraw_user_account<C_TOKEN>(
-            &version,
-            &mut registry,
-            MARKET_INDEX,
-            amount,
-            &user_account_cap,
-            ctx(scenario)
-        );
-        transfer::public_transfer(coin, sender(scenario));
-        return_shared(version);
-        return_shared(registry);
-        return_to_sender(scenario, user_account_cap);
         next_tx(scenario, ADMIN);
     }
 
@@ -1851,7 +1733,6 @@ module typus_perp::test_trading {
     public(package) fun test_create_and_cancel_trading_order() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, _babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
@@ -1878,13 +1759,6 @@ module typus_perp::test_trading {
             let version = version(&scenario);
             let registry = registry(&scenario);
             let result = trading::get_active_orders_by_order_tag<SUI>(
-                &version,
-                &registry,
-                MARKET_INDEX,
-                0
-            );
-            assert!(result.length() > 0, 0);
-            let result = trading::get_active_orders_by_order_tag_and_ctoken<SUI, SUI>(
                 &version,
                 &registry,
                 MARKET_INDEX,
@@ -1931,7 +1805,6 @@ module typus_perp::test_trading {
     public(package) fun test_normal_operation_for_position() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
@@ -2185,7 +2058,6 @@ module typus_perp::test_trading {
     public(package) fun test_manager_operations() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
 
@@ -2304,17 +2176,6 @@ module typus_perp::test_trading {
             SUI_PRICE,
             option::some(0),
             CURRENT_TS_MS
-        );
-
-        // manager_cancel_order_by_open_interest_limit (nothing happened as open interest not exceed limit)
-        let order_type_tag = 0;
-        let trigger_price = 9_0000_0000;
-        let max_operation_count = 10;
-        test_manager_cancel_order_by_open_interest_limit_<SUI, SUI>(
-            &mut scenario,
-            order_type_tag,
-            trigger_price,
-            max_operation_count,
         );
 
         // manager reduce position id 0
@@ -2537,7 +2398,6 @@ module typus_perp::test_trading {
     public(package) fun test_get_user_positions() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, _babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
@@ -2618,7 +2478,6 @@ module typus_perp::test_trading {
     public(package) fun test_normal_operation_for_option_position() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, _babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
@@ -2687,37 +2546,17 @@ module typus_perp::test_trading {
         end(scenario);
     }
 
-    #[test]
-    public(package) fun test_normal_user_account_operation() {
-        let mut scenario = begin_test();
-        test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
-
-        test_create_user_account_(&mut scenario);
-        test_remove_user_account_(&mut scenario);
-
-        test_create_user_account_(&mut scenario);
-        test_add_delegate_user_(&mut scenario, USER_1);
-        test_deposit_user_account_<SUI>(&mut scenario, 100_0000_00000);
-        test_deposit_user_account_<SUI>(&mut scenario, 100_0000_00000);
-        test_withdraw_user_account_<SUI>(&mut scenario, option::some(200_0000_00000));
-        end(scenario);
-    }
-
     // manager_close_option_position_v2
     #[test]
     public(package) fun test_manager_operation_for_option_position() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, _babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
 
         prepare_option_collateral_dov_env<SUI, SUI>(&mut scenario, sui_oracle_id, sui_oracle_id);
 
-        next_tx(&mut scenario, USER_1);
-        test_create_user_account_(&mut scenario);
         next_tx(&mut scenario, USER_1);
         let is_long = false;
         let current_trading_price = 11_0000_0000;
@@ -2751,7 +2590,6 @@ module typus_perp::test_trading {
     public(package) fun test_liquidate_option_position() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, _babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
@@ -2810,7 +2648,6 @@ module typus_perp::test_trading {
     public(package) fun test_settle_receipt_collateral() {
         let mut scenario = begin_test();
         test_new_markets_(&mut scenario);
-        init_user_account_table(&mut scenario);
         let (sui_oracle_id, babe_oracle_id) = prepare_lp_pool_env(&mut scenario, 1_000_000_000000000); // 1 million SUI
         test_add_trading_symbol_<SUI>(&mut scenario, sui_oracle_id, CURRENT_TS_MS);
         test_update_market_config_<SUI>(&mut scenario, sui_oracle_id);
