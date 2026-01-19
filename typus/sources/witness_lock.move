@@ -46,4 +46,9 @@ module typus::witness_lock {
 
     /// Aborts with an error code indicating an invalid witness.
     fun invalid_witness(): u64 { abort 0 }
+
+    #[test_only]
+    public fun update_witness_for_testing<T>(hot_potato: &mut HotPotato<T>, witness: String) {
+        hot_potato.witness = witness;
+    }
 }
