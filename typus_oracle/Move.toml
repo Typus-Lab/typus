@@ -1,7 +1,7 @@
 [package]
 name = "typus_oracle"
-version = "2.0.3"
-published-at = "0x88f64d0f59a37c85fc8f2045e968d936ff74ccc3362a03738e65ceea2b3f115d"
+version = "2.0.4"
+published-at = "0xfc9b05223195de2f134c84c2299c5ff3f2b51725b8ba821f46975da1264ace73"
 edition = "2024"
 
 [dependencies.Pyth]

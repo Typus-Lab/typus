@@ -148,11 +148,11 @@ module typus_dov::tds_otc_entry {
         let user = ctx.sender();
         let current_ts_ms = clock.timestamp_ms();
         let otc_configs: &mut Table<address, Table<u64, OtcConfig>> = dynamic_object_field::borrow_mut(id, KOtcConfigs.to_string());
-        assert!(otc_configs.contains(user), invalid_user(index));
+        assert!(otc_configs.contains(user), EInvalidUser);
         let user_otc_configs = otc_configs.borrow_mut(user);
-        assert!(user_otc_configs.contains(index), invalid_index(index));
+        assert!(user_otc_configs.contains(index), EInvalidIndex);
         let otc_config = user_otc_configs.remove(index);
-        assert!(current_ts_ms <= otc_config.expiration_ts_ms, expired(index));
+        assert!(current_ts_ms <= otc_config.expiration_ts_ms, EExpired);
         let size_decimal = typus_dov_single::get_size_decimal(portfolio_vault_registry, index);
         let fee_balance_value = ((otc_config.price as u128) * (otc_config.size as u128) / (utils::multiplier(size_decimal) as u128) * (otc_config.fee_bp as u128) / 10000 as u64);
         let fee_balance = balance.split(fee_balance_value);
@@ -228,7 +228,10 @@ module typus_dov::tds_otc_entry {
         result
     }
 
-    fun invalid_user(index: u64): u64 { abort index }
-    fun invalid_index(index: u64): u64 { abort index }
-    fun expired(index: u64): u64 { abort index }
+    #[error]
+    const EInvalidUser: vector<u8> = b"invalid_user";
+    #[error]
+    const EInvalidIndex: vector<u8> = b"invalid_index";
+    #[error]
+    const EExpired: vector<u8> = b"expired";
 }
