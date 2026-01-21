@@ -171,6 +171,8 @@ module typus_perp::error {
     const EInvalidOrderPrice: u64 = 32;
     /// The user account is invalid.
     const EUserAccount: u64 = 33;
+    /// The option collateral position is not supported.
+    const EOptionCollateralPositionNotSupported: u64 = 34;
 
     // ======== Errors from user_account ========
     /// The user is not the owner.
@@ -276,6 +278,7 @@ module typus_perp::error {
     public(package) fun exceed_max_open_interest(): u64 { abort EExceedMaxOpenInterest }
     public(package) fun invalid_order_price(): u64 { abort EInvalidOrderPrice }
     public(package) fun invalid_user_account(): u64 { abort EUserAccount }
+    public(package) fun option_collateral_position_not_supported(): u64 { abort EOptionCollateralPositionNotSupported }
 
     public(package) fun not_user_account_owner(): u64 { abort ENotOwner }
     public(package) fun no_balance(): u64 { abort ENoBalance }
@@ -770,6 +773,11 @@ module typus_perp::error_tests {
     #[expected_failure(abort_code = error::EUserAccount)]
     fun test_invalid_user_account() {
         error::invalid_user_account();
+    }
+    #[test]
+    #[expected_failure(abort_code = error::EOptionCollateralPositionNotSupported)]
+    fun test_option_collateral_position_not_supported() {
+        error::option_collateral_position_not_supported();
     }
 
     // ======== User Account Error Tests ========

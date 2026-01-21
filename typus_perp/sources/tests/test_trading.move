@@ -34,7 +34,6 @@ module typus_perp::test_trading {
     const USER_1: address = @0xAA1;
     const USER_2: address = @0xAA2;
     const SUI_PRICE: u64 = 10_0000_0000;
-    const SUI_PRICE_DECIMAL: u64 = 8;
     const MARKET_INDEX: u64 = 0;
     const TRADING_FEE_PROTOCOL_SHARE_BP: u64 = 3000;
     // market info
@@ -2684,7 +2683,7 @@ module typus_perp::test_trading {
             let registry = registry(&scenario);
             let pool_registry = lp_pool_registry(&scenario);
             let dov_registry = dov_registry(&scenario);
-            let mut babe_oracle = oracle(&scenario, babe_oracle_id);
+            let babe_oracle = oracle(&scenario, babe_oracle_id);
             let mut sui_oracle = oracle(&scenario, sui_oracle_id);
             let mut clock = new_clock(&mut scenario);
             update_clock(&mut clock, CURRENT_TS_MS);
@@ -2795,7 +2794,7 @@ module typus_perp::test_trading {
 
     #[test]
     public(package) fun test_calculate_trading_fee_rate_mbp() {
-        let mut scenario = begin_test();
+        let scenario = begin_test();
 
         let formula_version = 1;
         let (user_long_position_size, user_short_position_size, size_decimal) = (100_0000_00000, 800_0000_00000, 9);

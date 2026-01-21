@@ -4,9 +4,8 @@ module typus_perp::test_lp_pool {
     use std::type_name;
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin, TreasuryCap};
-    use sui::math as sui_math;
     use sui::sui::SUI;
-    use sui::test_scenario::{Scenario, begin, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
+    use sui::test_scenario::{Scenario, end, ctx, sender, next_tx, take_shared, return_shared, take_from_sender, return_to_sender, take_shared_by_id, take_immutable, return_immutable};
 
     use typus_perp::admin::{Self, Version};
     use typus_perp::babe::{Self, BABE};
@@ -1104,13 +1103,13 @@ module typus_perp::test_lp_pool {
     }
 
     fun prepare_scallop_lending_env(scenario: &mut Scenario) {
-        let mut clock = new_clock(scenario);
+        let clock = new_clock(scenario);
         let version = protocol::version::create_for_testing(ctx(scenario));
         let (mut market, admin_cap) = scallop_tests::app_init(scenario);
         let babe_interest_params = scallop_tests::babe_interest_model_params();
         next_tx(scenario, ADMIN);
 
-        scallop_tests::add_interest_model_t<BABE>(scenario, sui_math::pow(10, 18), 60 * 60 * 24, 30 * 60, &mut market, &admin_cap, &babe_interest_params, &clock);
+        scallop_tests::add_interest_model_t<BABE>(scenario, std::u64::pow(10, 18), 60 * 60 * 24, 30 * 60, &mut market, &admin_cap, &babe_interest_params, &clock);
 
         let mut coin_decimals_registry_obj = scallop_tests::coin_decimals_registry_init(scenario);
         coin_decimals_registry::coin_decimals_registry::register_decimals_t<BABE>(&mut coin_decimals_registry_obj, 9);
@@ -1584,11 +1583,9 @@ module typus_perp::babe2 {
 #[test_only]
 module typus_perp::scallop_tests {
     use sui::test_scenario::{Self, Scenario, next_tx, next_epoch, sender, ctx, take_shared, take_from_sender};
-    use sui::math;
     use sui::clock::Clock;
     use protocol::market::Market;
     use protocol::app::{Self, AdminCap};
-    use whitelist::whitelist;
     use coin_decimals_registry::coin_decimals_registry::{Self, CoinDecimalsRegistry};
     use math::u64;
     use typus_perp::babe::BABE;
@@ -1626,13 +1623,13 @@ module typus_perp::scallop_tests {
         app::update_supply_limit<BABE>(
             &adminCap,
             &mut market,
-            1_000_000 * sui::math::pow(10, 9),
+            1_000_000 * std::u64::pow(10, 9),
         );
 
         app::update_borrow_limit<BABE>(
             &adminCap,
             &mut market,
-            1_000_000 * sui::math::pow(10, 9),
+            1_000_000 * std::u64::pow(10, 9),
         );
 
         app::update_min_collateral_amount<BABE>(
@@ -1660,8 +1657,8 @@ module typus_perp::scallop_tests {
     }
 
     public fun babe_interest_model_params(): InterestModelParams<BABE> {
-        let interest_rate_scale = math::pow(10, 7);
-        let scale = math::pow(10, 12);
+        let interest_rate_scale = std::u64::pow(10, 7);
+        let scale = std::u64::pow(10, 12);
         let secs_per_year = 365 * 24 * 60 * 60;
 
         let borrow_rate_on_mid_kink = 8 * u64::mul_div(scale, interest_rate_scale, secs_per_year) / 100;
@@ -1677,7 +1674,7 @@ module typus_perp::scallop_tests {
             high_kink: u64::mul_div(90, scale, 100),
             revenue_factor: u64::mul_div(2, scale, 100),
             scale,
-            min_borrow_amount: math::pow(10, 8),
+            min_borrow_amount: std::u64::pow(10, 8),
             borrow_weight: 1 * scale,
         }
     }

@@ -804,7 +804,7 @@ module typus_perp::trading {
         let linked_position_collateral_amount = if (linked_position_id.is_some()) {
             let position_id = *linked_position_id.borrow();
             let position: &Position = &symbol_market.user_positions[position_id];
-            // TODO: check linked_position_id.is_some() => exceed max leverage
+            assert!(!position.is_option_collateral_position(), error::option_collateral_position_not_supported());
             position.get_position_collateral_amount<C_TOKEN>()
         } else { 0 };
         reserve_amount = if (collateral_amount + linked_position_collateral_amount >= reserve_amount) {
