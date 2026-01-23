@@ -24,15 +24,15 @@ module typus::keyed_big_vector {
     /// Error for a duplicate key.
     fun duplicate_key(): u64 { abort 0 }
     /// Error for an out-of-bounds index.
-    fun index_out_of_bounds(): u64 { abort 0 }
+    fun index_out_of_bounds(): u64 { abort 1 }
     /// Error for an invalid slice size.
-    fun invalid_slice_size(): u64 { abort 0 }
+    fun invalid_slice_size(): u64 { abort 2 }
     /// Error when a key is not found.
-    fun key_not_found(): u64 { abort 0 }
+    fun key_not_found(): u64 { abort 3 }
     /// Error when the maximum number of slices is reached.
-    fun max_slice_amount_reached(): u64 { abort 0 }
+    fun max_slice_amount_reached(): u64 { abort 4 }
     /// Error when trying to destroy a non-empty KeyedBigVector.
-    fun not_empty(): u64 { abort 0 }
+    fun not_empty(): u64 { abort 5 }
 
     // ======== Structs ========
 

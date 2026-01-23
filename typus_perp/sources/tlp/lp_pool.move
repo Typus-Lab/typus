@@ -681,7 +681,7 @@ module typus_perp::lp_pool {
         u64_padding: vector<u64>
     }
     /// [Authorized Function] Allows a manager to withdraw tokens in an emergency.
-    entry fun manager_emergency_withdraw<TOKEN, LP_TOKEN>(
+    entry fun manager_emergency_withdraw<TOKEN>(
         version: &Version,
         registry: &mut Registry,
         index: u64,
@@ -710,7 +710,6 @@ module typus_perp::lp_pool {
             // check token type correct
             assert!(token_type == receipt_token_type, error::invalid_token_type());
             let liquidity_pool = get_liquidity_pool(registry, index);
-            assert!(type_name::with_defining_ids<LP_TOKEN>() == liquidity_pool.lp_token_type, error::lp_token_type_mismatched());
             // check pool active
             assert!(liquidity_pool.pool_info.is_active, error::pool_inactive());
 
@@ -851,7 +850,6 @@ module typus_perp::lp_pool {
             let liquidity_pool = get_liquidity_pool(registry, index);
             let token_pool = get_token_pool(liquidity_pool, &token_type);
             assert!(deposit_amount >= token_pool.config.spot_config.min_deposit, error::deposit_amount_insufficient());
-            assert!(token_pool.state.liquidity_amount + deposit_amount <= token_pool.config.spot_config.max_capacity, error::reach_max_capacity());
         };
 
         let (price, price_decimal) = oracle.get_price_with_interval_ms(clock, 0);
@@ -876,6 +874,7 @@ module typus_perp::lp_pool {
 
         // update token_pool.state
         let token_pool = get_mut_token_pool(liquidity_pool, &token_type);
+        assert!(token_pool.state.liquidity_amount + deposit_amount - fee_amount <= token_pool.config.spot_config.max_capacity, error::reach_max_capacity());
         token_pool.state.liquidity_amount = token_pool.state.liquidity_amount + deposit_amount - fee_amount;
         update_tvl(version, liquidity_pool, token_type, oracle, clock);
 
@@ -2456,6 +2455,32 @@ module typus_perp::lp_pool {
         deposit_amount_usd: u64,
         is_mint: bool,
     ): (u64, u64) {
+        let spot_config = get_token_pool(liquidity_pool, &token_type).config.spot_config;
+        let (basic_fee_bp, additional_fee_bp) = if (is_mint) {
+            (spot_config.basic_mint_fee_bp, spot_config.additional_mint_fee_bp)
+        } else {
+            (spot_config.basic_burn_fee_bp, spot_config.additional_burn_fee_bp)
+        };
+        calculate_fee_(
+            liquidity_pool,
+            token_type,
+            deposit_amount,
+            deposit_amount_usd,
+            is_mint,
+            basic_fee_bp,
+            additional_fee_bp,
+        )
+    }
+
+    public(package) fun calculate_fee_(
+        liquidity_pool: &LiquidityPool,
+        token_type: TypeName,
+        deposit_amount: u64,
+        deposit_amount_usd: u64,
+        flow_in: bool,
+        basic_fee_bp: u64,
+        additional_fee_bp: u64
+    ): (u64, u64) {
         let token_pool = get_token_pool(liquidity_pool, &token_type);
         let spot_config = token_pool.config.spot_config;
         let value_in_usd = token_pool.state.value_in_usd;
@@ -2474,7 +2499,7 @@ module typus_perp::lp_pool {
             value_in_usd - target_amount_to_usd
         };
 
-        let new_value_in_usd = if (is_mint) {
+        let new_value_in_usd = if (flow_in) {
             value_in_usd + deposit_amount_usd
         } else {
             assert!(value_in_usd >= deposit_amount_usd, error::liquidity_not_enough());
@@ -2487,45 +2512,46 @@ module typus_perp::lp_pool {
             new_value_in_usd - target_amount_to_usd
         };
 
-        let basic_fee_bp = if (is_mint) { spot_config.basic_mint_fee_bp } else { spot_config.basic_burn_fee_bp };
-        let additional_fee_bp = if (is_mint) { spot_config.additional_mint_fee_bp } else { spot_config.additional_burn_fee_bp };
-
+        let additional_precision_9 = 1_000_000_000;
         // additional fee:
         // if new deposit will make amount_to_usd further from target_amount_to_usd
-        let mut additional_fee_bp = if (new_usd_diff > original_usd_diff) {
+        // high_precision = bp + 9 = 13
+        let mut additional_fee_high_precision = if (new_usd_diff > original_usd_diff) {
             if (spot_config.target_weight_bp == 0) {
-                basic_fee_bp
+                (basic_fee_bp as u256) * (additional_precision_9 as u256)
             } else if (liquidity_pool.pool_info.tvl_usd == 0) {
                 0
             } else {
-                let numerator = (additional_fee_bp as u128) * ((new_usd_diff + original_usd_diff) as u128);
-                let denominator = 2 * (target_amount_to_usd as u128);
-                let fee_bp = if (numerator / denominator * denominator == numerator) {
+                let numerator = (additional_fee_bp as u256) * ((new_usd_diff + original_usd_diff) as u256) * (additional_precision_9 as u256);
+                let denominator = 2 * (target_amount_to_usd as u256);
+                let fee_high_precision = if (numerator / denominator * denominator == numerator) {
                     numerator / denominator
                 } else {
                     numerator / denominator + 1
                 };
-                (fee_bp as u64)
+                fee_high_precision
             }
         } else {
             0
         };
         // clip additional_fee_bp to spot_config.basic_mint_fee_bp
-        additional_fee_bp = if (additional_fee_bp > basic_fee_bp) {
-            basic_fee_bp
+        additional_fee_high_precision = if (additional_fee_high_precision > (basic_fee_bp as u256) * (additional_precision_9 as u256)) {
+            (basic_fee_bp as u256) * (additional_precision_9 as u256)
         } else {
-            additional_fee_bp
+            additional_fee_high_precision
         };
 
         // fee bp summation:
-        let overall_fee_bp = basic_fee_bp + additional_fee_bp;
+        let overall_fee_high_precision = (basic_fee_bp as u256) * (additional_precision_9 as u256) + additional_fee_high_precision;
 
-        let fee = ((deposit_amount as u128)
-            * (overall_fee_bp as u128)
-                / (math::get_bp_scale() as u128) as u64);
-        let fee_usd = ((deposit_amount_usd as u128)
-            * (overall_fee_bp as u128)
-                / (math::get_bp_scale() as u128) as u64);
+        let high_precision_scale = (math::get_bp_scale() as u256) * (additional_precision_9 as u256);
+        // ceiling to avoid 0 fee
+        let fee = (((deposit_amount as u256)
+            * overall_fee_high_precision + high_precision_scale - 1)
+                / high_precision_scale as u64);
+        let fee_usd = (((deposit_amount_usd as u256)
+            * overall_fee_high_precision + high_precision_scale - 1)
+                / high_precision_scale as u64);
 
         (fee, fee_usd)
     }
@@ -2563,69 +2589,16 @@ module typus_perp::lp_pool {
         amount_usd: u64,
         swap_in: bool,
     ): (u64, u64) {
-        let token_pool = get_token_pool(liquidity_pool, &token_type);
-        let spot_config = token_pool.config.spot_config;
-        let value_in_usd = token_pool.state.value_in_usd;
-
-        let target_amount_to_usd = ((liquidity_pool.pool_info.tvl_usd as u128)
-            * (spot_config.target_weight_bp as u128)
-            / (math::get_bp_scale() as u128) as u64);
-
-        let original_usd_diff = if (target_amount_to_usd > value_in_usd) {
-            target_amount_to_usd - value_in_usd
-        } else {
-            value_in_usd - target_amount_to_usd
-        };
-
-        let new_value_in_usd = if (swap_in) {
-            value_in_usd + amount_usd
-        } else {
-            assert!(value_in_usd >= amount_usd, error::liquidity_not_enough());
-            value_in_usd - amount_usd
-        };
-
-        let new_usd_diff = if (target_amount_to_usd > new_value_in_usd) {
-            target_amount_to_usd - new_value_in_usd
-        } else {
-            new_value_in_usd - target_amount_to_usd
-        };
-
-        let basic_fee_bp = spot_config.swap_fee_bp;
-
-        let additional_fee_bp = spot_config.swap_fee_bp;
-
-        // additional fee:
-        // if new deposit will make amount_to_usd further from target_amount_to_usd
-        let mut additional_fee_bp = if (new_usd_diff > original_usd_diff) {
-            let numerator = (additional_fee_bp as u128) * ((new_usd_diff + original_usd_diff) as u128);
-            let denominator = 2 * (target_amount_to_usd as u128);
-            let fee_bp = if (numerator / denominator * denominator == numerator) {
-                numerator / denominator
-            } else {
-                numerator / denominator + 1
-            };
-            (fee_bp as u64)
-        } else {
-            0
-        };
-        // clip additional_fee_bp to spot_config.swap_fee_bp
-        additional_fee_bp = if (additional_fee_bp > basic_fee_bp) {
-            basic_fee_bp
-        } else {
-            additional_fee_bp
-        };
-
-        // fee bp summation:
-        let overall_fee_bp = basic_fee_bp + additional_fee_bp;
-
-        let fee = ((amount as u128)
-            * (overall_fee_bp as u128)
-                / (math::get_bp_scale() as u128) as u64);
-        let fee_usd = ((amount_usd as u128)
-            * (overall_fee_bp as u128)
-                / (math::get_bp_scale() as u128) as u64);
-
-        (fee, fee_usd)
+        let spot_config = get_token_pool(liquidity_pool, &token_type).config.spot_config;
+        calculate_fee_(
+            liquidity_pool,
+            token_type,
+            amount,
+            amount_usd,
+            swap_in,
+            spot_config.swap_fee_bp,
+            spot_config.swap_fee_bp,
+        )
     }
 
     fun check_tvl_updated(

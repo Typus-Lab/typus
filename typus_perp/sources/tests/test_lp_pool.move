@@ -666,7 +666,7 @@ module typus_perp::test_lp_pool {
         let mut registry = registry(scenario);
         let manager_deposit_receipt_v2 = take_from_sender<ManagerDepositReceipt>(scenario);
 
-        lp_pool::manager_emergency_withdraw<TOKEN, TLP>(
+        lp_pool::manager_emergency_withdraw<TOKEN>(
             &version,
             &mut registry,
             index,
@@ -1182,7 +1182,7 @@ module typus_perp::test_lp_pool {
             10_0000_00000,
             ts_ms
         );
-        assert!(swap_out_value == 9_0818_18181 && swap_out_value == to_amount_after_fee, 0);
+        assert!(swap_out_value == 9_0826_40491 && swap_out_value == to_amount_after_fee, 0);
 
         // side without additional fee
         let from_token_price = 11_0000_0000;
@@ -1423,8 +1423,8 @@ module typus_perp::test_lp_pool {
             10_0000_0000,
             10_0000_0000,
             index,
-            988_4000_00000,
-            988_4000_00000,
+            988_4994_99500,
+            988_4994_99500,
             CURRENT_TS_MS,
         );
         test_suspend_token_pool_<BABE>(&mut scenario, index);
