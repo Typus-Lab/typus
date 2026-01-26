@@ -26,10 +26,6 @@ module typus_stake_pool::admin {
         id: UID,
         /// The version number.
         value: u64,
-        /// The fee pool for protocol fees.
-        fee_pool: FeePool,
-        /// The fee pool for liquidator fees.
-        liquidator_fee_pool: FeePool,
         /// The list of authorized addresses.
         authority: VecSet<address>,
         /// Padding for future use.
@@ -55,14 +51,6 @@ module typus_stake_pool::admin {
         transfer::share_object(Version {
             id: object::new(ctx),
             value: CVersion,
-            fee_pool: FeePool {
-                id: object::new(ctx),
-                fee_infos: vector[],
-            },
-            liquidator_fee_pool: FeePool {
-                id: object::new(ctx),
-                fee_infos: vector[],
-            },
             authority: vec_set::singleton(tx_context::sender(ctx)),
             u64_padding: vector[],
         });
@@ -144,104 +132,5 @@ module typus_stake_pool::admin {
             user,
             amount
         );
-    }
-
-    // ======== Fee Pool ========
-
-    /// A shared object that holds fee information.
-    public struct FeePool has key, store {
-        id: UID,
-        /// A vector of `FeeInfo` structs.
-        fee_infos: vector<FeeInfo>,
-    }
-
-    /// A struct that holds fee information for a specific token.
-    public struct FeeInfo has copy, drop, store {
-        /// The type name of the token.
-        token: TypeName,
-        /// The amount of fees collected.
-        value: u64,
-    }
-
-    /// An event that is emitted when fees are sent.
-    public struct SendFeeEvent has copy, drop {
-        /// The type name of the token.
-        token: TypeName,
-        /// The amount of fees sent.
-        amount: u64,
-    }
-    /// Sends the collected fees to the fee address.
-    /// Safe with constant address as receiver
-    entry fun send_fee<TOKEN>(
-        version: &mut Version,
-        ctx: &mut TxContext,
-    ) {
-        version_check(version);
-
-        let mut i = 0;
-        while (i < vector::length(&version.fee_pool.fee_infos)) {
-            let fee_info = vector::borrow_mut(&mut version.fee_pool.fee_infos, i);
-            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                if (fee_info.value > 0) {
-                    transfer::public_transfer(
-                        coin::from_balance<TOKEN>(
-                            balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
-                            ctx,
-                        ),
-                        @typus_perp_fee_address,
-                    );
-                    emit(SendFeeEvent {
-                        token: type_name::with_defining_ids<TOKEN>(),
-                        amount: fee_info.value,
-                    });
-                    fee_info.value = 0;
-                };
-                return
-            };
-            i = i + 1;
-        };
-    }
-    /// Charges a protocol fee.
-    public(package) fun charge_fee<TOKEN>(
-        version: &mut Version,
-        balance: Balance<TOKEN>,
-    ) {
-        let amount = balance.value();
-        let mut i = 0;
-        while (i < version.fee_pool.fee_infos.length()) {
-            let fee_info = &mut version.fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
-                fee_info.value = fee_info.value + amount;
-                balance::join(
-                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>()),
-                    balance,
-                );
-                emit(ProtocolFeeEvent {
-                    token: type_name::with_defining_ids<TOKEN>(),
-                    amount,
-                });
-                return
-            };
-            i = i + 1;
-        };
-        // if not found, add new fee info
-        version.fee_pool.fee_infos.push_back(
-            FeeInfo {
-                token: type_name::with_defining_ids<TOKEN>(),
-                value: balance.value(),
-            },
-        );
-        dynamic_field::add(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
-        emit(ProtocolFeeEvent {
-            token: type_name::with_defining_ids<TOKEN>(),
-            amount,
-        });
-    }
-    /// An event that is emitted when protocol fees are charged.
-    public struct ProtocolFeeEvent has copy, drop {
-        /// The type name of the token.
-        token: TypeName,
-        /// The amount of fees charged.
-        amount: u64,
     }
 }

@@ -738,3 +738,34 @@ module typus_stake_pool::test_tlp {
         init(TEST_TLP {}, ctx);
     }
 }
+
+#[test_only]
+module typus_stake_pool::babe {
+    use sui::coin;
+    use sui::url;
+
+    public struct BABE has drop {}
+
+    const Decimals: u8 = 9;
+    // Due to the package size, we changed it to a test_only function
+    #[test_only]
+    fun init(witness: BABE, ctx: &mut TxContext) {
+        let (treasury_cap, coin_metadata) = coin::create_currency(
+            witness,
+            Decimals,
+            b"BABE",
+            b"Typus Perp LP Token",
+            b"Typus Perp LP Token Description", // TODO: update description
+            option::some(url::new_unsafe_from_bytes(b"https://raw.githubusercontent.com/Typus-Lab/typus-asset/main/assets/BABE.svg")),
+            ctx
+        );
+
+        transfer::public_freeze_object(coin_metadata);
+        transfer::public_transfer(treasury_cap, ctx.sender());
+    }
+
+    #[test_only]
+    public(package) fun test_init(ctx: &mut TxContext) {
+        init(BABE {}, ctx);
+    }
+}

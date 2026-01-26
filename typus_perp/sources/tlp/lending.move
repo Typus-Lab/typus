@@ -43,7 +43,7 @@ module typus_perp::lending {
 
     /// Withdraws a token from the Scallop lending protocol.
     /// WARNING: no authority check inside
-    public fun withdraw_scallop_basic<C_TOKEN>(
+    public(package) fun withdraw_scallop_basic<C_TOKEN>(
         market_coin: Coin<MarketCoin<C_TOKEN>>,
         scallop_version: &ScallopVersion,
         scallop_market: &mut ScallopMarket,
@@ -69,6 +69,5 @@ module typus_perp::lending {
 
         (balance, log)
     }
-
 }
 
