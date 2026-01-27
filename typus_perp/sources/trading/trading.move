@@ -100,8 +100,6 @@ module typus_perp::trading {
         symbol_markets: ObjectTable<TypeName, SymbolMarket>,
         /// Padding for future use.
         u64_padding: vector<u64>,
-        // df:
-        // user_accounts: ObjectTable<address, UserAccount>
     }
 
     /// A market for a specific trading symbol.
@@ -174,6 +172,8 @@ module typus_perp::trading {
         funding_interval_ts_ms: u64,
         /// The experience multiplier.
         exp_multiplier: u64,
+        /// The position cool-down threshold in milliseconds.
+        cool_down_threshold_ts_ms: u64,
         /// Padding for future use.
         u64_padding: vector<u64>,
     }
@@ -283,6 +283,7 @@ module typus_perp::trading {
         basic_funding_rate: u64,
         funding_interval_ts_ms: u64,
         exp_multiplier: u64,
+        cool_down_threshold_ts_ms: u64,
         max_buy_open_interest: u64,
         max_sell_open_interest: u64,
         maintenance_margin_rate_bp: u64,
@@ -336,6 +337,7 @@ module typus_perp::trading {
             basic_funding_rate,
             funding_interval_ts_ms,
             exp_multiplier,
+            cool_down_threshold_ts_ms,
             u64_padding: vector[
                 max_buy_open_interest,
                 max_sell_open_interest,
@@ -431,6 +433,7 @@ module typus_perp::trading {
         mut basic_funding_rate: Option<u64>,
         mut funding_interval_ts_ms: Option<u64>,
         mut exp_multiplier: Option<u64>,
+        mut cool_down_threshold_ts_ms: Option<u64>,
         mut max_buy_open_interest: Option<u64>, // market_config.u64_padding[0]
         mut max_sell_open_interest: Option<u64>, // market_config.u64_padding[1]
         mut maintenance_margin_rate_bp: Option<u64>, // market_config.u64_padding[2]
@@ -476,6 +479,9 @@ module typus_perp::trading {
         };
         if (option::is_some(&exp_multiplier)) {
             symbol_market.market_config.exp_multiplier = option::extract(&mut exp_multiplier);
+        };
+        if (option::is_some(&cool_down_threshold_ts_ms)) {
+            symbol_market.market_config.cool_down_threshold_ts_ms = option::extract(&mut cool_down_threshold_ts_ms);
         };
         if (option::is_some(&max_buy_open_interest)) {
             math::set_u64_vector_value(&mut symbol_market.market_config.u64_padding, I_MAX_BUY_OPEN_INTEREST, option::extract(&mut max_buy_open_interest));
@@ -824,6 +830,7 @@ module typus_perp::trading {
         if (linked_position_id.is_some()) {
             let position_id = *linked_position_id.borrow();
             let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
+            mut_position.check_position_update_timestamp(clock, symbol_market.market_config.cool_down_threshold_ts_ms);
             // edit position.linked_order_ids
             check_position_user_matched(mut_position, user);
             position::add_position_linked_order_info(mut_position, order_id, trigger_price);
@@ -1752,6 +1759,7 @@ module typus_perp::trading {
             admin::verify(version, ctx);
         };
         assert!(mut_position.is_option_collateral_position(), error::not_option_collateral_position());
+        mut_position.check_position_update_timestamp(clock, symbol_market.market_config.cool_down_threshold_ts_ms);
         let (dov_index, bid_token) = mut_position.get_position_option_collateral_info();
         assert!(bid_token == type_name::with_defining_ids<B_TOKEN>(), error::bid_token_mismatched());
 
@@ -1998,6 +2006,12 @@ module typus_perp::trading {
                     );
                     return_to_user(collateral, order_user, ctx);
                     continue
+                } else {
+                    let position: &Position = &symbol_market.user_positions[position_id];
+                    if (!position.check_position_update_timestamp_(clock, symbol_market.market_config.cool_down_threshold_ts_ms)) {
+                        remaining_orders.push_back(order);
+                        continue
+                    };
                 };
             };
 
@@ -2181,6 +2195,7 @@ module typus_perp::trading {
         assert!(symbol_market.market_config.oracle_id == object::id_address(typus_oracle_trading_symbol), error::oracle_mismatched());
 
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
+        mut_position.check_position_update_timestamp(clock, symbol_market.market_config.cool_down_threshold_ts_ms);
         let cumulative_borrow_rate = lp_pool::get_cumulative_borrow_rate(liquidity_pool, type_name::with_defining_ids<C_TOKEN>());
 
         position::update_position_borrow_rate_and_funding_rate(
@@ -2408,6 +2423,7 @@ module typus_perp::trading {
         let symbol_market = object_table::borrow_mut<TypeName, SymbolMarket>(&mut market.symbol_markets, base_token);
         let collateral_token = type_name::with_defining_ids<C_TOKEN>();
         let mut_position: &mut Position = &mut symbol_market.user_positions[position_id];
+        mut_position.check_position_update_timestamp(clock, symbol_market.market_config.cool_down_threshold_ts_ms);
         assert!(mut_position.is_option_collateral_position(), error::not_option_collateral_position());
         assert!(position::option_position_bid_receipts_expired(dov_registry, mut_position), error::bid_receipt_not_expired());
 

@@ -42,6 +42,8 @@ module typus_perp::position {
         id: UID,
         /// The timestamp when the position was created.
         create_ts_ms: u64,
+        /// The timestamp when the position was last updated.
+        update_ts_ms: u64,
         /// The ID of the position.
         position_id: u64,
         /// A vector of the linked order IDs.
@@ -347,6 +349,7 @@ module typus_perp::position {
         let Position {
             id: mut id,
             create_ts_ms: _,
+            update_ts_ms: _,
             position_id: _,
             linked_order_ids,
             linked_order_prices,
@@ -546,6 +549,7 @@ module typus_perp::position {
                 trading_pair_oracle_price_decimal,
             );
 
+            position.update_ts_ms = clock.timestamp_ms();
             position.is_long = new_side;
             position.size = new_size;
             position.average_price = average_price;
@@ -565,7 +569,8 @@ module typus_perp::position {
             );
             let mut position = Position {
                 id: object::new(ctx),
-                create_ts_ms: clock::timestamp_ms(clock),
+                create_ts_ms: clock.timestamp_ms(),
+                update_ts_ms: clock.timestamp_ms(),
                 position_id: next_position_id,
                 linked_order_ids: vector::empty(),
                 linked_order_prices: vector::empty(),
@@ -1359,6 +1364,7 @@ module typus_perp::position {
         let Position {
             id: mut id,
             create_ts_ms: _,
+            update_ts_ms: _,
             position_id: _,
             linked_order_ids,
             linked_order_prices,
@@ -1532,6 +1538,7 @@ module typus_perp::position {
                 trading_pair_oracle_price,
                 trading_pair_oracle_price_decimal,
             );
+            position.update_ts_ms = clock.timestamp_ms();
             position.is_long = new_side;
             position.size = new_size;
             position.average_price = average_price;
@@ -1558,7 +1565,8 @@ module typus_perp::position {
             });
             let mut position = Position {
                 id: object::new(ctx),
-                create_ts_ms: clock::timestamp_ms(clock),
+                create_ts_ms: clock.timestamp_ms(),
+                update_ts_ms: clock.timestamp_ms(),
                 position_id: next_position_id,
                 linked_order_ids: vector::empty(),
                 linked_order_prices: vector::empty(),
@@ -2381,6 +2389,22 @@ module typus_perp::position {
             realized_funding_fee_usd,
             u64_padding,
         });
+    }
+
+    public(package) fun check_position_update_timestamp(
+        position: &Position,
+        clock: &Clock,
+        threshold_ts_ms: u64
+    ) {
+        assert!(check_position_update_timestamp_(position, clock, threshold_ts_ms), error::position_cool_down_threshold());
+    }
+
+    public(package) fun check_position_update_timestamp_(
+        position: &Position,
+        clock: &Clock,
+        threshold_ts_ms: u64
+    ): bool {
+        clock.timestamp_ms() >= position.update_ts_ms + threshold_ts_ms
     }
 
     public(package) fun get_position_id(

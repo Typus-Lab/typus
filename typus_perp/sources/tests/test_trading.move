@@ -48,6 +48,7 @@ module typus_perp::test_trading {
     const BASIC_FUNDING_RATE: u64 = 0_0001_00000;
 
     const EXP_MULTIPLIER: u64 = 200;
+    const COOL_DOWN_THRESHOLD_TS_MS: u64 = 10_000;
     const MAX_BUY_OPEN_INTEREST: u64 = 1_000_000_000000000; // 1 million SUI
     const MAX_SELL_OPEN_INTEREST: u64 = 1_000_000_000000000;
     const MAINTENANCE_MARGIN_RATE_BP: u64 = 150; // 1.5%
@@ -416,6 +417,7 @@ module typus_perp::test_trading {
             BASIC_FUNDING_RATE,
             FUNDING_INTERVAL_TS_MS,
             EXP_MULTIPLIER,
+            COOL_DOWN_THRESHOLD_TS_MS,
             MAX_BUY_OPEN_INTEREST,
             MAX_SELL_OPEN_INTEREST,
             MAINTENANCE_MARGIN_RATE_BP,
@@ -466,6 +468,7 @@ module typus_perp::test_trading {
             option::some(BASIC_FUNDING_RATE),
             option::some(FUNDING_INTERVAL_TS_MS),
             option::some(EXP_MULTIPLIER),
+            option::some(COOL_DOWN_THRESHOLD_TS_MS),
             option::some(MAX_BUY_OPEN_INTEREST),
             option::some(MAX_SELL_OPEN_INTEREST),
             option::some(MAINTENANCE_MARGIN_RATE_BP),
@@ -499,7 +502,8 @@ module typus_perp::test_trading {
         let mut version = version(scenario);
         let mut registry = registry(scenario);
         let mut pool_registry = lp_pool_registry(scenario);
-        let clock = new_clock(scenario);
+        let mut clock = new_clock(scenario);
+        clock.set_for_testing(ts_ms);
         let collateral = mint_test_coin<C_TOKEN>(scenario, collateral_amount);
 
         if (c_oracle_id == trading_oracle_id) {
@@ -603,7 +607,8 @@ module typus_perp::test_trading {
         let version = version(scenario);
         let mut registry = registry(scenario);
         let mut pool_registry = lp_pool_registry(scenario);
-        let clock = new_clock(scenario);
+        let mut clock = new_clock(scenario);
+        clock.set_for_testing(ts_ms);
         let coin = if (c_oracle_id == trading_oracle_id) {
             let mut oracle_c_token = oracle(scenario, c_oracle_id);
             let sender_address = sender(scenario);
@@ -664,11 +669,13 @@ module typus_perp::test_trading {
         trading_oracle_id: ID,
         position_id: u64,
         deposit_amount: u64,
+        ts_ms: u64,
     ) {
         let version = version(scenario);
         let mut registry = registry(scenario);
         let mut pool_registry = lp_pool_registry(scenario);
-        let clock = new_clock(scenario);
+        let mut clock = new_clock(scenario);
+        clock.set_for_testing(ts_ms);
         let coin = mint_test_coin<C_TOKEN>(scenario, deposit_amount);
         if (c_oracle_id == trading_oracle_id) {
             let oracle_c_token = oracle(scenario, c_oracle_id);
@@ -773,12 +780,14 @@ module typus_perp::test_trading {
         trading_oracle_id: ID,
         position_id: u64,
         reduced_ratio_bp: u64,
+        ts_ms: u64,
     ) {
         let mut version = version(scenario);
         let ecosystem_version = ecosystem_version(scenario);
         let mut registry = registry(scenario);
         let mut pool_registry = lp_pool_registry(scenario);
-        let clock = new_clock(scenario);
+        let mut clock = new_clock(scenario);
+        clock.set_for_testing(ts_ms);
         let mut typus_user_registry = typus_user_registry(scenario);
         let mut leaderboard_registry = leaderboard_registry(scenario);
         let tails_staking_registry = tails_staking_registry(scenario);
@@ -1921,7 +1930,7 @@ module typus_perp::test_trading {
             SUI_PRICE,
             SUI_PRICE,
             option::some(2),
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000, // avoid position cooldown case
         );
 
         {
@@ -1951,7 +1960,7 @@ module typus_perp::test_trading {
             new_price,
             position_id,
             0_5000_00000, // release 0.5 SUI
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000
         );
         test_increase_collateral_<SUI, SUI>(
             &mut scenario,
@@ -1959,6 +1968,7 @@ module typus_perp::test_trading {
             sui_oracle_id,
             position_id,
             1_0000_00000, // increase 1.0 SUI
+            CURRENT_TS_MS + 10_000
         );
 
         let (
@@ -1978,7 +1988,7 @@ module typus_perp::test_trading {
             new_price,
             new_price,
             position_id,
-            CURRENT_TS_MS,
+            CURRENT_TS_MS + 10_000,
         );
         // pnl_usd = gross pnl - closing position trading fee
         // gross pnl = 10_0000_00000 * (11_0000_0000 - 10_0000_0000) / 10^8 = 10_0000_00000
@@ -2006,7 +2016,7 @@ module typus_perp::test_trading {
             new_price,
             new_price,
             1,
-            CURRENT_TS_MS,
+            CURRENT_TS_MS + 10_000,
         );
         // pnl_usd = gross pnl - closing position trading fee
         // gross pnl = 10_0000_00000 * (11_0000_0000 - 10_0000_0000) / 10^8 = 10_0000_00000
@@ -2027,10 +2037,10 @@ module typus_perp::test_trading {
             new_price,
             position_id,
             0_5000_00000, // release 0.5 SUI
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000
         );
 
-        let ts_ms = CURRENT_TS_MS + 1;
+        let ts_ms = CURRENT_TS_MS + 10_000 + 1;
         test_update_funding_rate_<SUI>(&mut scenario, sui_oracle_id, new_price, ts_ms);
         test_collect_position_funding_fee_<SUI, SUI>(
             &mut scenario,
@@ -2040,7 +2050,7 @@ module typus_perp::test_trading {
             ts_ms
         );
 
-        let ts_ms = CURRENT_TS_MS + FUNDING_INTERVAL_TS_MS + 1;
+        let ts_ms = CURRENT_TS_MS + 10_000 + FUNDING_INTERVAL_TS_MS + 1;
         test_update_funding_rate_<SUI>(&mut scenario, sui_oracle_id, new_price, ts_ms);
         test_collect_position_funding_fee_<SUI, SUI>(
             &mut scenario,
@@ -2174,7 +2184,7 @@ module typus_perp::test_trading {
             SUI_PRICE,
             SUI_PRICE,
             option::some(0),
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000 // avoid position cooldown case
         );
 
         // manager reduce position id 0
@@ -2186,6 +2196,7 @@ module typus_perp::test_trading {
             sui_oracle_id,
             position_id,
             reduced_ratio_bp,
+            CURRENT_TS_MS + 10_000
         );
 
         // Open one orders by USER_1 (id 3 not filled)
@@ -2206,7 +2217,7 @@ module typus_perp::test_trading {
             SUI_PRICE,
             SUI_PRICE,
             option::none(),
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000
         );
 
         // no order filled
@@ -2214,7 +2225,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let trigger_price = 9_0000_0000;
         let sui_token_price = 10_0000_0000;
-        let ts_ms = CURRENT_TS_MS;
+        let ts_ms = CURRENT_TS_MS + 10_000;
         let max_operation_count = 10;
         test_match_trading_order_<SUI, SUI>(
             &mut scenario,
@@ -2233,7 +2244,7 @@ module typus_perp::test_trading {
         let order_type_tag = 0;
         let trigger_price = 9_0000_0000;
         let sui_token_price = 9_0000_0000;
-        let ts_ms = CURRENT_TS_MS;
+        let ts_ms = CURRENT_TS_MS + 10_000;
         let max_operation_count = 10;
         test_match_trading_order_<SUI, SUI>(
             &mut scenario,
@@ -2266,13 +2277,13 @@ module typus_perp::test_trading {
             SUI_PRICE,
             SUI_PRICE,
             option::none(),
-            CURRENT_TS_MS
+            CURRENT_TS_MS + 10_000
         );
 
         // filled immediately
         next_tx(&mut scenario, ADMIN);
         let order_type_tag = 0;
-        let ts_ms = CURRENT_TS_MS;
+        let ts_ms = CURRENT_TS_MS + 10_000;
         let max_operation_count = 10;
         test_match_trading_order_<BABE, SUI>(
             &mut scenario,
@@ -2287,7 +2298,7 @@ module typus_perp::test_trading {
         );
 
         let liquidated_position_id = 1;
-        let ts_ms = CURRENT_TS_MS + FUNDING_INTERVAL_TS_MS + 1;
+        let ts_ms = CURRENT_TS_MS + 10_000 + FUNDING_INTERVAL_TS_MS + 1;
         {
             let version = version(&scenario);
             let registry = registry(&scenario);
@@ -2373,7 +2384,7 @@ module typus_perp::test_trading {
         next_tx(&mut scenario, USER_1);
         let is_long = false;
         let current_trading_price = 11_0000_0000;
-        let ts_ms = CURRENT_TS_MS + FUNDING_INTERVAL_TS_MS + 1;
+        let ts_ms = CURRENT_TS_MS + 10_000 + FUNDING_INTERVAL_TS_MS + 1;
         test_create_trading_order_with_bid_receipt_v3_<SUI, SUI, SUI>(&mut scenario, sui_oracle_id, sui_oracle_id, current_trading_price, is_long, ts_ms);
 
         let liquidated_position_id = 4;
@@ -2525,7 +2536,7 @@ module typus_perp::test_trading {
             current_trading_price,
             position_id,
             option::some(order_size),
-            ts_ms
+            ts_ms + 10_000, // avoid position cooldown case
         );
 
         let ts_ms = EXPIRATION_TS_MS + 1;

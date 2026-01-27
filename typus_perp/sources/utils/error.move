@@ -101,6 +101,8 @@ module typus_perp::error {
     const ENotTokenCollateralPosition: u64 = 8;
     /// There are too many linked orders.
     const ETooManyLinkedOrders: u64 = 9;
+    /// The position is in the cool-down period.
+    const EPositionCoolDownThreshold: u64 = 10;
 
     // ======== Errors from trading ========
     /// The trading symbol already exists.
@@ -243,6 +245,7 @@ module typus_perp::error {
     public(package) fun not_option_collateral_position(): u64 { abort ENotOptionCollateralPosition }
     public(package) fun not_token_collateral_position(): u64 { abort ENotTokenCollateralPosition }
     public(package) fun too_many_linked_orders(): u64 { abort ETooManyLinkedOrders }
+    public(package) fun position_cool_down_threshold(): u64 { abort EPositionCoolDownThreshold }
 
     public(package) fun trading_symbol_existed(): u64 { abort ETradingSymbolExisted }
     public(package) fun trading_symbol_not_existed(): u64 { abort ETradingSymbolNotExisted }
