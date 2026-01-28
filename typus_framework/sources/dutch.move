@@ -329,7 +329,7 @@ module typus_framework::dutch {
         });
 
         balance::split(
-            dynamic_field::borrow_mut(&mut auction.id, K_BIDDER_BALANCE),
+            dynamic_field::borrow_mut(&mut auction.id, K_INCENTIVE_BALANCE),
             incentive_balance,
         )
     }

@@ -1,7 +1,7 @@
 [package]
 name = "typus_framework"
-version = "3.1.0"
-published-at = "0xa00e1424c9eef6786dca30b2e2dcbbf75af10fef2ae2639e064af39abff59fa6"
+version = "3.1.1"
+published-at = "0xff833c8378057598cb2a397a08ca22606a1aa5a46b76eb4aee0e657142baa45e"
 edition = "2024.alpha"
 
 [dependencies.Pyth]
@@ -42,5 +42,5 @@ rev = "main"
 [addresses]
 typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"
 
-# sui client upgrade --upgrade-capability 0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --skip-dependency-verification --serialize-unsigned-transaction > data.txt
+# sui client upgrade --upgrade-capability 0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt
 
