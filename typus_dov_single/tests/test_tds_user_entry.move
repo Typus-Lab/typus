@@ -141,6 +141,25 @@ module typus_dov::test_tds_user_entry {
         next_tx(scenario, ADMIN);
     }
 
+    public(package) fun test_rebate_<TOKEN>(
+        scenario: &mut Scenario,
+    ) {
+        let mut dov_registry = test_environment::dov_registry(scenario);
+
+        let (balance, _log) = tds_user_entry::rebate<TOKEN>(
+            &mut dov_registry,
+            ctx(scenario),
+        );
+        if (balance.is_some()) {
+            transfer::public_transfer(coin::from_balance(balance.destroy_some(), ctx(scenario)), sender(scenario));
+        } else {
+            balance.destroy_none();
+        };
+
+        return_shared(dov_registry);
+        next_tx(scenario, ADMIN);
+    }
+
     public(package) fun test_exercise_<D_TOKEN, B_TOKEN>(
         scenario: &mut Scenario,
         index: u64,

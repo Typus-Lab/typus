@@ -208,7 +208,7 @@ module typus_dov::test_manager_cases {
 
         // round 2
         // test_manager_entry::test_set_lending_protocol_flag_(&mut scenario, index, 2);
-        // test_manager_entry::test_set_current_lending_protocol_flag_(&mut scenario, index, 2);
+        test_manager_entry::test_set_current_lending_protocol_flag_(&mut scenario, index, 0);
         test_manager_entry::test_enable_additional_lending_<BABE, BABE>(&mut scenario, index);
         test_manager_entry::test_disable_additional_lending_<BABE, BABE>(&mut scenario, index);
 
@@ -359,6 +359,7 @@ module typus_dov::test_manager_cases {
 
         // withdraw all fund from premium share
         let ts_ms = activate_ts_ms + 86400_000;
+        test_tds_user_entry::test_rebate_<BABE>(&mut scenario);
         let receipt = take_from_sender<TypusDepositReceipt>(&scenario);
         test_tds_user_entry::test_public_reduce_fund_<BABE, BABE, BABE>(
             &mut scenario,
@@ -424,6 +425,7 @@ module typus_dov::test_manager_cases {
         );
 
         let index = 0;
+        test_manager_entry::test_withdraw_fixed_incentive_<SUI>(&mut scenario, index, option::none());
         test_manager_entry::test_fixed_incentivise_<SUI, SUI, SUI>(&mut scenario, index, 10000_0000_00000, 1000_0000_00000);
         test_manager_entry::test_withdraw_fixed_incentive_<SUI>(&mut scenario, index, option::some(1000_000_00000));
         test_manager_entry::test_withdraw_fixed_incentive_<SUI>(&mut scenario, index, option::none());

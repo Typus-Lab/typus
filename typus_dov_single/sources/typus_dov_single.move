@@ -640,20 +640,6 @@ module typus_dov::typus_dov_single {
         }
     }
 
-    /// [View Function] Retrieves the amount of assets a vault has deposited in a Scallop Spool.
-    public(package) fun get_scallop_deposit_amount<TOKEN>(
-        registry: &Registry,
-        index: u64,
-    ): u64 {
-        let additional_config = get_additional_config(&registry.additional_config_registry, index);
-        if (dynamic_field::exists_(&additional_config.id, K_SCALLOP_SPOOL_ACCOUNT)) {
-            let spool_account = dynamic_field::borrow(&additional_config.id, K_SCALLOP_SPOOL_ACCOUNT);
-            spool_account::stake_amount<MarketCoin<TOKEN>>(spool_account)
-        } else {
-            0
-        }
-    }
-
     /// Deposits assets from a DOV into Scallop's basic lending market.
     /// WARNING: no authority check inside.
     public(package) fun deposit_scallop_basic_lending_<TOKEN>(
@@ -745,21 +731,6 @@ module typus_dov::typus_dov_single {
         };
 
         vector::empty()
-    }
-
-    /// [View Function] Retrieves the amount of assets a vault has deposited in Scallop's basic lending market.
-    public(package) fun get_scallop_basic_lending_deposit_amount<TOKEN>(
-        registry: &Registry,
-        index: u64,
-    ): u64 {
-        let additional_config = get_additional_config(&registry.additional_config_registry, index);
-        if (dynamic_field::exists_(&additional_config.id, K_SCALLOP_MARKET_COIN)) {
-            let market_coin
-                = dynamic_field::borrow<vector<u8>, Coin<MarketCoin<TOKEN>>>(&additional_config.id, K_SCALLOP_MARKET_COIN);
-            coin::value(market_coin)
-        } else {
-            0
-        }
     }
 
     /// Creates a NAVI Account Cap for a specific vault to interact with the NAVI protocol.
@@ -1809,7 +1780,7 @@ module typus_dov::typus_dov_single {
     }
 
     /// Returns the dynamic field key for a specific lending protocol's account capability object.
-    fun lending_cap_key(lending_index: u64): vector<u8> {
+    public(package) fun lending_cap_key(lending_index: u64): vector<u8> {
         if (lending_index == 5) {
             K_ALPHALEND_ACCOUNT_CAP
         } else if (lending_index == 4) {
@@ -2167,24 +2138,6 @@ module typus_dov::typus_dov_single {
         amount: u64,
     ) {
         user::add_tails_exp_amount(
-            dynamic_field::borrow(id, K_TYPUS_ECOSYSTEM),
-            version,
-            typus_user_registry,
-            user,
-            amount
-        );
-    }
-
-    /// Removes TAILS experience points from a user's account.
-    /// WARNING: no authority check inside.
-    public(package) fun remove_tails_exp_amount(
-        id: &UID,
-        version: &TypusEcosystemVersion,
-        typus_user_registry: &mut TypusUserRegistry,
-        user: address,
-        amount: u64,
-    ) {
-        user::remove_tails_exp_amount(
             dynamic_field::borrow(id, K_TYPUS_ECOSYSTEM),
             version,
             typus_user_registry,
