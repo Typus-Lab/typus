@@ -40,7 +40,7 @@ module version::version {
                 fee_infos: vector[],
             },
             authority: vec_set::singleton(ctx.sender()),
-            witness: type_name::get<W>(),
+            witness: type_name::with_defining_ids<W>(),
             u64_padding: vector[],
         });
     }
@@ -58,7 +58,7 @@ module version::version {
     }
 
     public fun verify_witness<W: drop>(version: &Version, _: W) {
-        assert!(type_name::get<W>() == version.witness, EInvalidWitness);
+        assert!(type_name::with_defining_ids<W>() == version.witness, EInvalidWitness);
     }
 
     public fun verify_authority(
@@ -88,7 +88,7 @@ module version::version {
 
         assert!(version.authority.contains(&user_address), EAuthorityDoesNotExist);
         version.authority.remove(&user_address);
-        assert!(version.authority.size() > 0, EAuthorityEmpty);
+        assert!(version.authority.length() > 0, EAuthorityEmpty);
     }
 
     // ======== Fee Pool ========
@@ -113,10 +113,10 @@ module version::version {
         let mut i = 0;
         while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = version.fee_pool.fee_infos.borrow_mut(i);
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 transfer::public_transfer(
                     coin::from_balance<TOKEN>(
-                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>())),
+                        balance::withdraw_all(dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>())),
                         ctx,
                     ),
                     recipient,
@@ -135,10 +135,10 @@ module version::version {
         let mut i = 0;
         while (i < version.fee_pool.fee_infos.length()) {
             let fee_info = &mut version.fee_pool.fee_infos[i];
-            if (fee_info.token == type_name::get<TOKEN>()) {
+            if (fee_info.token == type_name::with_defining_ids<TOKEN>()) {
                 fee_info.value = fee_info.value + balance::value(&balance);
                 balance::join(
-                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::get<TOKEN>()),
+                    dynamic_field::borrow_mut(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>()),
                     balance,
                 );
                 return
@@ -147,10 +147,10 @@ module version::version {
         };
         version.fee_pool.fee_infos.push_back(
             FeeInfo {
-                token: type_name::get<TOKEN>(),
+                token: type_name::with_defining_ids<TOKEN>(),
                 value: balance::value(&balance),
             },
         );
-        dynamic_field::add(&mut version.fee_pool.id, type_name::get<TOKEN>(), balance);
+        dynamic_field::add(&mut version.fee_pool.id, type_name::with_defining_ids<TOKEN>(), balance);
     }
 }
