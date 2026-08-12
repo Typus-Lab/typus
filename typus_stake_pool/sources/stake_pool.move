@@ -214,22 +214,22 @@ module typus_stake_pool::stake_pool {
                 active: true,
                 new_tlp_price: 10000,
                 depositors_count: 0,
-                u64_padding: vector::empty()
+                u64_padding:  vector[]
             },
             config: StakePoolConfig {
                 unlock_countdown_ts_ms,
                 usd_per_exp: 200,
-                u64_padding: vector::empty()
+                u64_padding:  vector[]
             },
-            incentives: vector::empty(),
-            u64_padding: vector::empty()
+            incentives:  vector[],
+            u64_padding:  vector[]
         };
 
         emit(NewStakePoolEvent {
             sender: tx_context::sender(ctx),
             stake_pool_info: stake_pool.pool_info,
             stake_pool_config: stake_pool.config,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
 
         dynamic_object_field::add(&mut registry.id, registry.num_pool, stake_pool);
@@ -308,7 +308,7 @@ module typus_stake_pool::stake_pool {
             total_amount: total_incentive_value,
             compound_users,
             total_users,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -351,14 +351,14 @@ module typus_stake_pool::stake_pool {
             config: IncentiveConfig {
                 period_incentive_amount,
                 incentive_interval_ts_ms,
-                u64_padding: vector::empty(),
+                u64_padding:  vector[],
             },
             info: IncentiveInfo {
                 active: true,
                 last_allocate_ts_ms: clock::timestamp_ms(clock),
                 incentive_price_index: 0,
                 unallocated_amount: 0,
-                u64_padding: vector::empty(),
+                u64_padding:  vector[],
             }
         };
         vector::push_back(&mut stake_pool.incentives, incentive);
@@ -369,7 +369,7 @@ module typus_stake_pool::stake_pool {
             incentive_token: incentive.token_type,
             incentive_info: incentive.info,
             incentive_config: incentive.config,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
         dynamic_field::add(&mut stake_pool.id, incentive_token, balance::zero<I_TOKEN>());
 
@@ -411,7 +411,7 @@ module typus_stake_pool::stake_pool {
         emit(DeactivateStakePoolEvent {
             sender: tx_context::sender(ctx),
             index,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -438,7 +438,7 @@ module typus_stake_pool::stake_pool {
         emit(ActivateStakePoolEvent {
             sender: tx_context::sender(ctx),
             index,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -472,7 +472,7 @@ module typus_stake_pool::stake_pool {
             sender: tx_context::sender(ctx),
             index,
             incentive_token,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -507,7 +507,7 @@ module typus_stake_pool::stake_pool {
             sender: tx_context::sender(ctx),
             index,
             incentive_token,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -571,7 +571,7 @@ module typus_stake_pool::stake_pool {
             index,
             incentive_token,
             incentive_balance_value: balance::value(&incentive_balance),
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
 
         coin::from_balance(incentive_balance, ctx)
@@ -608,7 +608,7 @@ module typus_stake_pool::stake_pool {
             index,
             previous_unlock_countdown_ts_ms,
             new_unlock_countdown_ts_ms: unlock_countdown_ts_ms,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -659,7 +659,7 @@ module typus_stake_pool::stake_pool {
             index,
             previous_incentive_config,
             new_incentive_config: incentive.config,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -744,7 +744,7 @@ module typus_stake_pool::stake_pool {
             index,
             incentive_token_type: incentive_token,
             deposit_amount: incentive_amount,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -791,7 +791,7 @@ module typus_stake_pool::stake_pool {
             index,
             incentive_token_type: incentive_token,
             withdrawal_amount,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
         coin::from_balance(withdraw_balance, ctx)
     }
@@ -866,7 +866,7 @@ module typus_stake_pool::stake_pool {
                 stake_ts_ms: current_ts_ms,
                 total_shares: balance_value,
                 active_shares: balance_value,
-                deactivating_shares: vector::empty(),
+                deactivating_shares:  vector[],
                 last_incentive_price_index,
                 snapshot_ts_ms: current_ts_ms,
                 tlp_price: new_tlp_price,
@@ -1041,7 +1041,7 @@ module typus_stake_pool::stake_pool {
             unsubscribed_ts_ms: current_ts_ms,
             unlocked_ts_ms,
             unsubscribed_incentive_price_index: last_incentive_price_index,
-            u64_padding: vector::empty(),
+            u64_padding:  vector[],
         };
         lp_user_share.deactivating_shares.push_back(deactivating_shares);
 
@@ -1054,7 +1054,7 @@ module typus_stake_pool::stake_pool {
             unsubscribed_shares,
             unsubscribe_ts_ms: current_ts_ms,
             unlocked_ts_ms,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
     }
 
@@ -1146,7 +1146,7 @@ module typus_stake_pool::stake_pool {
             user_share_id,
             unstake_amount: temp_unstaked_shares,
             unstake_ts_ms: current_ts_ms,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
 
         let b = balance::split(dynamic_field::borrow_mut(&mut stake_pool.id, string::utf8(K_STAKED_TLP)), temp_unstaked_shares);
@@ -1213,7 +1213,7 @@ module typus_stake_pool::stake_pool {
             incentive_token_type: incentive_token,
             harvest_amount: incentive_value,
             user_share_id,
-            u64_padding: vector::empty()
+            u64_padding:  vector[]
         });
 
         let b = balance::split(dynamic_field::borrow_mut(&mut stake_pool.id, incentive_token), incentive_value);
@@ -1311,12 +1311,12 @@ module typus_stake_pool::stake_pool {
         // check exist
         if (!all_lp_user_shares.contains(user)) {
             // early return
-            return vector::empty<u8>()
+            return  vector[]
         };
         let user_share: & LpUserShare = all_lp_user_shares.borrow_by_key(user);
         let incentive_tokens = get_incentive_tokens(stake_pool);
 
-        let mut incentive_values = vector::empty<u64>();
+        let mut incentive_values =  vector[];
         incentive_tokens.do_ref!(|incentive_token| {
             let incentive = get_incentive(stake_pool, incentive_token);
             let current_incentive_index = incentive.info.incentive_price_index;
@@ -1340,12 +1340,12 @@ module typus_stake_pool::stake_pool {
         let stake_pool = get_stake_pool(&registry.id, index);
         let all_lp_user_shares = dynamic_field::borrow<String, KeyedBigVector>(&stake_pool.id, string::utf8(K_LP_USER_SHARES));
 
-        let mut result = vector::empty<u8>();
+        let mut result =  vector[];
 
         all_lp_user_shares.do_ref!<address, LpUserShare>(|_user, user_share| {
             if (user_share.user_share_id == user_share_id) {
                 let incentive_tokens = get_incentive_tokens(stake_pool);
-                let mut incentive_values = vector::empty<u64>();
+                let mut incentive_values =  vector[];
                 incentive_tokens.do_ref!(|incentive_token| {
                     let incentive = get_incentive(stake_pool, incentive_token);
                     let current_incentive_index = incentive.info.incentive_price_index;
@@ -1383,7 +1383,7 @@ module typus_stake_pool::stake_pool {
     fun get_incentive_tokens(stake_pool: &StakePool): vector<TypeName> {
         let mut i = 0;
         let length = vector::length(&stake_pool.incentives);
-        let mut incentive_tokens = vector::empty();
+        let mut incentive_tokens =  vector[];
         while (i < length) {
             vector::push_back(
                 &mut incentive_tokens,
@@ -1446,7 +1446,7 @@ module typus_stake_pool::stake_pool {
     fun get_last_incentive_price_index(stake_pool: &StakePool): vector<u64> {
         let mut i = 0;
         let length = vector::length(&stake_pool.incentives);
-        let mut last_incentive_price_index = vector::empty();
+        let mut last_incentive_price_index = vector[];
         while (i < length) {
             let incentive = vector::borrow(&stake_pool.incentives, i);
             vector::push_back(&mut last_incentive_price_index, incentive.info.incentive_price_index);
