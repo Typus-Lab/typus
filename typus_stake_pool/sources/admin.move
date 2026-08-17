@@ -6,7 +6,6 @@ module typus_stake_pool::admin {
     use sui::balance::{Self, Balance};
     use sui::coin;
     use sui::dynamic_field;
-    use sui::event::emit;
     use sui::vec_set::{Self, VecSet};
 
     // ======== Errors ========
