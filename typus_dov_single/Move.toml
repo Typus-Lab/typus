@@ -1,0 +1,29 @@
+[package]
+name = "typus_dov"
+version = "3.1.1"
+published-at = "0xd16e1a497e27f9d1f25cbb82c836888d411811afdf5bff9ebf81afdefd340184"
+edition = "2024.alpha"
+
+[dependencies.typus_nft]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus_nft"
+rev = "main"
+
+[dependencies.typus_oracle]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus_oracle"
+rev = "main"
+
+[dependencies.typus]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "typus"
+rev = "main"
+
+[dependencies.typus_framework]
+local = "../typus_framework"
+
+[addresses]
+typus_dov = "0x321848bf1ae327a9e022ccb3701940191e02fa193ab160d9c0e49cd3c003de3a"
+dov_fee_address = "0x03e3f1ca852358b50837758b5197fedf61e2ea69186c469595baa717560963f9"
+
+# sui client upgrade --upgrade-capability 0xc9a11c34734c7742a7f10c62d2d8161c0e0fccb619f46a39367b2925408b4e4f --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt

@@ -1,0 +1,7 @@
+# Package
+
+0xaded0918624ba1a31a9818ae73ccb557d46f35cb0d754b34597356ce38e6004d
+
+# Initial Typus Token Object
+
+0xa633dd0101ae7b95ba675de8a12a7c9aad420054f4bcf7fcd23bd9d099fc2920

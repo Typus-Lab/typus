@@ -1,0 +1,25 @@
+[package]
+name = "typus_oracle"
+version = "2.0.4"
+published-at = "0xfc9b05223195de2f134c84c2299c5ff3f2b51725b8ba821f46975da1264ace73"
+edition = "2024"
+
+[dependencies.Pyth]
+git = "https://github.com/Typus-Lab/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "main"
+
+[dependencies.SupraOracle]
+git = "https://github.com/Typus-Lab/dora-interface.git"
+subdir = "sui/mainnet/supra_holder"
+rev = "master"
+
+[dependencies.SwitchboardStdLib]
+git = "https://github.com/Typus-Lab/sui-sdk.git"
+subdir = "move/mainnet/switchboard_std"
+rev = "main"
+
+[addresses]
+typus_oracle = "0x855eb2d260ee42b898266e6df90bfd3c4ed821ccb253a352c159c223244a4b8a"
+# sui client upgrade --upgrade-capability 0x7f4749330bbd782e37e42c754e7ceca575ccd153ae38bf5ed4f687c3319e3243 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt
+# UpgradeCap = 0x7f4749330bbd782e37e42c754e7ceca575ccd153ae38bf5ed4f687c3319e3243

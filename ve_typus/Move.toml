@@ -1,0 +1,16 @@
+[package]
+name = "ve_typus"
+edition = "2024.beta"
+version = "1.0.0"
+
+[dependencies.typus]
+local = "../typus"
+
+[dependencies.typus_token]
+local = "../typus_token"
+
+[dependencies.version]
+local = "../version"
+
+[addresses]
+ve_typus = "0x0"

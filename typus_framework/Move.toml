@@ -1,0 +1,46 @@
+[package]
+name = "typus_framework"
+version = "3.1.1"
+published-at = "0xff833c8378057598cb2a397a08ca22606a1aa5a46b76eb4aee0e657142baa45e"
+edition = "2024.alpha"
+
+[dependencies.Pyth]
+git = "https://github.com/Typus-Lab/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "main"
+
+[dependencies.ScallopProtocol]
+git = "https://github.com/Typus-Lab/sui-lending-protocol.git"
+subdir = "contracts/protocol"
+rev = "main"
+
+[dependencies.Math]
+git = "https://github.com/Typus-Lab/sui-lending-protocol.git"
+subdir = "contracts/libs/math"
+rev = "main"
+
+[dependencies.suilend]
+git = "https://github.com/Typus-Lab/suilend.git"
+subdir = "contracts/suilend"
+rev = "no-tests"
+
+[dependencies.lending_core]
+git = "https://github.com/Typus-Lab/navi-smart-contracts.git"
+subdir = "lending_core"
+rev = "main"
+
+[dependencies.oracle]
+git = "https://github.com/Typus-Lab/navi-smart-contracts.git"
+subdir = "oracle"
+rev = "main"
+
+[dependencies.spool]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "dependency/scallop/spool"
+rev = "main"
+
+[addresses]
+typus_framework = "0xb4f25230ba74837d8299e92951306100c4a532e8c48cc3d8828abe9b91c8b274"
+
+# sui client upgrade --upgrade-capability 0xb05e11dfdc0f44e29ed1d49090fdf90e3d0b3d1123974c31d9da174a007c6642 --gas 0x15466b6df9e2607fe961986efc33ab6147b10710c3cf3f2cbef2003e86122474 --gas-budget 1000000000 --serialize-unsigned-transaction > data.txt
+

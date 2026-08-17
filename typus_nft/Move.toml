@@ -1,0 +1,16 @@
+[package]
+name = "typus_nft"
+published-at = "0x153ead7b2ccad1483458d41f0daffa35965d89960d1024a4883ba52fb18332b3"
+edition = "2024.alpha"
+
+[dependencies.Kiosk]
+git = "git@github.com:Typus-Lab/typus.git"
+subdir = "dependency/kiosk"
+rev = "main"
+
+
+[addresses]
+typus_nft = "0xbd147bc7f12f38f175d78947a61364e8e077b9b188b00e7094bc0c3623162196"
+TYPUS = "0xe62c0a0509e2baa4700cd9b9bad8b1ba9296ecc1b36ff8122e29926efe1eb800"
+HOLDERS = "0x7a199f53557a804241ef6151677585e02708c27eca57111dea91043e1ed58410"
+SM = "0x585fff81dad10fc7fcdba55a815557ba263185b49307285002852e9fa981451d"
